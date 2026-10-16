@@ -20,5 +20,7 @@ export interface Entry {
   group: string;
   /** What running it does, e.g. the resolved command. */
   detail?: string;
+  /** The command line that does the same thing, when it is not `pf <name>`. */
+  cli?: string;
   run: () => Promise<number>;
 }

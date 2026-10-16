@@ -20,6 +20,7 @@ import { findVersionsRoot } from './commands/ver.js';
 import { lastMenuChoice, rememberMenuChoice } from './config.js';
 import { err, out } from './ui/palette.js';
 import { pick } from './ui/picker.js';
+import { h2, termLine } from './ui/text.js';
 import { interactive } from './util.js';
 
 const BUILTIN_NAMES = new Set(['dev', 'build', 'test', 'lint', 'install', 'doc', 'docs', 'deploy:staging']);
@@ -109,33 +110,37 @@ export function entriesFor(ctx: Context): Entry[] {
 }
 
 /** Static grouped list: `pf list`, and the fallback when there is no terminal. */
-export function printList(ctx: Context): void {
+export function printList(ctx: Context, entries: Entry[] = entriesFor(ctx), heading?: string): void {
   const c = out();
-  const entries = entriesFor(ctx);
-  const width = Math.max(...entries.map((e) => e.name.length));
+  const key = (e: Entry) => e.cli ?? `pf ${e.name}`;
+  const width = Math.max(...entries.map((e) => key(e).length));
   const sw = Math.max(...entries.map((e) => e.summary.length));
   const w = (s: string) => process.stdout.write(s + '\n');
-  w(ctx.repo ? `${c.bold(ctx.repo.name)}  ${c.dim(ctx.stacks.map((s) => s.label).join(', ') || 'no stack detected')}` : c.bold('Not inside a repo'));
+  w(heading ? c.bold(heading) : ctx.repo ? `${c.bold(ctx.repo.name)}  ${c.dim(ctx.stacks.map((s) => s.label).join(', ') || 'no stack detected')}` : c.bold('Not inside a repo'));
   let group = '';
   for (const e of entries) {
     if (e.group !== group) {
       group = e.group;
-      w(`\n${c.dim(c.bold(group))}`);
+      w(`\n${h2(group, c)}`);
     }
-    w(`  ${c.boldBrand('pf ' + e.name.padEnd(width))}  ${e.detail ? e.summary.padEnd(sw) + c.dim('  ' + e.detail) : e.summary}`);
+    w(`  ${termLine(key(e), c)}${' '.repeat(width - key(e).length)}  ${e.detail ? e.summary.padEnd(sw) + c.dim('  ' + e.detail) : e.summary}`);
   }
-  w(`\n${c.dim('pf help shows every command and option.')}`);
+  w(`\n${termLine('pf help', c)} ${c.dim('shows every command and option.')}`);
 }
 
 /** Interactive menu. Without a terminal it prints the static list instead. */
-export async function runMenu(ctx: Context): Promise<number> {
+export async function runMenu(
+  ctx: Context,
+  custom: { entries: Entry[]; title: string; heading: string; historyKey: string } | null = null,
+): Promise<number> {
   if (!interactive()) {
-    printList(ctx);
+    if (custom) printList(ctx, custom.entries, custom.heading);
+    else printList(ctx);
     return 0;
   }
-  const entries = entriesFor(ctx);
-  const title = ctx.repo ? `What do you want to do in ${ctx.repo.name}?` : 'Not inside a repo. What now?';
-  const historyKey = ctx.repo?.root ?? '(no repo)';
+  const entries = custom?.entries ?? entriesFor(ctx);
+  const title = custom?.title ?? (ctx.repo ? `What do you want to do in ${ctx.repo.name}?` : 'Not inside a repo. What now?');
+  const historyKey = custom?.historyKey ?? ctx.repo?.root ?? '(no repo)';
   const last = entries.find((e) => e.name === lastMenuChoice(historyKey));
   const chosen = await pick(
     title,
@@ -150,6 +155,6 @@ export async function runMenu(ctx: Context): Promise<number> {
   );
   if (!chosen) return 0;
   rememberMenuChoice(historyKey, chosen.name);
-  process.stderr.write(err().dim(`next time: pf ${chosen.name}\n`));
+  process.stderr.write(`${err().dim('next time:')} ${termLine(chosen.cli ?? `pf ${chosen.name}`, err())}\n`);
   return chosen.run();
 }

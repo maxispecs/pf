@@ -59,6 +59,35 @@ test('outside a repo the fallback list offers skills and about', () => {
   assert.doesNotMatch(r.out, /pf dev/);
 });
 
+test('with PF_LOCAL set (./pf), the menu is the local checkout menu', () => {
+  const home = mkRepo({});
+  const r = spawnSync(process.execPath, ['--import', loader, entry], {
+    cwd: repo(),
+    encoding: 'utf8',
+    env: cleanEnv({ PF_HOME: home, PF_LOCAL: root }),
+  });
+  assert.equal(r.status, 0);
+  assert.match(r.stderr, /^pf v\S+ \(local\)/);
+  assert.match(r.stdout, /local checkout/);
+  assert.match(r.stdout, /Global pf/);
+  assert.match(r.stdout, /pnpm install:local\s+Install pf globally from this checkout/);
+  assert.match(r.stdout, /pf update\s+Update the global pf/);
+  assert.match(r.stdout, /pf doc\s+Run the docs site locally/);
+  assert.match(r.stdout, /pf ver\s+List versions/);
+  assert.doesNotMatch(r.stdout, /pf dev/);
+});
+
+test('the installed pf ignores a PF_LOCAL that points nowhere', () => {
+  const home = mkRepo({});
+  const r = spawnSync(process.execPath, ['--import', loader, entry], {
+    cwd: repo(),
+    encoding: 'utf8',
+    env: cleanEnv({ PF_HOME: home, PF_LOCAL: path.join(home, 'missing') }),
+  });
+  assert.doesNotMatch(r.stderr, /\(local\)/);
+  assert.match(r.stdout, /pf dev/);
+});
+
 test('dev --dry-run prints the resolved command and runs nothing', () => {
   const r = pf(repo(), 'dev', '--dry-run');
   assert.equal(r.code, 0);

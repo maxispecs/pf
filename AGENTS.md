@@ -19,11 +19,13 @@
 | `src/bin/pf.ts`, `src/cli.ts` | entry point, banner, dispatch |
 | `src/menu.ts` | repo menu, fallback menu, static list |
 | `src/detect/` | repo, stack, docs and staging detection, command resolution |
+| `src/ui/text.ts` | text helpers: colored command samples (`termLine`, `promptLine`), badges, headings, lists, tables. Return strings, take a `Palette`. Use these instead of hand-coloring messages |
 | `src/commands/` | built-in commands |
 | `src/skills/` | skill discovery and runner (direct scripts, else an agent CLI) |
 | `src/install/`, `src/update/` | machine setup helpers, update check |
 | `assets/version.mjs` | bundled copy of the `/ver` CLI. Copy it from the skill, do not rewrite it |
 | `scripts/install.sh` | install on a machine without pf (`--from-source` for a checkout) |
+| `scripts/logo-art.mjs` | turns `assets/pulpfixer.png` into the header art in `src/ui/logo-art.ts` (generated, commit the output) |
 | `scripts/release.mjs` | check, build, dry-run publish (`--publish` for real) |
 
 ## Commands

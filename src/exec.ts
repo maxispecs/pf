@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { err } from './ui/palette.js';
+import { badge, term, termLine } from './ui/text.js';
 import { quote } from './util.js';
 
 export interface Cmd {
@@ -43,7 +44,8 @@ export interface RunOptions {
 export function runCmd(cmd: Cmd, opts: RunOptions = {}): Promise<number> {
   const c = err();
   if (!opts.quiet || opts.dryRun) {
-    process.stderr.write(`${c.dim(opts.dryRun ? 'would run' : '$')} ${c.bold(formatCmd(cmd, opts.base))}\n`);
+    const line = termLine(formatCmd(cmd, opts.base), c);
+    process.stderr.write(`${opts.dryRun ? `${c.dim('would run')} ${line}` : `${term(c).prefix()}${line}`}\n`);
   }
   if (opts.dryRun) return Promise.resolve(0);
   return new Promise((resolve) => {
@@ -55,7 +57,7 @@ export function runCmd(cmd: Cmd, opts: RunOptions = {}): Promise<number> {
     process.on('SIGINT', ignore);
     child.on('error', (e: NodeJS.ErrnoException) => {
       process.removeListener('SIGINT', ignore);
-      process.stderr.write(`${c.red('error:')} ${e.code === 'ENOENT' ? `${cmd.argv[0]} not found on PATH` : e.message}\n`);
+      process.stderr.write(`${badge.error(e.code === 'ENOENT' ? `${cmd.argv[0]} not found on PATH` : e.message, c)}\n`);
       resolve(127);
     });
     child.on('close', (code, signal) => {

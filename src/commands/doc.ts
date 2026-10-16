@@ -1,6 +1,7 @@
 import { detectDocs } from '../detect/docs.js';
 import { formatCmd, runCmd, withArgs } from '../exec.js';
 import { err } from '../ui/palette.js';
+import { badgeLabel } from '../ui/text.js';
 import { pick } from '../ui/picker.js';
 import { interactive, takeFlag } from '../util.js';
 import type { Context } from '../context.js';
@@ -10,13 +11,13 @@ import type { Command } from './types.js';
 export async function runDoc(ctx: Context, opts: { dryRun?: boolean; pick?: boolean; extra?: string[] } = {}): Promise<number> {
   const c = err();
   if (!ctx.repo) {
-    process.stderr.write(`${c.red('error:')} pf doc needs a repo. Run it inside a project directory.\n`);
+    process.stderr.write(`${badgeLabel('error', c)} pf doc needs a repo. Run it inside a project directory.\n`);
     return 1;
   }
   const list = detectDocs(ctx);
   if (list.length === 0) {
     process.stderr.write(
-      `${c.red('error:')} no docs site found (looked for doc scripts, Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo).\n` +
+      `${badgeLabel('error', c)} no docs site found (looked for doc scripts, Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo).\n` +
         `Add one to ${c.bold('pf.json')}: { "commands": { "doc": { "run": "<your command>" } } }\n`,
     );
     return 1;

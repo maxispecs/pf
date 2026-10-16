@@ -1,6 +1,6 @@
 {
   "name": "pulpfixer",
-  "version": "2.1.0",
+  "version": "3.8.0",
   "description": "pf: unified developer CLI for any repo, any language",
   "license": "UNLICENSED",
   "author": "Max Glotov, Sam Pretorius",
@@ -29,6 +29,7 @@
     "release": "node scripts/release.mjs",
     "publish:cellars": "node scripts/release.mjs --publish",
     "ver": "node scripts/version.mjs",
+    "logo": "node scripts/logo-art.mjs",
     "ask": "node scripts/tasks.mjs ask"
   },
   "scriptsInfo": {
@@ -47,7 +48,8 @@
       "publish:cellars": "Publish to the cellars registry"
     },
     "Tools": {
-      "ver": "List versions and bump commands"
+      "ver": "List versions and bump commands",
+      "logo": "Regenerate the header art from assets/pulpfixer.png (--preview to see it)"
     },
     "Help": {
       "ask": "Show this list"

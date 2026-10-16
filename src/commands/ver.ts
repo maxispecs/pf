@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Context } from '../context.js';
 import { runCmd } from '../exec.js';
 import { err } from '../ui/palette.js';
+import { badgeLabel, termLine } from '../ui/text.js';
 import { confirm } from '../ui/prompt.js';
 import { exists } from '../util.js';
 import { packageRoot } from '../version.js';
@@ -44,7 +45,7 @@ export const verCommand: Command = {
     const c = err();
     const cli = bundledVerCli();
     if (!fs.existsSync(cli)) {
-      process.stderr.write(`${c.red('error:')} the bundled ver CLI is missing (${cli}). Reinstall pf.\n`);
+      process.stderr.write(`${badgeLabel('error', c)} the bundled ver CLI is missing (${cli}). Reinstall pf.\n`);
       return 1;
     }
     const first = args[0];
@@ -53,9 +54,9 @@ export const verCommand: Command = {
     const run = (a: string[]) => runCmd({ argv: [process.execPath, cli, ...a], cwd: ctx.cwd }, { quiet: true });
 
     if (!known && (!first || first === 'list')) {
-      process.stderr.write(`${c.yellow('!')} no versions.json in ${c.bold(path.relative(ctx.cwd, repoRoot) || '.')} or above, so versioning is not set up.\n`);
+      process.stderr.write(`${badgeLabel('warning', c)} no versions.json in ${c.bold(path.relative(ctx.cwd, repoRoot) || '.')} or above, so versioning is not set up.\n`);
       if (await confirm('Set it up now (pf ver init)?', false)) return run(['init', '--root', repoRoot]);
-      process.stderr.write(c.dim('Run pf ver init to set it up. It never commits.\n'));
+      process.stderr.write(`${c.dim('Run')} ${termLine('pf ver init', c)} ${c.dim('to set it up. It never commits.')}\n`);
       return 1;
     }
 

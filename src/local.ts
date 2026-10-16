@@ -1,0 +1,70 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { runDoc } from './commands/doc.js';
+import type { Entry } from './commands/types.js';
+import { updateCommand } from './commands/update.js';
+import { findVersionsRoot, verCommand } from './commands/ver.js';
+import { buildContext, type Context } from './context.js';
+import { detectDocs } from './detect/docs.js';
+import { formatCmd, runCmd } from './exec.js';
+import { runMenu } from './menu.js';
+
+/**
+ * The checkout `./pf` was started from, or null when pf runs as the installed binary.
+ * The `pf` launcher in the repo root sets `PF_LOCAL` to its own directory.
+ */
+export function localRoot(env: NodeJS.ProcessEnv = process.env): string | null {
+  const dir = env.PF_LOCAL;
+  if (!dir || !fs.existsSync(path.join(dir, 'package.json'))) return null;
+  return path.resolve(dir);
+}
+
+/** Menu for working on pf itself: manage the global install, docs, versions. */
+export function localEntries(root: string, ctx: Context = buildContext(root)): Entry[] {
+  const docs = detectDocs(ctx);
+  return [
+    {
+      name: 'install',
+      summary: 'Install pf globally from this checkout',
+      group: 'Global pf',
+      detail: 'build, then npm install -g (the global pf follows this code)',
+      cli: 'pnpm install:local',
+      run: () => runCmd({ argv: ['bash', path.join(root, 'scripts', 'install.sh'), '--from-source'], cwd: root }, { base: root }),
+    },
+    {
+      name: 'update',
+      summary: 'Update the global pf from the cellars registry',
+      group: 'Global pf',
+      detail: 'asks before installing',
+      cli: 'pf update',
+      run: () => updateCommand.run(ctx, []),
+    },
+    {
+      name: 'doc',
+      summary: 'Run the docs site locally',
+      group: 'This repo',
+      detail: docs[0] ? formatCmd(docs[0].cmd, ctx.workdir) : 'no docs site in this repo yet',
+      cli: 'pf doc',
+      run: () => runDoc(ctx, { pick: true }),
+    },
+    {
+      name: 'ver',
+      summary: 'List versions and bump them (major.minor)',
+      group: 'This repo',
+      detail: findVersionsRoot(root) ? 'versions.json' : 'not set up yet',
+      cli: 'pf ver',
+      run: () => verCommand.run(ctx, []),
+    },
+  ];
+}
+
+/** `./pf` with no command: the menu for this checkout. */
+export function runLocalMenu(root: string): Promise<number> {
+  const ctx = buildContext(root);
+  return runMenu(ctx, {
+    entries: localEntries(root, ctx),
+    title: 'pf from source. What do you want to do?',
+    heading: `${ctx.repo?.name ?? path.basename(root)}  (local checkout, ./pf)`,
+    historyKey: `local:${root}`,
+  });
+}

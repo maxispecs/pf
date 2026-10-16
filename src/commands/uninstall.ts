@@ -7,6 +7,7 @@ import { stripRcBlock, RC_START } from '../install/completions.js';
 import { err, out } from '../ui/palette.js';
 import { multiPick } from '../ui/picker.js';
 import { confirm, reporter } from '../ui/prompt.js';
+import { termLine } from '../ui/text.js';
 import { interactive, takeFlag } from '../util.js';
 import type { Command } from './types.js';
 
@@ -47,7 +48,7 @@ export const uninstallCommand: Command = {
         what.shell = picked.includes('shell');
         what.data = picked.includes('data');
         const flags = [!what.package && '--no-package', !what.shell && '--no-shell', what.data && '--purge'].filter(Boolean);
-        process.stderr.write(err().dim(`same without the menu: pf uninstall --yes${flags.length ? ' ' + flags.join(' ') : ''}\n`));
+        process.stderr.write(`${err().dim('same without the menu:')} ${termLine(`pf uninstall --yes${flags.length ? ' ' + flags.join(' ') : ''}`, err())}\n`);
       } else if (!(await confirm(`Remove the global ${PACKAGE_NAME} package and the shell completion blocks?`, false, { flag: '--yes' }))) {
         r.info('cancelled');
         return 130;

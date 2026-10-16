@@ -80,6 +80,13 @@ pnpm install:local        # build and link this checkout as the global pf
 pnpm ask                  # every script
 ```
 
+`./pf` in the checkout root runs the local source with no build, while the global `pf` stays as installed. It keeps your current directory, so you can point it at another repo:
+
+```bash
+./pf dev --dry-run
+cd ~/some/repo && ~/dev/agents/pulpfixer/pf dev --dry-run
+```
+
 ## Release
 
 ```bash

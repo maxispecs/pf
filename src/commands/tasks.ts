@@ -3,6 +3,7 @@ import { candidates } from '../detect/resolve.js';
 import type { Candidate, Task } from '../detect/stacks.js';
 import { formatCmd, runCmd, withArgs } from '../exec.js';
 import { err } from '../ui/palette.js';
+import { badgeLabel, termLine } from '../ui/text.js';
 import { pick } from '../ui/picker.js';
 import { interactive, takeFlag } from '../util.js';
 import type { Command, Group } from './types.js';
@@ -26,8 +27,8 @@ const GROUP: Record<Task, Group> = {
 export function noCommandHint(task: string): string {
   const c = err();
   return [
-    `${c.red('error:')} no ${task} command found for this repo.`,
-    `Add one to ${c.bold('pf.json')} (run ${c.bold('pf init')} to create it):`,
+    `${badgeLabel('error', c)} no ${task} command found for this repo.`,
+    `Add one to ${c.bold('pf.json')} (run ${termLine('pf init', c)} to create it):`,
     `  { "commands": { "${task}": { "run": "<your command>" } } }`,
   ].join('\n');
 }
@@ -42,7 +43,7 @@ export interface TaskRunOptions {
 export async function runTask(ctx: Context, task: Task, opts: TaskRunOptions = {}): Promise<number> {
   const c = err();
   if (!ctx.repo) {
-    process.stderr.write(`${c.red('error:')} pf ${task} needs a repo. Run it inside a project directory.\n`);
+    process.stderr.write(`${badgeLabel('error', c)} pf ${task} needs a repo. Run it inside a project directory.\n`);
     return 1;
   }
   const list = candidates(task, ctx);

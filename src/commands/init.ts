@@ -6,6 +6,7 @@ import { candidates } from '../detect/resolve.js';
 import { TASKS, type Task } from '../detect/stacks.js';
 import { runCmd, type Cmd } from '../exec.js';
 import { err } from '../ui/palette.js';
+import { badgeLabel } from '../ui/text.js';
 import { confirm } from '../ui/prompt.js';
 import { quote, readJson, takeFlag } from '../util.js';
 import { bundledVerCli, findVersionsRoot } from './ver.js';
@@ -61,7 +62,7 @@ export const initCommand: Command = {
     const dryRun = takeFlag(rest, '--dry-run', '-n');
     const withVer = takeFlag(rest, '--ver');
     if (!ctx.repo) {
-      process.stderr.write(`${c.red('error:')} pf init needs a repo. Run it inside a project directory.\n`);
+      process.stderr.write(`${badgeLabel('error', c)} pf init needs a repo. Run it inside a project directory.\n`);
       return 1;
     }
     const root = ctx.repo.root;

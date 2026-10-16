@@ -3,6 +3,7 @@ import type { Context } from '../context.js';
 import { runCmd, type Cmd } from '../exec.js';
 import { verCommand } from '../commands/ver.js';
 import { err } from '../ui/palette.js';
+import { badgeLabel, termLine } from '../ui/text.js';
 import { exists, which } from '../util.js';
 import type { Skill } from './discover.js';
 
@@ -31,13 +32,13 @@ export function agentCommand(agent: string, skill: string, args: string[], cwd: 
 export async function runDirect(ctx: Context, skill: Skill, args: string[], dryRun: boolean): Promise<number | null> {
   const c = err();
   if (skill.name === 'ver') {
-    return dryRun ? (process.stderr.write(`${c.dim('would run')} ${c.bold('pf ver ' + args.join(' '))}\n`), 0) : verCommand.run(ctx, args);
+    return dryRun ? (process.stderr.write(`${c.dim('would run')} ${termLine('pf ver ' + args.join(' '), c)}\n`), 0) : verCommand.run(ctx, args);
   }
   if (skill.name === 'pnpm') {
     const script = path.join(skill.dir, 'scripts', 'tasks.mjs');
     if (!exists(script)) return null;
     if (!exists(ctx.workdir, 'package.json')) {
-      process.stderr.write(`${c.yellow('!')} /pnpm is for Node repos (no package.json here). pf already lists commands for other stacks: run ${c.bold('pf')}.\n`);
+      process.stderr.write(`${badgeLabel('warning', c)} /pnpm is for Node repos (no package.json here). pf already lists commands for other stacks: run ${termLine('pf', c)}.\n`);
       return 1;
     }
     return runCmd({ argv: [process.execPath, script, ...(args.length ? args : ['setup'])], cwd: ctx.workdir }, { dryRun, base: ctx.workdir });
@@ -53,7 +54,7 @@ export async function runSkill(ctx: Context, skill: Skill, args: string[], dryRu
   const agent = detectAgent(ctx.user.agent);
   if (!agent) {
     process.stderr.write(
-      `${c.red('error:')} ${ctx.user.agent ? `agent "${ctx.user.agent}" is not on PATH` : 'no agent CLI found (cursor-agent, claude or codex)'}.\n` +
+      `${badgeLabel('error', c)} ${ctx.user.agent ? `agent "${ctx.user.agent}" is not on PATH` : 'no agent CLI found (cursor-agent, claude or codex)'}.\n` +
         `The skill lives at ${path.join(skill.dir, 'SKILL.md')}. Install an agent CLI, or set "agent" in ~/.pf/config.json.\n`,
     );
     return 1;

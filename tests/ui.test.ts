@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { wantsLogo } from '../src/cli.js';
-import { LOGO_MIN_COLS, logoFits, renderBanner, renderLogo } from '../src/ui/banner.js';
+import { LOGO_MIN_COLS, LOGO_MIN_ROWS, logoFits, renderBanner, renderLogo } from '../src/ui/banner.js';
 import { fitLine, palette, stripAnsi, type Palette } from '../src/ui/palette.js';
+import { LOGO_ART, LOGO_COLORS } from '../src/ui/logo-art.js';
 import { confirmKey, renderConfirm } from '../src/ui/prompt.js';
 import {
   buildRows,
@@ -104,7 +105,7 @@ test('logo carries the version, fits its width, and is plain without color', () 
   const logo = renderLogo({ version: '2.1.0', repo: 'web', stacks: ['Node (pnpm)'] }, off, 100);
   assert.match(logo, /pf v2\.1/);
   assert.match(logo, /web/);
-  assert.match(logo, /██╗/);
+  assert.ok(logo.includes(LOGO_ART[8]!), 'the dotted figure is drawn');
   assert.doesNotMatch(logo, /\x1b/);
   for (const line of logo.split('\n')) assert.ok(stripAnsi(line).length <= 99, `too wide: ${line}`);
 });
@@ -116,8 +117,10 @@ test('logo gives the update hint its own row and is colored when color is on', (
   process.env.FORCE_COLOR = '1';
   delete process.env.NO_COLOR;
   const colored = renderLogo({ version: '2.0.0' }, palette(process.stderr), 100);
-  assert.match(colored, /\x1b\[38;5;221m/);
-  assert.equal(stripAnsi(colored), renderLogo({ version: '2.0.0' }, off, 100));
+  for (const n of LOGO_COLORS) assert.match(colored, new RegExp(`38;5;${n}m`), `uses color ${n}`);
+  const art = colored.split('\n').map((l) => stripAnsi(l).slice(2, 2 + LOGO_ART[0]!.length));
+  assert.ok(LOGO_ART.every((row) => art.includes(row)), 'the colored art is drawn');
+  assert.doesNotMatch(colored, /\x1b\[[0-9;]*48;/, 'no background color: the terminal shows through');
   if (saved === undefined) delete process.env.FORCE_COLOR; else process.env.FORCE_COLOR = saved;
 });
 
@@ -125,6 +128,8 @@ test('the logo is for narrow-safe terminals and the menu, about and help only', 
   assert.equal(logoFits(LOGO_MIN_COLS), true);
   assert.equal(logoFits(LOGO_MIN_COLS - 1), false);
   assert.equal(logoFits(undefined), false);
+  assert.equal(logoFits(200, LOGO_MIN_ROWS), true);
+  assert.equal(logoFits(200, LOGO_MIN_ROWS - 1), false, 'a short window gets the one-line banner');
   for (const c of [undefined, 'menu', 'about', 'help', '--help']) assert.equal(wantsLogo(c), true, String(c));
   for (const c of ['dev', 'build', 'list', '--version', 'ver']) assert.equal(wantsLogo(c), false, c);
 });

@@ -1,0 +1,24 @@
+#!/bin/sh
+# Run pf from this checkout's source (no build step): ./pf <args>
+# Same as the global `pf`, but with the code in src/. Keeps your current directory,
+# so you can also call it from elsewhere: /path/to/pulpfixer/pf <args>
+set -e
+
+# Resolve symlinks so this works when linked from somewhere else.
+self="$0"
+while [ -L "$self" ]; do
+  dir=$(cd "$(dirname "$self")" && pwd)
+  self=$(readlink "$self")
+  case "$self" in /*) ;; *) self="$dir/$self" ;; esac
+done
+root=$(cd "$(dirname "$self")" && pwd)
+
+tsx="$root/node_modules/.bin/tsx"
+if [ ! -x "$tsx" ]; then
+  echo "pf: tsx not found in $root. Run 'pnpm install' there first." >&2
+  exit 1
+fi
+
+# Tells pf it runs from a checkout: with no command it shows the local menu.
+export PF_LOCAL="$root"
+exec "$tsx" "$root/src/bin/pf.ts" "$@"

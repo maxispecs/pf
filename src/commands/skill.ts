@@ -3,6 +3,7 @@ import { discoverSkills, shortDescription, type Skill } from '../skills/discover
 import { runSkill } from '../skills/run.js';
 import { err, out } from '../ui/palette.js';
 import { pick } from '../ui/picker.js';
+import { badgeLabel, termLine } from '../ui/text.js';
 import { interactive, takeFlag } from '../util.js';
 import type { Command } from './types.js';
 
@@ -41,7 +42,7 @@ export const skillCommand: Command = {
     const dryRun = takeFlag(rest, '--dry-run', '-n');
     const skills = loadSkills(ctx);
     if (skills.length === 0) {
-      process.stderr.write(`${c.red('error:')} no skills found (looked in ~/.cursor/skills, ~/.agents/skills, ~/.claude/skills and the repo).\n`);
+      process.stderr.write(`${badgeLabel('error', c)} no skills found (looked in ~/.cursor/skills, ~/.agents/skills, ~/.claude/skills and the repo).\n`);
       return 1;
     }
     if (list || (rest.length === 0 && !interactive())) {
@@ -52,13 +53,13 @@ export const skillCommand: Command = {
     if (rest.length === 0) {
       skill = await pickSkill(ctx);
       if (!skill) return 130;
-      process.stderr.write(c.dim(`next time: pf skill ${skill.name}\n`));
+      process.stderr.write(`${c.dim('next time:')} ${termLine(`pf skill ${skill.name}`, c)}\n`);
     } else {
       const name = rest.shift()!.replace(/^\//, '');
       skill = skills.find((s) => s.name === name);
       if (!skill) {
         const near = skills.filter((s) => s.name.includes(name)).map((s) => s.name);
-        process.stderr.write(`${c.red('error:')} no skill named "${name}".${near.length ? ` Did you mean: ${near.join(', ')}?` : ''}\n`);
+        process.stderr.write(`${badgeLabel('error', c)} no skill named "${name}".${near.length ? ` Did you mean: ${near.join(', ')}?` : ''}\n`);
         return 1;
       }
     }
