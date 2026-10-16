@@ -1,0 +1,61 @@
+{
+  "name": "pulpfixer",
+  "version": "2.0.0",
+  "description": "pf: unified developer CLI for any repo, any language",
+  "license": "UNLICENSED",
+  "author": "Max Glotov, Sam Pretorius",
+  "type": "module",
+  "bin": {
+    "pf": "./dist/bin/pf.js"
+  },
+  "files": [
+    "dist",
+    "assets",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  },
+  "scripts": {
+    "dev": "tsx src/bin/pf.ts",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "test": "node --import tsx --test \"tests/**/*.test.ts\"",
+    "pf": "node dist/bin/pf.js",
+    "install:local": "bash scripts/install.sh --from-source",
+    "release": "node scripts/release.mjs",
+    "publish:cellars": "node scripts/release.mjs --publish",
+    "ver": "node scripts/version.mjs",
+    "ask": "node scripts/tasks.mjs ask"
+  },
+  "scriptsInfo": {
+    "Develop": {
+      "dev": "Run pf from source (pnpm dev -- <args>)",
+      "pf": "Run the built pf from dist"
+    },
+    "Build & check": {
+      "build": "Compile TypeScript to dist",
+      "typecheck": "Type-check without emitting",
+      "test": "Run the test suite"
+    },
+    "Deploy": {
+      "install:local": "Build and install pf globally from this checkout",
+      "release": "Check, build and dry-run publish to cellars",
+      "publish:cellars": "Publish to the cellars registry"
+    },
+    "Tools": {
+      "ver": "List versions and bump commands"
+    },
+    "Help": {
+      "ask": "Show this list"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.0",
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.0"
+  }
+}

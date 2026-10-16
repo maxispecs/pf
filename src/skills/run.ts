@@ -1,0 +1,62 @@
+import path from 'node:path';
+import type { Context } from '../context.js';
+import { runCmd, type Cmd } from '../exec.js';
+import { verCommand } from '../commands/ver.js';
+import { err } from '../ui/palette.js';
+import { exists, which } from '../util.js';
+import type { Skill } from './discover.js';
+
+export const AGENTS = ['cursor-agent', 'claude', 'codex'] as const;
+
+/** The agent CLI used for prompt-only skills: the configured one, else the first installed. */
+export function detectAgent(configured?: string): string | null {
+  if (configured) return which(configured) ? configured : null;
+  return AGENTS.find((a) => which(a)) ?? null;
+}
+
+export function agentPrompt(agent: string, skill: string, args: string[]): string {
+  const rest = args.join(' ').trim();
+  if (agent === 'codex') return `Use the ${skill} skill${rest ? `: ${rest}` : '.'}`;
+  return `/${skill}${rest ? ` ${rest}` : ''}`;
+}
+
+export function agentCommand(agent: string, skill: string, args: string[], cwd: string): Cmd {
+  return { argv: [agent, agentPrompt(agent, skill, args)], cwd };
+}
+
+/**
+ * Skills with a deterministic script run directly. Everything else goes through an agent CLI.
+ * Returns null when the skill is not a direct one.
+ */
+export async function runDirect(ctx: Context, skill: Skill, args: string[], dryRun: boolean): Promise<number | null> {
+  const c = err();
+  if (skill.name === 'ver') {
+    return dryRun ? (process.stderr.write(`${c.dim('would run')} ${c.bold('pf ver ' + args.join(' '))}\n`), 0) : verCommand.run(ctx, args);
+  }
+  if (skill.name === 'pnpm') {
+    const script = path.join(skill.dir, 'scripts', 'tasks.mjs');
+    if (!exists(script)) return null;
+    if (!exists(ctx.workdir, 'package.json')) {
+      process.stderr.write(`${c.yellow('!')} /pnpm is for Node repos (no package.json here). pf already lists commands for other stacks: run ${c.bold('pf')}.\n`);
+      return 1;
+    }
+    return runCmd({ argv: [process.execPath, script, ...(args.length ? args : ['setup'])], cwd: ctx.workdir }, { dryRun, base: ctx.workdir });
+  }
+  return null;
+}
+
+/** Run a skill: direct script when there is one, otherwise hand off to the agent CLI. */
+export async function runSkill(ctx: Context, skill: Skill, args: string[], dryRun = false): Promise<number> {
+  const direct = await runDirect(ctx, skill, args, dryRun);
+  if (direct !== null) return direct;
+  const c = err();
+  const agent = detectAgent(ctx.user.agent);
+  if (!agent) {
+    process.stderr.write(
+      `${c.red('error:')} ${ctx.user.agent ? `agent "${ctx.user.agent}" is not on PATH` : 'no agent CLI found (cursor-agent, claude or codex)'}.\n` +
+        `The skill lives at ${path.join(skill.dir, 'SKILL.md')}. Install an agent CLI, or set "agent" in ~/.pf/config.json.\n`,
+    );
+    return 1;
+  }
+  return runCmd(agentCommand(agent, skill.name, args, ctx.workdir), { dryRun, base: ctx.workdir });
+}
