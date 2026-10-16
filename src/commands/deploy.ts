@@ -33,7 +33,7 @@ export async function runDeployStaging(ctx: Context, opts: { dryRun?: boolean; y
       process.stderr.write(`${c.red('error:')} refusing to deploy without a terminal. Pass --yes to confirm, or --dry-run to preview.\n`);
       return 2;
     }
-    if (!(await confirm(`Run ${plan.steps.length} step(s) now?`, false))) {
+    if (!(await confirm(`Run ${plan.steps.length} step(s) now?`, false, { flag: '--yes' }))) {
       process.stderr.write(c.dim('cancelled\n'));
       return 130;
     }

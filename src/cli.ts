@@ -40,6 +40,13 @@ export function helpText(): string {
   return lines.join('\n');
 }
 
+/** The big logo is for the menu and the pages people read; everything else stays one quiet line. */
+const LOGO_COMMANDS = new Set(['menu', 'about', 'help', '-h', '--help']);
+
+export function wantsLogo(first: string | undefined): boolean {
+  return first === undefined || LOGO_COMMANDS.has(first);
+}
+
 function suggest(name: string, ctx: Context): string[] {
   const names = [...allCommands().map((x) => x.name), ...Object.keys(ctx.config.commands)];
   return names.filter((n) => n.startsWith(name.slice(0, 2)) || n.includes(name) || name.includes(n)).slice(0, 4);
@@ -49,11 +56,14 @@ export async function main(argv: string[]): Promise<number> {
   const ctx = buildContext();
   const first = argv[0];
 
-  printBanner({
-    version: ctx.version,
-    ...(ctx.repo ? { repo: ctx.repo.name, stacks: ctx.stacks.map((s) => s.label) } : {}),
-    ...(cachedLatest() ? { latest: cachedLatest()! } : {}),
-  });
+  printBanner(
+    {
+      version: ctx.version,
+      ...(ctx.repo ? { repo: ctx.repo.name, stacks: ctx.stacks.map((s) => s.label) } : {}),
+      ...(cachedLatest() ? { latest: cachedLatest()! } : {}),
+    },
+    { logo: wantsLogo(first) },
+  );
   if (!first || !NO_UPDATE_CHECK.has(first)) refreshInBackground();
 
   if (!first) return runMenu(ctx);

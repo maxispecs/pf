@@ -41,7 +41,7 @@ export const setupCommand: Command = {
     const noCompletions = takeFlag(rest, '--no-completions');
     const c = out();
     const r = reporter(c);
-    const ask = (q: string, fallback: boolean) => (yes ? Promise.resolve(true) : confirm(q, fallback));
+    const ask = (q: string, fallback: boolean) => (yes ? Promise.resolve(true) : confirm(q, fallback, { flag: '--yes' }));
     let problems = 0;
 
     process.stdout.write(`${c.bold('pf setup')}${dryRun ? c.dim('  (dry run: nothing is changed)') : ''}\n`);

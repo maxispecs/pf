@@ -86,7 +86,7 @@ export const updateCommand: Command = {
     }
     r.warn(`v${displayVersion(found.version)} is available (you have v${displayVersion()})`);
     if (check) return 0;
-    if (!(yes || (await confirm(`Install pf v${displayVersion(found.version)} now?`, true)))) {
+    if (!(yes || (await confirm(`Install pf v${displayVersion(found.version)} now?`, true, { flag: '--yes' })))) {
       r.info('skipped');
       return 0;
     }

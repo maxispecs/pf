@@ -17,7 +17,8 @@ import { candidates } from './detect/resolve.js';
 import type { Task } from './detect/stacks.js';
 import { formatCmd, runCmd, shellCmd, withArgs } from './exec.js';
 import { findVersionsRoot } from './commands/ver.js';
-import { out } from './ui/palette.js';
+import { lastMenuChoice, rememberMenuChoice } from './config.js';
+import { err, out } from './ui/palette.js';
 import { pick } from './ui/picker.js';
 import { interactive } from './util.js';
 
@@ -134,10 +135,21 @@ export async function runMenu(ctx: Context): Promise<number> {
   }
   const entries = entriesFor(ctx);
   const title = ctx.repo ? `What do you want to do in ${ctx.repo.name}?` : 'Not inside a repo. What now?';
+  const historyKey = ctx.repo?.root ?? '(no repo)';
+  const last = entries.find((e) => e.name === lastMenuChoice(historyKey));
   const chosen = await pick(
     title,
-    entries.map((e) => ({ value: e, label: e.name, hint: e.detail ?? e.summary, group: e.group })),
+    entries.map((e) => ({
+      value: e,
+      label: e.name,
+      hint: e.summary,
+      group: e.group,
+      ...(e.detail ? { detail: e.detail } : {}),
+    })),
+    last ? { initial: last } : {},
   );
   if (!chosen) return 0;
+  rememberMenuChoice(historyKey, chosen.name);
+  process.stderr.write(err().dim(`next time: pf ${chosen.name}\n`));
   return chosen.run();
 }

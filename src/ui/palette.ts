@@ -19,6 +19,8 @@ export interface Palette {
   boldBrand(s: string): string;
   /** Selected-row highlight. */
   inverse(s: string): string;
+  /** Any of the 256 terminal colors (used for the logo gradient). */
+  fg(n: number, s: string): string;
 }
 
 export function palette(stream: NodeJS.WriteStream = process.stdout): Palette {
@@ -37,6 +39,7 @@ export function palette(stream: NodeJS.WriteStream = process.stdout): Palette {
     brand: paint('38;5;208'),
     boldBrand: paint('1;38;5;208'),
     inverse: paint('7'),
+    fg: (n, s) => (on ? `\x1b[38;5;${n}m${s}\x1b[0m` : String(s)),
   };
 }
 
@@ -47,4 +50,28 @@ export const err = (): Palette => palette(process.stderr);
 export function stripAnsi(s: string): string {
   // eslint-disable-next-line no-control-regex
   return s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '');
+}
+
+/**
+ * Cut a line to `cols` visible characters, keeping escape sequences intact. Adds an ellipsis
+ * when something was cut. Lines wider than the terminal wrap and break cursor-up redraws.
+ */
+export function fitLine(s: string, cols: number): string {
+  if (cols <= 1 || stripAnsi(s).length <= cols) return s;
+  let visible = 0;
+  let res = '';
+  for (let i = 0; i < s.length; ) {
+    // eslint-disable-next-line no-control-regex
+    const esc = /^\x1b\[[0-9;?]*[A-Za-z]/.exec(s.slice(i));
+    if (esc) {
+      res += esc[0];
+      i += esc[0].length;
+      continue;
+    }
+    if (visible >= cols - 1) break;
+    res += s[i];
+    visible++;
+    i++;
+  }
+  return `${res}${res.includes('\x1b') ? '\x1b[0m' : ''}…`;
 }

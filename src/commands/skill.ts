@@ -52,6 +52,7 @@ export const skillCommand: Command = {
     if (rest.length === 0) {
       skill = await pickSkill(ctx);
       if (!skill) return 130;
+      process.stderr.write(c.dim(`next time: pf skill ${skill.name}\n`));
     } else {
       const name = rest.shift()!.replace(/^\//, '');
       skill = skills.find((s) => s.name === name);

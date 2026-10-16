@@ -54,6 +54,26 @@ export function loadUserConfig(): UserConfig {
   return readJson<UserConfig>(userConfigPath()) ?? {};
 }
 
+interface History {
+  /** Last menu entry run, keyed by repo root. */
+  menu?: Record<string, string>;
+}
+
+function historyPath(): string {
+  return path.join(pfHome(), 'history.json');
+}
+
+/** The menu entry this repo ran last, so the menu can start on it. */
+export function lastMenuChoice(key: string): string | undefined {
+  return readJson<History>(historyPath())?.menu?.[key];
+}
+
+/** Remember the menu entry just chosen. Never throws. */
+export function rememberMenuChoice(key: string, name: string): void {
+  const history = readJson<History>(historyPath()) ?? {};
+  writeHomeFile('history.json', JSON.stringify({ ...history, menu: { ...(history.menu ?? {}), [key]: name } }, null, 2) + '\n');
+}
+
 /** Write a file under the pf home; returns false (never throws) when the home is read-only. */
 export function writeHomeFile(rel: string, content: string): boolean {
   try {

@@ -131,3 +131,21 @@ test('setup --dry-run changes nothing', () => {
   assert.equal(fs.existsSync(path.join(home, 'pfhome')), false);
   assert.equal(fs.existsSync(path.join(home, '.zshrc')), false);
 });
+
+test('without a terminal the header stays one line, even for the menu, about and help', () => {
+  for (const args of [[], ['about'], ['help'], ['menu']]) {
+    const r = pf(repo(), ...args);
+    assert.doesNotMatch(r.err, /██/, `logo leaked for: pf ${args.join(' ')}`);
+    assert.equal(r.err.trim().split('\n').length, 1, `banner is not one line for: pf ${args.join(' ')}`);
+  }
+});
+
+test('uninstall without a terminal or --yes cancels and names the flag; flags pick the parts', () => {
+  const r = pf(repo(), 'uninstall');
+  assert.equal(r.code, 130);
+  assert.match(r.err, /pass --yes/);
+  const dry = pf(repo(), 'uninstall', '--yes', '--no-package', '--no-shell', '--dry-run');
+  assert.equal(dry.code, 0, dry.err);
+  assert.doesNotMatch(dry.err, /npm rm/);
+  assert.match(dry.out, /kept/);
+});

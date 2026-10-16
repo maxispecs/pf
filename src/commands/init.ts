@@ -82,7 +82,7 @@ export const initCommand: Command = {
     }
 
     if (!findVersionsRoot(ctx.cwd)) {
-      const doIt = withVer || (await confirm('Set up major.minor versioning too (pf ver init)?', false));
+      const doIt = withVer || (await confirm('Set up major.minor versioning too (pf ver init)?', false, { flag: '--ver' }));
       if (doIt) {
         const code = await runCmd(
           { argv: [process.execPath, bundledVerCli(), 'init', '--root', root, ...(dryRun ? ['--dry-run'] : [])], cwd: root },

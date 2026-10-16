@@ -10,10 +10,7 @@ export const aboutCommand: Command = {
   usage: 'pf about',
   async run(ctx) {
     const c = out();
-    const logo = [
-      '█▀█ █▀▀',
-      '█▀▀ █▀ ',
-    ];
+    // The big logo is printed with the banner (stderr, terminal only), so this is just the facts.
     const rows: [string, string][] = [
       ['version', `${displayVersion()} (${version()})`],
       ['package', PACKAGE_NAME],
@@ -25,8 +22,7 @@ export const aboutCommand: Command = {
     ];
     const w = Math.max(...rows.map(([k]) => k.length));
     process.stdout.write('\n');
-    process.stdout.write(`  ${c.boldBrand(logo[0]!)}   ${c.bold('pulpfixer')}\n`);
-    process.stdout.write(`  ${c.boldBrand(logo[1]!)}   ${c.dim('one command line for every repo, in any language')}\n\n`);
+    process.stdout.write(`  ${c.boldBrand('pulpfixer')}  ${c.dim('(pf)')}\n\n`);
     for (const [k, v] of rows) process.stdout.write(`  ${c.dim(k.padEnd(w))}  ${v}\n`);
     process.stdout.write(`\n  ${c.dim('Run')} ${c.bold('pf help')} ${c.dim('for commands, or')} ${c.bold('pf')} ${c.dim('for the menu.')}\n\n`);
     return 0;
