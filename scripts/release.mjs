@@ -28,8 +28,39 @@ const die = (s) => {
   process.exit(1);
 };
 
+// The repo .npmrc reads the registry token from ${NPM_TOKEN}, and a project .npmrc overrides ~/.npmrc, so a
+// token saved by `npm login` is shadowed. When NPM_TOKEN is unset, load it from the user .npmrc into this
+// process's environment (child processes inherit it). The value is never printed.
 const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: root, stdio: 'inherit', ...opts });
 const capture = (cmd, args) => spawnSync(cmd, args, { cwd: root, encoding: 'utf8' });
+
+function userNpmrcToken() {
+  const userNpmrc = process.env.NPM_CONFIG_USERCONFIG ?? path.join(process.env.HOME ?? '', '.npmrc');
+  try {
+    const m = fs
+      .readFileSync(userNpmrc, 'utf8')
+      .match(new RegExp(`^//${HOST.replace(/\./g, '\\.')}/:_authToken=(?!\\$\\{)(\\S+)\\s*$`, 'm'));
+    return m ? m[1] : null;
+  } catch {
+    return null; // no user .npmrc
+  }
+}
+
+/** True when `npm whoami` accepts the current NPM_TOKEN. */
+const tokenWorks = () => capture('npm', ['whoami', '--registry', REGISTRY]).status === 0;
+
+// Use the token from the user .npmrc when NPM_TOKEN is unset, or set but rejected (for example a stale value
+// exported before a re-login). Child processes inherit process.env. Token values are never printed.
+function ensureAuth() {
+  const fromFile = userNpmrcToken();
+  if (process.env.NPM_TOKEN && tokenWorks()) return true;
+  if (fromFile) {
+    if (process.env.NPM_TOKEN && process.env.NPM_TOKEN !== fromFile) warn('NPM_TOKEN in your environment was rejected: using the token from ~/.npmrc instead (unset NPM_TOKEN to silence this)');
+    process.env.NPM_TOKEN = fromFile;
+    return tokenWorks();
+  }
+  return false;
+}
 
 function cmp(a, b) {
   const pa = a.split('.').map(Number);
@@ -52,6 +83,7 @@ try {
   warn('no readable versions.json: skipping the drift check');
 }
 
+ensureAuth();
 const latest = capture('npm', ['view', pkg.name, 'version', '--registry', REGISTRY]);
 const published = latest.status === 0 ? latest.stdout.trim().split('\n').pop().trim() : null;
 if (published) {
@@ -76,14 +108,8 @@ if (pack.status !== 0) die('npm pack failed');
 
 step(publish ? 'Publish' : 'Publish (dry run)');
 if (publish) {
-  const npmrc = process.env.NPM_CONFIG_USERCONFIG ?? path.join(process.env.HOME ?? '', '.npmrc');
-  let hasAuth = false;
-  try {
-    hasAuth = new RegExp(`^//${HOST.replace(/\./g, '\\.')}/:_authToken=`, 'm').test(fs.readFileSync(npmrc, 'utf8'));
-  } catch {
-    // no .npmrc
-  }
-  if (!hasAuth && !process.env.NPM_TOKEN) die('no registry auth: export NPM_TOKEN or run pf setup');
+  if (!ensureAuth()) die('no valid registry token (npm whoami failed): run `npm login --auth-type=web --registry ' + REGISTRY + '`');
+  ok(`registry auth ok (${capture('npm', ['whoami', '--registry', REGISTRY]).stdout.trim()})`);
   if (!process.stdin.isTTY) die('publishing needs a terminal to confirm');
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const answer = await new Promise((resolve) => rl.question(`Type ${bold(pkg.version)} to publish ${pkg.name} to ${REGISTRY}: `, resolve));
