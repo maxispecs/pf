@@ -1,5 +1,7 @@
 import path from 'node:path';
+import { resolveAgent } from './agent/agents.js';
 import { aboutCommand } from './commands/about.js';
+import { agentCommand } from './commands/agent.js';
 import { runDeployStaging } from './commands/deploy.js';
 import { runDoc } from './commands/doc.js';
 import { doctorCommand } from './commands/doctor.js';
@@ -25,6 +27,18 @@ import { interactive } from './util.js';
 
 const BUILTIN_NAMES = new Set(['dev', 'build', 'test', 'lint', 'install', 'doc', 'docs', 'deploy:staging']);
 
+function agentEntry(ctx: Context): Entry {
+  const choice = resolveAgent({ env: process.env.PF_AGENT, configured: ctx.user.agent });
+  const ready = Boolean(choice.agent && !choice.missing && !choice.unknown);
+  return {
+    name: 'agent',
+    summary: 'Open the coding agent',
+    group: 'Agent',
+    detail: ready ? `${choice.agent!.label}${choice.source === 'detected' ? ' (auto)' : ''}` : 'not set up',
+    run: () => agentCommand.run(ctx, []),
+  };
+}
+
 /** Run a custom command from pf.json. */
 export function runCustom(ctx: Context, name: string, args: string[]): Promise<number> {
   const cfg = ctx.config.commands[name]!;
@@ -34,7 +48,7 @@ export function runCustom(ctx: Context, name: string, args: string[]): Promise<n
 
 function groupRank(g: string): number {
   const i = (GROUPS as readonly string[]).indexOf(g);
-  return i === -1 ? 2.5 : i; // custom groups sit between Docs & deploy and Tools
+  return i === -1 ? GROUPS.indexOf('Tools') - 0.5 : i; // custom groups sit between Docs & deploy and Tools
 }
 
 /** Everything the menu and the static list show for this context. */
@@ -49,6 +63,7 @@ export function entriesFor(ctx: Context): Entry[] {
   });
 
   if (ctx.repo) {
+    entries.push(agentEntry(ctx));
     for (const t of TASK_COMMANDS) {
       const list = candidates(t.name as Task, ctx);
       if (list.length === 0) continue;
@@ -97,6 +112,7 @@ export function entriesFor(ctx: Context): Entry[] {
     entries.push(tool(updateCommand, 'Tools'));
     entries.push(tool(aboutCommand, 'Help'));
   } else {
+    entries.push(agentEntry(ctx));
     entries.push({ ...tool(skillCommand, 'Tools'), name: 'skill', summary: 'Run a skill' });
     entries.push(tool(doctorCommand, 'Tools'));
     entries.push(tool(setupCommand, 'Tools'));

@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { UserConfig } from '../config.js';
 import { exists } from '../util.js';
+import { packageRoot } from '../version.js';
 
 export interface Skill {
   name: string;
@@ -62,8 +63,20 @@ function scan(dir: string, source: string, depth: number, out: Skill[]): void {
   }
 }
 
-/** Directories scanned for skills, in priority order. */
-export function skillDirs(repoRoot: string | null, user: UserConfig, home = os.homedir()): { dir: string; label: string }[] {
+/** Source label of the skills that ship with pf. */
+export const BUNDLED_LABEL = 'pulpfixer';
+
+export function bundledSkillsDir(): string {
+  return path.join(packageRoot(), 'assets', 'skills');
+}
+
+/** Directories scanned for skills, in priority order. pf's own skills come last so any other copy wins. */
+export function skillDirs(
+  repoRoot: string | null,
+  user: UserConfig,
+  home = os.homedir(),
+  bundled: string | null = bundledSkillsDir(),
+): { dir: string; label: string }[] {
   const dirs: { dir: string; label: string }[] = [];
   if (repoRoot) {
     for (const d of ['.cursor/skills', '.agents/skills', '.claude/skills']) dirs.push({ dir: path.join(repoRoot, d), label: d });
@@ -72,13 +85,14 @@ export function skillDirs(repoRoot: string | null, user: UserConfig, home = os.h
     dirs.push({ dir: path.join(home, d), label: `~/${d}` });
   }
   for (const d of user.skillDirs ?? []) dirs.push({ dir: d.replace(/^~(?=\/)/, home), label: d });
+  if (bundled) dirs.push({ dir: bundled, label: BUNDLED_LABEL });
   return dirs;
 }
 
 /** Discover skills, one per name; earlier directories win. Sorted by name. */
-export function discoverSkills(repoRoot: string | null, user: UserConfig, home?: string): Skill[] {
+export function discoverSkills(repoRoot: string | null, user: UserConfig, home?: string, bundled?: string | null): Skill[] {
   const all: Skill[] = [];
-  for (const { dir, label } of skillDirs(repoRoot, user, home)) scan(dir, label, 3, all);
+  for (const { dir, label } of skillDirs(repoRoot, user, home, bundled)) scan(dir, label, 3, all);
   const byName = new Map<string, Skill>();
   for (const s of all) if (!byName.has(s.name)) byName.set(s.name, s);
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));

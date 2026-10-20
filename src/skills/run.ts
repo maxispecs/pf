@@ -1,19 +1,13 @@
 import path from 'node:path';
+import { resolveAgent } from '../agent/agents.js';
+import { startAgent } from '../agent/launch.js';
 import type { Context } from '../context.js';
 import { runCmd, type Cmd } from '../exec.js';
 import { verCommand } from '../commands/ver.js';
 import { err } from '../ui/palette.js';
 import { badgeLabel, termLine } from '../ui/text.js';
-import { exists, which } from '../util.js';
-import type { Skill } from './discover.js';
-
-export const AGENTS = ['cursor-agent', 'claude', 'codex'] as const;
-
-/** The agent CLI used for prompt-only skills: the configured one, else the first installed. */
-export function detectAgent(configured?: string): string | null {
-  if (configured) return which(configured) ? configured : null;
-  return AGENTS.find((a) => which(a)) ?? null;
-}
+import { exists } from '../util.js';
+import { BUNDLED_LABEL, type Skill } from './discover.js';
 
 export function agentPrompt(agent: string, skill: string, args: string[]): string {
   const rest = args.join(' ').trim();
@@ -50,14 +44,18 @@ export async function runDirect(ctx: Context, skill: Skill, args: string[], dryR
 export async function runSkill(ctx: Context, skill: Skill, args: string[], dryRun = false): Promise<number> {
   const direct = await runDirect(ctx, skill, args, dryRun);
   if (direct !== null) return direct;
+  if (skill.source === BUNDLED_LABEL) {
+    const rest = args.join(' ').trim();
+    return startAgent(ctx, { prompt: `Call pf_skill with name "${skill.name}" and follow it.${rest ? ` Task: ${rest}` : ''}`, dryRun });
+  }
   const c = err();
-  const agent = detectAgent(ctx.user.agent);
-  if (!agent) {
+  const choice = resolveAgent({ env: process.env.PF_AGENT, configured: ctx.user.agent });
+  if (!choice.agent || choice.missing) {
     process.stderr.write(
-      `${badgeLabel('error', c)} ${ctx.user.agent ? `agent "${ctx.user.agent}" is not on PATH` : 'no agent CLI found (cursor-agent, claude or codex)'}.\n` +
-        `The skill lives at ${path.join(skill.dir, 'SKILL.md')}. Install an agent CLI, or set "agent" in ~/.pf/config.json.\n`,
+      `${badgeLabel('error', c)} ${choice.requested ? `agent "${choice.requested}" is ${choice.unknown ? 'not a known agent' : 'not on PATH'}` : 'no agent CLI found (cursor-agent, claude or codex)'}.\n` +
+        `The skill lives at ${path.join(skill.dir, 'SKILL.md')}. Install an agent CLI, or choose one with ${termLine('pf agent use', c)}.\n`,
     );
     return 1;
   }
-  return runCmd(agentCommand(agent, skill.name, args, ctx.workdir), { dryRun, base: ctx.workdir });
+  return runCmd(agentCommand(choice.agent.bin, skill.name, args, ctx.workdir), { dryRun, base: ctx.workdir });
 }

@@ -33,7 +33,8 @@ scripts/install.sh --dry-run      # show what would happen
 
 | Command | What it does |
 |---------|--------------|
-| `pf` | Menu: this repo's commands, or the fallback menu outside a repo |
+| `pf` | Menu: this repo's commands, or the fallback menu outside a repo. Includes the agent |
+| `pf agent [prompt]` | Open the coding agent (Claude Code, Codex or Cursor) with pf's tools and skills. `--agent`, `--dry-run`. `pf agent use [id]` sets the default |
 | `pf list` | The same list, static (for scripts and agents) |
 | `pf dev`, `build`, `test`, `lint`, `install` | Resolved per repo, see below. `--dry-run` prints, `--pick` chooses when several exist, `-- <args>` passes args on |
 | `pf ver [list\|bump\|init\|sync]` | Major.minor versioning with the bundled `/ver` CLI |
@@ -68,7 +69,13 @@ Built-in names (`dev`, `build`, ...) override detection. Other names show up in 
 
 ### Skills
 
-`pf skill` finds skills in `~/.cursor/skills`, `~/.cursor/skills-cursor`, `~/.agents/skills`, `~/.claude/skills`, and the repo's `.cursor/skills`, `.agents/skills`, `.claude/skills`. `ver` and `pnpm` run their scripts directly. Others run through the first agent CLI found (`cursor-agent`, `claude`, `codex`), or the one set as `"agent"` in `~/.pf/config.json`.
+`pf skill` finds skills in `~/.cursor/skills`, `~/.cursor/skills-cursor`, `~/.agents/skills`, `~/.claude/skills`, the repo's `.cursor/skills`, `.agents/skills`, `.claude/skills`, and the skills bundled with pf. A skill in an earlier directory wins over a bundled one with the same name. `ver` and `pnpm` run their scripts directly. Others run through the agent CLI.
+
+### Agent
+
+`pf agent` (also the Agent entry in the `pf` menu) starts Claude Code, Codex or Cursor with a system prompt built from this repo, the pf tools (`pf mcp`) and the skills above. The agent CLI is chosen with `--agent`, `PF_AGENT`, or `"agent"` in `~/.pf/config.json` (`claude`, `codex` or `cursor`; `claude-code` and `cursor-agent` are accepted too). Otherwise the first installed CLI is used, and a terminal asks the first time more than one is installed. `pf agent use cursor` also registers the pf MCP server in `~/.cursor/mcp.json`.
+
+The tools can list and run this repo's commands, bump versions and deploy to staging. A staging deploy returns the plan until the call passes `confirm`, and the agent CLI asks before running it. Production is never targeted.
 
 ## Develop
 

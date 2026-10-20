@@ -9,7 +9,7 @@ import { badge, h2, promptLine, termLine } from './ui/text.js';
 import { cachedLatest, refreshInBackground } from './update/check.js';
 import { version } from './version.js';
 
-const NO_UPDATE_CHECK = new Set(['update', 'setup', 'uninstall', 'doctor']);
+const NO_UPDATE_CHECK = new Set(['update', 'setup', 'uninstall', 'doctor', 'mcp']);
 
 export function helpText(): string {
   const c = out();

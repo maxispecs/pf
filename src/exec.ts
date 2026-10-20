@@ -67,6 +67,62 @@ export function runCmd(cmd: Cmd, opts: RunOptions = {}): Promise<number> {
   });
 }
 
+export interface CaptureResult {
+  /** Exit code; 124 on timeout, 127 when the binary is missing. */
+  code: number;
+  /** stdout and stderr interleaved, trimmed to the last `maxBytes` characters. */
+  output: string;
+  truncated: boolean;
+  timedOut: boolean;
+}
+
+/**
+ * Run a command with piped output (never touches this process's stdout) and resolve with the
+ * exit code and the tail of its output. stdin is closed, so prompts fail instead of hanging.
+ */
+export function captureAsync(
+  cmd: Cmd,
+  opts: { timeout?: number; maxBytes?: number; env?: NodeJS.ProcessEnv } = {},
+): Promise<CaptureResult> {
+  const max = opts.maxBytes ?? 20_000;
+  const env: NodeJS.ProcessEnv = { ...(opts.env ?? process.env), NO_COLOR: '1' };
+  delete env.FORCE_COLOR;
+  return new Promise((resolve) => {
+    let output = '';
+    let truncated = false;
+    let timedOut = false;
+    const append = (chunk: Buffer) => {
+      output += chunk.toString('utf8');
+      if (output.length > max * 2) {
+        output = output.slice(-max);
+        truncated = true;
+      }
+    };
+    const child = cmd.shell
+      ? spawn(cmd.argv[0]!, { cwd: cmd.cwd, stdio: ['ignore', 'pipe', 'pipe'], shell: true, env })
+      : spawn(cmd.argv[0]!, cmd.argv.slice(1), { cwd: cmd.cwd, stdio: ['ignore', 'pipe', 'pipe'], env });
+    child.stdout!.on('data', append);
+    child.stderr!.on('data', append);
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+    }, opts.timeout ?? 10 * 60_000);
+    const finish = (code: number) => {
+      clearTimeout(timer);
+      if (output.length > max) {
+        output = output.slice(-max);
+        truncated = true;
+      }
+      resolve({ code, output, truncated, timedOut });
+    };
+    child.on('error', (e: NodeJS.ErrnoException) => {
+      output += e.code === 'ENOENT' ? `${cmd.argv[0]} not found on PATH\n` : `${e.message}\n`;
+      finish(127);
+    });
+    child.on('close', (code, signal) => finish(timedOut ? 124 : (code ?? (signal ? 130 : 1))));
+  });
+}
+
 /** Run a command and capture its output (no terminal). */
 export function capture(
   argv: string[],

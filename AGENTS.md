@@ -21,7 +21,9 @@
 | `src/detect/` | repo, stack, docs and staging detection, command resolution |
 | `src/ui/text.ts` | text helpers: colored command samples (`termLine`, `promptLine`), badges, headings, lists, tables. Return strings, take a `Palette`. Use these instead of hand-coloring messages |
 | `src/commands/` | built-in commands |
+| `src/agent/` | coding agent: persona, tool registry, MCP server, launchers for claude, codex and cursor |
 | `src/skills/` | skill discovery and runner (direct scripts, else an agent CLI) |
+| `assets/skills/` | skills that ship with pf (a same-named user or repo skill wins) |
 | `src/install/`, `src/update/` | machine setup helpers, update check |
 | `assets/version.mjs` | bundled copy of the `/ver` CLI. Copy it from the skill, do not rewrite it |
 | `scripts/install.sh` | install on a machine without pf (`--from-source` for a checkout) |

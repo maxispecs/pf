@@ -1,4 +1,6 @@
 import { aboutCommand } from './about.js';
+import { agentCommand } from './agent.js';
+import { mcpCommand } from './mcp.js';
 import { deployCommand } from './deploy.js';
 import { docCommand } from './doc.js';
 import { doctorCommand } from './doctor.js';
@@ -14,6 +16,8 @@ import { verCommand } from './ver.js';
 /** Built-in commands except the ones that live in cli.ts (help, list, menu, version). */
 export function allCommands(): Command[] {
   return [
+    agentCommand,
+    mcpCommand,
     ...TASK_COMMANDS,
     docCommand,
     deployCommand,

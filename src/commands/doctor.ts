@@ -2,11 +2,13 @@ import fs from 'node:fs';
 import { PACKAGE_NAME, REGISTRY_URL, pfHome } from '../constants.js';
 import { userConfigPath } from '../config.js';
 import { globalBinOnPath, legacyGlobal, npmrcHasCellarsAuth, pfOnPath, userNpmrc } from '../install/env.js';
-import { AGENTS, detectAgent } from '../skills/run.js';
+import { AGENT_IDS, installedAgents, resolveAgent } from '../agent/agents.js';
+import { cursorMcpPath, cursorMcpRegistered } from '../agent/adapters.js';
+import { BUNDLED_LABEL } from '../skills/discover.js';
 import { loadSkills } from './skill.js';
 import { out } from '../ui/palette.js';
 import { reporter } from '../ui/prompt.js';
-import { compareVersions, takeFlag, which } from '../util.js';
+import { compareVersions, takeFlag } from '../util.js';
 import { displayVersion, packageRoot } from '../version.js';
 import { fetchLatest } from '../update/check.js';
 import { findVersionsRoot } from './ver.js';
@@ -63,10 +65,19 @@ export const doctorCommand: Command = {
     }
 
     r.step('Skills and agents');
-    const agents = AGENTS.filter((a) => which(a));
-    if (agents.length) r.ok(`agent CLIs: ${agents.join(', ')} (using ${detectAgent(ctx.user.agent) ?? 'none'})`);
-    else r.warn('no agent CLI (cursor-agent, claude, codex): prompt-only skills cannot run');
-    r.ok(`${loadSkills(ctx).length} skills found`);
+    const agents = installedAgents();
+    const choice = resolveAgent({ env: process.env.PF_AGENT, configured: ctx.user.agent });
+    if (agents.length) r.ok(`agent CLIs: ${agents.map((a) => a.bin).join(', ')}`);
+    else r.warn('no agent CLI (cursor-agent, claude, codex): pf agent and prompt-only skills cannot run');
+    if (choice.unknown) fail(`agent "${choice.requested}" (${choice.source}) is not one of ${AGENT_IDS.join(', ')}: run pf agent use`);
+    else if (choice.missing) fail(`agent ${choice.agent!.label} (${choice.source}) is not on PATH: run pf agent use`);
+    else if (choice.agent) r.ok(`pf agent uses ${choice.agent.label} (${choice.source === 'detected' ? 'auto-detected; pf agent use sets it' : choice.source})`);
+    if (agents.some((a) => a.id === 'cursor')) {
+      if (cursorMcpRegistered()) r.ok(`pulpfixer MCP server registered in ${cursorMcpPath()}`);
+      else r.info(`pulpfixer MCP server not in ${cursorMcpPath()} (pf agent use cursor adds it)`);
+    }
+    const skills = loadSkills(ctx);
+    r.ok(`${skills.length} skills found (${skills.filter((s) => s.source === BUNDLED_LABEL).length} bundled with pf)`);
 
     r.step('Config');
     r.info(`${pfHome()} ${fs.existsSync(pfHome()) ? 'exists' : 'does not exist yet'}`);
