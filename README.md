@@ -40,7 +40,7 @@ scripts/install.sh --dry-run      # show what would happen
 | `pf ver [list\|bump\|init\|sync]` | Major.minor versioning with the bundled `/ver` CLI |
 | `pf doc` | Run the docs site (Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo) |
 | `pf deploy staging` | Deploy to staging. `--dry-run`, `--yes`. Never production |
-| `pf skill [name]` | Pick and run an agent skill |
+| `pf skill [name]` | Pick and run an agent skill. `available`, `install`, `update`, `remove` manage skills from the registry |
 | `pf init` | Write `pf.json` for this repo from what was detected |
 | `pf setup`, `update`, `uninstall`, `doctor` | Machine tooling |
 | `pf about`, `pf help`, `pf --version` | Info |
@@ -69,7 +69,21 @@ Built-in names (`dev`, `build`, ...) override detection. Other names show up in 
 
 ### Skills
 
-`pf skill` finds skills in `~/.cursor/skills`, `~/.cursor/skills-cursor`, `~/.agents/skills`, `~/.claude/skills`, the repo's `.cursor/skills`, `.agents/skills`, `.claude/skills`, and the skills bundled with pf. A skill in an earlier directory wins over a bundled one with the same name. `ver` and `pnpm` run their scripts directly. Others run through the agent CLI.
+`pf skill` finds skills in `~/.cursor/skills`, `~/.cursor/skills-cursor`, `~/.agents/skills`, `~/.claude/skills`, the repo's `.cursor/skills`, `.agents/skills`, `.claude/skills`, pf's own folder `~/.pf/skills`, and the skills bundled with pf, in that order: a skill in an earlier directory wins over a later one with the same name. Skills in `~/.pf/skills` and the bundled ones run through `pf agent`, which reads them with the `pf_skill` tool, so they work with any agent CLI. `ver` and `pnpm` run their scripts directly. Others run through the agent CLI.
+
+#### Skills from the registry
+
+The skills repo publishes each skill to cellars as `@pf-skills/<name>`, or `@pf-skills-<name>/<name>` when it has its own package. pf installs and updates them:
+
+```bash
+pf skill available                  # registry skills, their versions and where they are installed
+pf skill install ver bp             # latest version into pf's own folder, ~/.pf/skills
+pf skill install --all --to claude  # every skill, into ~/.claude/skills instead
+pf skill update [name...]           # bring registry installs to the latest (--check only reports)
+pf skill remove ver                 # delete a registry install
+```
+
+`--to` takes `pf` (the default), `cursor`, `claude`, `agents` or `all` (comma-separated); use an agent folder when that agent should see the skill outside `pf agent`. An install keeps the package's `package.json` in the skill folder; that marks it as a registry install. pf never replaces a symlink (a skills repo checkout) or a folder it did not install unless you pass `--force`. `pf update` also updates every registry install. A skill named `available`, `install`, `update`, `remove` or `run` runs as `pf skill run <name>`.
 
 ### Agent
 

@@ -137,12 +137,19 @@ test('bundled skills ship with pf, and an earlier skill of the same name wins', 
     'pf-repo/SKILL.md': '---\nname: pf-repo\ndescription: Bundled copy.\n---\n',
     'fix-failing/SKILL.md': '---\nname: fix-failing\ndescription: Fix.\n---\n',
   });
-  const skills = discoverSkills(null, {}, home, bundled);
+  const own = mkRepo({
+    'fix-failing/SKILL.md': '---\nname: fix-failing\ndescription: Registry copy.\n---\n',
+    'save/SKILL.md': '---\nname: save\ndescription: Save.\n---\n',
+  });
+  const skills = discoverSkills(null, {}, home, bundled, null);
   assert.equal(skills.find((s) => s.name === 'pf-repo')!.description, 'User copy.');
   assert.equal(skills.find((s) => s.name === 'pf-repo')!.source, '~/.agents/skills');
   assert.equal(skills.find((s) => s.name === 'fix-failing')!.source, 'pulpfixer');
+  const withOwn = discoverSkills(null, {}, home, bundled, own);
+  assert.equal(withOwn.find((s) => s.name === 'fix-failing')!.source, '~/.pf/skills');
+  assert.equal(withOwn.find((s) => s.name === 'save')!.source, '~/.pf/skills');
 
-  const shipped = discoverSkills(null, {}, mkRepo({}), bundledSkillsDir()).map((s) => s.name);
+  const shipped = discoverSkills(null, {}, mkRepo({}), bundledSkillsDir(), null).map((s) => s.name);
   for (const name of ['pf-repo', 'fix-failing', 'ship-staging']) assert.ok(shipped.includes(name), name);
   assert.ok(fs.existsSync(path.join(bundledSkillsDir(), 'ship-staging', 'SKILL.md')));
 });

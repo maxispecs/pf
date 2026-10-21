@@ -3,25 +3,8 @@ import { saveAgent } from '../agent/agents.js';
 import { chooseSavedAgent, startAgent } from '../agent/launch.js';
 import { err } from '../ui/palette.js';
 import { badgeLabel, termLine } from '../ui/text.js';
-import { splitDashes, takeFlag, which } from '../util.js';
+import { splitDashes, takeFlag, takeOption, which } from '../util.js';
 import type { Command } from './types.js';
-
-function takeOption(args: string[], name: string): string | undefined {
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i]!;
-    if (a === name) {
-      const value = args[i + 1];
-      if (value === undefined) return undefined;
-      args.splice(i, 2);
-      return value;
-    }
-    if (a.startsWith(`${name}=`)) {
-      args.splice(i, 1);
-      return a.slice(name.length + 1);
-    }
-  }
-  return undefined;
-}
 
 export const agentCommand: Command = {
   name: 'agent',

@@ -5,6 +5,7 @@ import { globalBinOnPath, legacyGlobal, npmrcHasCellarsAuth, pfOnPath, userNpmrc
 import { AGENT_IDS, installedAgents, resolveAgent } from '../agent/agents.js';
 import { cursorMcpPath, cursorMcpRegistered } from '../agent/adapters.js';
 import { BUNDLED_LABEL } from '../skills/discover.js';
+import { installedSkills, targetDir } from '../skills/registry.js';
 import { loadSkills } from './skill.js';
 import { out } from '../ui/palette.js';
 import { reporter } from '../ui/prompt.js';
@@ -78,6 +79,8 @@ export const doctorCommand: Command = {
     }
     const skills = loadSkills(ctx);
     r.ok(`${skills.length} skills found (${skills.filter((s) => s.source === BUNDLED_LABEL).length} bundled with pf)`);
+    const fromRegistry = installedSkills();
+    r.info(`${fromRegistry.length} installed from the registry (${fromRegistry.filter((s) => s.target === 'pf').length} in ${targetDir('pf')})${fromRegistry.length ? ': pf update keeps them current' : ': pf skill available lists them'}`);
 
     r.step('Config');
     r.info(`${pfHome()} ${fs.existsSync(pfHome()) ? 'exists' : 'does not exist yet'}`);

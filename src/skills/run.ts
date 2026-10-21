@@ -7,7 +7,7 @@ import { verCommand } from '../commands/ver.js';
 import { err } from '../ui/palette.js';
 import { badgeLabel, termLine } from '../ui/text.js';
 import { exists } from '../util.js';
-import { BUNDLED_LABEL, type Skill } from './discover.js';
+import { isPfSkill, type Skill } from './discover.js';
 
 export function agentPrompt(agent: string, skill: string, args: string[]): string {
   const rest = args.join(' ').trim();
@@ -44,7 +44,7 @@ export async function runDirect(ctx: Context, skill: Skill, args: string[], dryR
 export async function runSkill(ctx: Context, skill: Skill, args: string[], dryRun = false): Promise<number> {
   const direct = await runDirect(ctx, skill, args, dryRun);
   if (direct !== null) return direct;
-  if (skill.source === BUNDLED_LABEL) {
+  if (isPfSkill(skill)) {
     const rest = args.join(' ').trim();
     return startAgent(ctx, { prompt: `Call pf_skill with name "${skill.name}" and follow it.${rest ? ` Task: ${rest}` : ''}`, dryRun });
   }

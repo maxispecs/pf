@@ -21,7 +21,7 @@ test('discovers skills in order, de-duplicates by name, scans nested folders', (
     '.claude/skills/synced/uuid/beta/SKILL.md': '---\nname: beta\ndescription: Nested.\n---\n',
   });
   const repo = mkRepo({ '.agents/skills/gamma/SKILL.md': '---\nname: gamma\ndescription: Repo.\n---\n' });
-  const skills = discoverSkills(repo, {}, home, null);
+  const skills = discoverSkills(repo, {}, home, null, null);
   assert.deepEqual(skills.map((s) => s.name), ['alpha', 'beta', 'gamma']);
   assert.equal(skills.find((s) => s.name === 'alpha')!.description, 'From agents.');
 });

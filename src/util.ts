@@ -92,6 +92,24 @@ export function takeFlag(args: string[], ...names: string[]): boolean {
   return found;
 }
 
+/** Remove `--name value` or `--name=value` from args, returning the value. */
+export function takeOption(args: string[], name: string): string | undefined {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!;
+    if (a === name) {
+      const value = args[i + 1];
+      if (value === undefined) return undefined;
+      args.splice(i, 2);
+      return value;
+    }
+    if (a.startsWith(`${name}=`)) {
+      args.splice(i, 1);
+      return a.slice(name.length + 1);
+    }
+  }
+  return undefined;
+}
+
 /** Split args at the first `--`: [before, after]. */
 export function splitDashes(args: string[]): [string[], string[]] {
   const i = args.indexOf('--');
