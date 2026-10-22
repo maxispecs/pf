@@ -1,6 +1,6 @@
 import readline from 'node:readline';
 import type { Context } from '../context.js';
-import { findSkill, findTool, loadAgentSkills, skillText, TOOLS } from './tools.js';
+import { findSkill, loadAgentSkills, skillText, TOOLS, type Tool } from './tools.js';
 
 /** Name agent CLIs show for the server; Claude Code tools become `mcp__pulpfixer__<tool>`. */
 export const SERVER_NAME = 'pulpfixer';
@@ -21,8 +21,8 @@ export type JsonRpcResponse =
 const result = (id: JsonRpcRequest['id'], value: unknown): JsonRpcResponse => ({ jsonrpc: '2.0', id: id ?? null, result: value });
 const error = (id: JsonRpcRequest['id'], code: number, message: string): JsonRpcResponse => ({ jsonrpc: '2.0', id: id ?? null, error: { code, message } });
 
-/** Answer one JSON-RPC message. Notifications (no id) get null. */
-export async function handle(ctx: Context, req: JsonRpcRequest): Promise<JsonRpcResponse | null> {
+/** Answer one JSON-RPC message. Notifications (no id) get null. `tools` defaults to the repo tools. */
+export async function handle(ctx: Context, req: JsonRpcRequest, tools: Tool[] = TOOLS): Promise<JsonRpcResponse | null> {
   const isNotification = req.id === undefined;
   const params = req.params ?? {};
   switch (req.method) {
@@ -32,16 +32,19 @@ export async function handle(ctx: Context, req: JsonRpcRequest): Promise<JsonRpc
         protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
         capabilities: { tools: {}, prompts: {} },
         serverInfo: { name: SERVER_NAME, version: ctx.version },
-        instructions: 'pulpfixer (pf) tools for this repo: resolved commands, runs, versions, staging deploys and skills. Start with pf_commands.',
+        instructions:
+          tools === TOOLS
+            ? 'pulpfixer (pf) tools for this repo: resolved commands, runs, versions, staging deploys and skills. Start with pf_commands.'
+            : 'pulpfixer (pf) tools for this host: status, security updates, packages, services, patching and allowlisted restarts. Start with pf_host_status.',
       });
     }
     case 'ping':
       return isNotification ? null : result(req.id, {});
     case 'tools/list':
-      return result(req.id, { tools: TOOLS.map(({ name, description, inputSchema, readOnly }) => ({ name, description, inputSchema, annotations: { readOnlyHint: readOnly } })) });
+      return result(req.id, { tools: tools.map(({ name, description, inputSchema, readOnly }) => ({ name, description, inputSchema, annotations: { readOnlyHint: readOnly } })) });
     case 'tools/call': {
       const name = typeof params.name === 'string' ? params.name : '';
-      const tool = findTool(name);
+      const tool = tools.find((t) => t.name === name);
       if (!tool) return error(req.id, -32602, `Unknown tool: ${name}`);
       const args = params.arguments && typeof params.arguments === 'object' ? (params.arguments as Record<string, unknown>) : {};
       try {
@@ -77,7 +80,12 @@ export async function handle(ctx: Context, req: JsonRpcRequest): Promise<JsonRpc
  * Serve MCP over stdio: one JSON-RPC message per line. stdout carries only protocol messages,
  * so nothing else in this process may write to it. Resolves when stdin closes.
  */
-export function serve(ctx: Context, input: NodeJS.ReadableStream = process.stdin, output: NodeJS.WritableStream = process.stdout): Promise<number> {
+export function serve(
+  ctx: Context,
+  input: NodeJS.ReadableStream = process.stdin,
+  output: NodeJS.WritableStream = process.stdout,
+  tools: Tool[] = TOOLS,
+): Promise<number> {
   const send = (msg: JsonRpcResponse) => output.write(JSON.stringify(msg) + '\n');
   const pending = new Set<Promise<void>>();
   const rl = readline.createInterface({ input, crlfDelay: Infinity });
@@ -90,7 +98,7 @@ export function serve(ctx: Context, input: NodeJS.ReadableStream = process.stdin
       send(error(null, -32700, 'Parse error'));
       return;
     }
-    const p = handle(ctx, req)
+    const p = handle(ctx, req, tools)
       .then((res) => {
         if (res) send(res);
       })

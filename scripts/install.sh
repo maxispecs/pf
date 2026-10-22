@@ -3,6 +3,7 @@
 #
 #   scripts/install.sh                  install the latest published version from the cellars registry
 #   scripts/install.sh --from-source    build this checkout and link it globally (for development)
+#   scripts/install.sh --host           set up an EC2 instance (as root; `pf host install` sends this via SSM)
 #
 # Options:
 #   --yes          do not ask before removing the legacy pulpfixer 1.x global
@@ -10,8 +11,19 @@
 #   --registry U   registry URL (default: the cellars staging registry)
 #   --no-setup     skip `pf setup` at the end
 #
-# Needs Node >= 18 and npm. Installing from the registry needs NPM_TOKEN (token from #frontend)
-# or an existing auth line for the registry in ~/.npmrc. A token is never written or printed.
+# Host options (with --host; the rest are passed to `pf host init`):
+#   --secrets S    ssm (default) or secretsmanager: where NPM_TOKEN and the agent key live
+#   --prefix P     secret name prefix (default /pulpfixer: /pulpfixer/npm-token, /pulpfixer/anthropic-api-key)
+#   --region R     AWS region (default: the instance's)
+#   --service U    systemd unit the agent may restart (repeatable)
+#   --budget USD   spending cap per agent run
+#   --timer        daily `pf host update` systemd timer
+#   --no-agent     do not install Claude Code
+#
+# Needs Node >= 18 and npm (--host installs Node with dnf/yum/apt when it is missing).
+# Installing from the registry needs NPM_TOKEN (token from #frontend) or an existing auth line
+# for the registry in ~/.npmrc; --host reads it from SSM or Secrets Manager with the instance role.
+# A token is never written or printed.
 set -euo pipefail
 
 PACKAGE="pulpfixer"
@@ -20,6 +32,12 @@ FROM_SOURCE=0
 YES=0
 DRY=0
 SETUP=1
+HOST=0
+AGENT=1
+SECRETS="ssm"
+PREFIX="/pulpfixer"
+AWS_REGION_ARG=""
+INIT_ARGS=()
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   B=$'\033[1m'; D=$'\033[2m'; R=$'\033[31m'; G=$'\033[32m'; Y=$'\033[33m'; O=$'\033[38;5;208m'; Z=$'\033[0m'
@@ -42,7 +60,15 @@ while [ $# -gt 0 ]; do
     --dry-run|-n) DRY=1 ;;
     --no-setup) SETUP=0 ;;
     --registry) shift; REGISTRY="${1:?--registry needs a URL}" ;;
-    -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --host) HOST=1; YES=1; SETUP=0 ;;
+    --no-agent) AGENT=0 ;;
+    --secrets) shift; SECRETS="${1:?--secrets needs ssm or secretsmanager}"; INIT_ARGS+=(--secrets "$SECRETS") ;;
+    --prefix) shift; PREFIX="${1:?--prefix needs a value}"; INIT_ARGS+=(--prefix "$PREFIX") ;;
+    --region) shift; AWS_REGION_ARG="${1:?--region needs a value}"; INIT_ARGS+=(--region "$AWS_REGION_ARG") ;;
+    --service) shift; INIT_ARGS+=(--service "${1:?--service needs a unit}") ;;
+    --budget) shift; INIT_ARGS+=(--budget "${1:?--budget needs a number}") ;;
+    --timer) INIT_ARGS+=(--timer) ;;
+    -h|--help) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "unknown option: $1 (try --help)" ;;
   esac
   shift
@@ -50,6 +76,40 @@ done
 
 say "${O}${B}pf${Z} ${B}install${Z}"
 [ "$DRY" = 1 ] && say "${D}(dry run: nothing is changed)${Z}"
+
+# 0. Host mode: root, Node from the OS, the registry token read with the instance role
+if [ "$HOST" = 1 ]; then
+  [ "$FROM_SOURCE" = 0 ] || die "--host installs from the registry; drop --from-source"
+  [ "$(id -u)" = 0 ] || [ "$DRY" = 1 ] || die "--host needs root (SSM Run Command runs as root; locally use sudo)"
+  export HOME="${HOME:-/root}"
+  if ! command -v node >/dev/null 2>&1; then
+    if command -v dnf >/dev/null 2>&1; then run dnf install -y nodejs npm
+    elif command -v yum >/dev/null 2>&1; then run yum install -y nodejs npm
+    elif command -v apt-get >/dev/null 2>&1; then run apt-get update -q; DEBIAN_FRONTEND=noninteractive run apt-get install -y -q nodejs npm
+    else die "Node is missing and no dnf, yum or apt-get to install it"; fi
+  fi
+  command -v aws >/dev/null 2>&1 || die "the aws CLI is missing: install awscli, it reads secrets with the instance role"
+  REGION_FLAG=()
+  [ -n "$AWS_REGION_ARG" ] && REGION_FLAG=(--region "$AWS_REGION_ARG")
+  if [ "$SECRETS" = ssm ]; then
+    TOKEN_CMD=(aws ssm get-parameter --name "${PREFIX%/}/npm-token" --with-decryption --query Parameter.Value --output text "${REGION_FLAG[@]+"${REGION_FLAG[@]}"}")
+  elif [ "$SECRETS" = secretsmanager ]; then
+    TOKEN_CMD=(aws secretsmanager get-secret-value --secret-id "${PREFIX#/}/npm-token" --query SecretString --output text "${REGION_FLAG[@]+"${REGION_FLAG[@]}"}")
+  else die "--secrets must be ssm or secretsmanager"; fi
+  if [ "$DRY" = 1 ]; then
+    printf '  %swould read NPM_TOKEN with:%s %s\n' "$D" "$Z" "${TOKEN_CMD[*]}"
+  else
+    # Only this process and npm see the token. It is never written or printed.
+    NPM_TOKEN="$("${TOKEN_CMD[@]}")" || die "cannot read the registry token with ${TOKEN_CMD[*]} (check the instance role)"
+    export NPM_TOKEN
+  fi
+  run mkdir -p /etc/pulpfixer
+  if [ "$DRY" = 0 ]; then
+    HOST_NAME="${REGISTRY#*://}"; HOST_NAME="${HOST_NAME%%/*}"
+    ( umask 077; printf '//%s/:_authToken=${NPM_TOKEN}\n' "$HOST_NAME" > /etc/pulpfixer/npmrc )
+  fi
+  export NPM_CONFIG_USERCONFIG=/etc/pulpfixer/npmrc
+fi
 
 # 1. Node and npm
 command -v node >/dev/null 2>&1 || die "Node is not installed. Install Node >= 18 first (https://nodejs.org)."
@@ -61,7 +121,7 @@ ok "Node $(node -v), npm $(npm -v)"
 # 2. Registry auth (presence only, never the token)
 HOST="${REGISTRY#*://}"; HOST="${HOST%%/*}"
 NPMRC="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
-if [ "$FROM_SOURCE" = 0 ]; then
+if [ "$FROM_SOURCE" = 0 ] && [ "$HOST" = 0 ]; then
   if [ -f "$NPMRC" ] && grep -q "^//${HOST}/:_authToken=" "$NPMRC"; then
     ok "registry auth line for $HOST found in $NPMRC"
   elif [ -n "${NPM_TOKEN:-}" ]; then
@@ -116,8 +176,20 @@ fi
 if [ "$DRY" = 1 ]; then
   say ""; say "${D}dry run finished${Z}"; exit 0
 fi
+export PATH="$PATH:$(npm prefix -g)/bin"
 command -v pf >/dev/null 2>&1 || die "installed, but \`pf\` is not on PATH. Add \"$(npm prefix -g)/bin\" to PATH."
 ok "pf is on PATH: $(command -v pf)"
+if [ "$HOST" = 1 ]; then
+  if [ "$AGENT" = 1 ] && ! command -v claude >/dev/null 2>&1; then
+    npm install -g @anthropic-ai/claude-code || die "could not install Claude Code"
+  fi
+  unset NPM_TOKEN
+  pf host init "${INIT_ARGS[@]+"${INIT_ARGS[@]}"}"
+  pf host login || warn "pf host login reported problems (see above): fix the IAM role or secrets, then rerun pf host login"
+  say ""
+  say "${G}Done.${Z} Try ${B}pf host fix \"check for pending security patches\"${Z}"
+  exit 0
+fi
 if [ "$SETUP" = 1 ]; then
   pf setup --yes || warn "pf setup reported items needing attention: run pf doctor"
 fi

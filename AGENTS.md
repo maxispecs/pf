@@ -7,7 +7,8 @@
 - TypeScript, ESM, strict. Node >= 18. **No runtime dependencies**: colors, the picker and argument parsing are hand-written. Dev dependencies only (`typescript`, `tsx`, `@types/node`).
 - Every invocation prints a banner with the version (`pf v2.0`) to **stderr**, so stdout stays pipeable. Do not add output paths that skip it.
 - Colors follow `NO_COLOR` / `FORCE_COLOR` (`src/ui/palette.ts`). Anything with a terminal-only mode (the menu, prompts) must fall back to static output without a TTY.
-- Never read, print or write a registry token. Only check that an auth line exists. `.npmrc` uses `${NPM_TOKEN}`.
+- Never read, print or write a registry token. Only check that an auth line exists. `.npmrc` uses `${NPM_TOKEN}`. The one exception is host mode, which reads secrets with the instance role into a child process's env only, never to disk or output.
+- Host mode (`pf host fix`) gives the agent no shell or file tools. Anything that changes the host is a pf host tool, and the MCP server refuses it without `--apply`.
 - Commands that run something support `--dry-run`. Deploys target staging only and never production.
 - New command: add `src/commands/<name>.ts`, register it in `src/commands/index.ts`, show it in `src/menu.ts` if it belongs in the menu, add a test.
 - Command resolution order is `pf.json` override, then scripts/targets the repo defines, then stack defaults (`src/detect/`). New stacks go in `src/detect/stacks.ts` with a test in `tests/`.
@@ -22,6 +23,7 @@
 | `src/ui/text.ts` | text helpers: colored command samples (`termLine`, `promptLine`), badges, headings, lists, tables. Return strings, take a `Palette`. Use these instead of hand-coloring messages |
 | `src/commands/` | built-in commands |
 | `src/agent/` | coding agent: persona, tool registry, MCP server, launchers for claude, codex and cursor |
+| `src/host/` | host mode (`pf host`): host config, IMDS identity and secrets via the aws CLI, SSM send-command, OS security patching, host MCP tools, the headless fix agent and its audit log |
 | `src/skills/` | skill discovery and runner (direct scripts, else an agent CLI) |
 | `assets/skills/` | skills that ship with pf (a same-named user or repo skill wins) |
 | `src/install/`, `src/update/` | machine setup helpers, update check |

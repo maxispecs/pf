@@ -4,6 +4,7 @@ import { mcpCommand } from './mcp.js';
 import { deployCommand } from './deploy.js';
 import { docCommand } from './doc.js';
 import { doctorCommand } from './doctor.js';
+import { hostCommand } from './host.js';
 import { initCommand } from './init.js';
 import { setupCommand } from './setup.js';
 import { skillCommand } from './skill.js';
@@ -26,6 +27,7 @@ export function allCommands(): Command[] {
     initCommand,
     doctorCommand,
     setupCommand,
+    hostCommand,
     updateCommand,
     uninstallCommand,
     aboutCommand,
