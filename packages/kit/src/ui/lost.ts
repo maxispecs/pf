@@ -1,4 +1,12 @@
-import { TRAVOLTA_BG, TRAVOLTA_CHARS, TRAVOLTA_DOTS, TRAVOLTA_FG } from './travolta-art.js';
+import {
+  TRAVOLTA_BG,
+  TRAVOLTA_CHARS,
+  TRAVOLTA_DOTS,
+  TRAVOLTA_FG,
+  TRAVOLTA_HALF_BG,
+  TRAVOLTA_HALF_CHARS,
+  TRAVOLTA_HALF_FG,
+} from './travolta-art.js';
 import { err, type Palette } from './palette.js';
 
 /** Width of the picture in characters. */
@@ -26,6 +34,15 @@ export function xterm256(r: number, g: number, b: number): number {
   return Math.max(r, g, b) - Math.min(r, g, b) < 18 || grayDist < cubeDist ? 232 + k : 16 + 36 * cr + 6 * cg + cb;
 }
 
+/**
+ * Whether to draw with half blocks only. Apple Terminal's fonts lack the quadrant characters, so it
+ * substitutes another font and the picture comes out jagged. `PF_TRAVOLTA_BLOCKS=half|quadrant` overrides.
+ */
+export function halfBlocks(env: NodeJS.ProcessEnv = process.env): boolean {
+  const forced = env.PF_TRAVOLTA_BLOCKS;
+  return forced ? forced === 'half' : env.TERM_PROGRAM === 'Apple_Terminal';
+}
+
 /** SGR parameters for a stored color (`rrggbb`), as foreground (38) or background (48). */
 function sgr(hex: string, base: 38 | 48, full: boolean): string {
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
@@ -33,13 +50,14 @@ function sgr(hex: string, base: 38 | 48, full: boolean): string {
 }
 
 /** One terminal row in color. Cells with the same colors share one escape sequence. */
-function paintRow(i: number, full: boolean): string {
-  const chars = TRAVOLTA_CHARS[i]!;
+function paintRow(i: number, full: boolean, half: boolean): string {
+  const [CHARS, FG, BG] = half ? [TRAVOLTA_HALF_CHARS, TRAVOLTA_HALF_FG, TRAVOLTA_HALF_BG] : [TRAVOLTA_CHARS, TRAVOLTA_FG, TRAVOLTA_BG];
+  const chars = CHARS[i]!;
   let res = '';
   let last = '';
   for (let x = 0; x < chars.length; x++) {
-    const fg = TRAVOLTA_FG[i]!.slice(x * 6, x * 6 + 6);
-    const bg = TRAVOLTA_BG[i]!.slice(x * 6, x * 6 + 6);
+    const fg = FG[i]!.slice(x * 6, x * 6 + 6);
+    const bg = BG[i]!.slice(x * 6, x * 6 + 6);
     const codes = ['0', ...(fg === '------' ? [] : [sgr(fg, 38, full)]), ...(bg === '------' ? [] : [sgr(bg, 48, full)])].join(';');
     if (codes !== last) res += `\x1b[${codes}m`;
     res += chars[x];
@@ -52,8 +70,8 @@ function paintRow(i: number, full: boolean): string {
  * Confused Travolta, for when pf is lost (an unknown command, an error). In color he is a picture
  * (true color when the terminal says it takes it, else 256 colors); without color he is braille dots.
  */
-export function renderLost(c: Palette = err(), full = trueColor()): string {
-  const rows = c.on ? TRAVOLTA_CHARS.map((_, i) => paintRow(i, full)) : TRAVOLTA_DOTS;
+export function renderLost(c: Palette = err(), full = trueColor(), half = halfBlocks()): string {
+  const rows = c.on ? TRAVOLTA_CHARS.map((_, i) => paintRow(i, full, half)) : TRAVOLTA_DOTS;
   return ['', ...rows.map((row) => `  ${row}`)].join('\n');
 }
 

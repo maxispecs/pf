@@ -6,9 +6,8 @@
 //
 // Writes packages/kit/src/ui/travolta-art.ts. The output is committed; run it again only to change the look.
 // Two versions of the same picture, `cols` characters wide:
-// - color: every character is a 2x2 block of pixels drawn with a half block (▀▄▌▐█) in two colors, the
-//   split that keeps each half closest to its pixels. The quadrant characters (U+2596-259F) are left out:
-//   many fonts lack them, so the terminal falls back to another font and the picture comes out jagged. Colors are stored as RGB and
+// - color: every character is a 2x2 block of pixels drawn with a quadrant character (▘▝▀▖▌▞▛▗▚▐▜▄▙▟█)
+//   in two colors, the split that keeps each half closest to its pixels. Colors are stored as RGB and
 //   mapped to true color or xterm-256 when drawn. Transparent pixels show the terminal's background.
 // - braille dots for terminals without color: the dark parts (suit, hair) plus the edges.
 // No dependencies: the PNG is decoded with node:zlib.
@@ -68,49 +67,56 @@ const hex = (rgb) => rgb.map((v) => Math.round(v).toString(16).padStart(2, '0'))
 
 // Color: quadrant bits are 1 upper left, 2 upper right, 4 lower left, 8 lower right.
 const QUADRANT = ' ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█';
-const SAFE = [3, 5, 10, 12, 15];
-const bits = (m) => [0, 1, 2, 3].filter((q) => m & (1 << q)).length;
 const px = sample(cols * 2, rows * 2);
-const chars = [];
-const fgs = [];
-const bgs = [];
-for (let row = 0; row < rows; row++) {
-  let line = '';
-  let fgLine = '';
-  let bgLine = '';
-  for (let col = 0; col < cols; col++) {
-    const quad = [0, 1, 2, 3].map((q) => px[(row * 2 + (q >> 1)) * cols * 2 + col * 2 + (q & 1)]);
-    const solid = quad.map((p) => p.alpha >= 0.5);
-    let best = { mask: 0, fg: null, bg: null };
-    if (solid.every((s) => !s)) {
-      // Nothing here: the terminal's own background.
-    } else if (solid.some((s) => !s)) {
-      // At the outline the see-through pixels are the background half.
-      const want = solid.reduce((m, s, q) => (s ? m | (1 << q) : m), 0);
-      const mask = SAFE.reduce((b, m) => (bits(m ^ want) < bits(b ^ want) ? m : b), SAFE[0]);
-      best = { mask, fg: mean(quad.filter((_, q) => solid[q]).map((p) => p.rgb)), bg: null };
-    } else {
-      let bestErr = Infinity;
-      for (const mask of SAFE) {
-        const on = quad.filter((_, q) => mask & (1 << q)).map((p) => p.rgb);
-        const off = quad.filter((_, q) => !(mask & (1 << q))).map((p) => p.rgb);
-        const fg = mean(on);
-        const bg = off.length ? mean(off) : fg;
-        const e = on.reduce((s, c) => s + dist(c, fg), 0) + off.reduce((s, c) => s + dist(c, bg), 0);
-        if (e < bestErr) {
-          bestErr = e;
-          best = { mask, fg, bg: off.length ? bg : null };
+// Terminals whose font lacks the quadrant characters (Apple Terminal) get the half-block version.
+const ALL = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+const HALF = [3, 5, 10, 12, 15];
+const bits = (m) => [0, 1, 2, 3].filter((q) => m & (1 << q)).length;
+function paint(masks) {
+  const chars = [];
+  const fgs = [];
+  const bgs = [];
+  for (let row = 0; row < rows; row++) {
+    let line = '';
+    let fgLine = '';
+    let bgLine = '';
+    for (let col = 0; col < cols; col++) {
+      const quad = [0, 1, 2, 3].map((q) => px[(row * 2 + (q >> 1)) * cols * 2 + col * 2 + (q & 1)]);
+      const solid = quad.map((p) => p.alpha >= 0.5);
+      let best = { mask: 0, fg: null, bg: null };
+      if (solid.every((s) => !s)) {
+        // Nothing here: the terminal's own background.
+      } else if (solid.some((s) => !s)) {
+        // At the outline the see-through pixels are the background half.
+        const want = solid.reduce((m, s, q) => (s ? m | (1 << q) : m), 0);
+        const mask = masks.reduce((b, m) => (bits(m ^ want) < bits(b ^ want) ? m : b), masks[0]);
+        best = { mask, fg: mean(quad.filter((_, q) => solid[q]).map((p) => p.rgb)), bg: null };
+      } else {
+        let bestErr = Infinity;
+        for (const mask of masks) {
+          const on = quad.filter((_, q) => mask & (1 << q)).map((p) => p.rgb);
+          const off = quad.filter((_, q) => !(mask & (1 << q))).map((p) => p.rgb);
+          const fg = mean(on);
+          const bg = off.length ? mean(off) : fg;
+          const e = on.reduce((s, c) => s + dist(c, fg), 0) + off.reduce((s, c) => s + dist(c, bg), 0);
+          if (e < bestErr) {
+            bestErr = e;
+            best = { mask, fg, bg: off.length ? bg : null };
+          }
         }
       }
+      line += QUADRANT[best.mask];
+      fgLine += best.fg ? hex(best.fg) : '------';
+      bgLine += best.bg ? hex(best.bg) : '------';
     }
-    line += QUADRANT[best.mask];
-    fgLine += best.fg ? hex(best.fg) : '------';
-    bgLine += best.bg ? hex(best.bg) : '------';
+    chars.push(line);
+    fgs.push(fgLine);
+    bgs.push(bgLine);
   }
-  chars.push(line);
-  fgs.push(fgLine);
-  bgs.push(bgLine);
+  return { chars, fgs, bgs };
 }
+const { chars, fgs, bgs } = paint(ALL);
+const half = paint(HALF);
 
 // Braille: cells are 2 dots wide and 4 tall.
 const W = cols * 2;
@@ -145,8 +151,13 @@ fs.writeFileSync(
   path.join(root, 'packages', 'kit', 'src', 'ui', 'travolta-art.ts'),
   `// Generated by scripts/travolta-art.mjs from scripts/art/travolta.png. Do not edit by hand.
 
-/** The color picture: one half-block character per cell, one string per terminal row. */
+/** The color picture: one quadrant character per cell, one string per terminal row. */
 export const TRAVOLTA_CHARS: string[] = ${list(chars)};
+
+/** The same picture with half blocks only (▀▄▌▐█), for fonts without the quadrant characters. */
+export const TRAVOLTA_HALF_CHARS: string[] = ${list(half.chars)};
+export const TRAVOLTA_HALF_FG: string[] = ${list(half.fgs)};
+export const TRAVOLTA_HALF_BG: string[] = ${list(half.bgs)};
 
 /** Per cell, the foreground as 6 hex digits (RGB); ------ means none. */
 export const TRAVOLTA_FG: string[] = ${list(fgs)};
