@@ -14,6 +14,7 @@ export const SHORTCUTS: Shortcut[] = [
   { names: ['ds'], target: ['deploy', 'staging'], summary: 'Deploy to staging (pf deploy staging)', group: 'Docs & deploy' },
   { names: ['dp'], target: ['deploy', 'production'], summary: 'Deploy to production (pf deploy production)', group: 'Docs & deploy' },
   { names: ['r'], target: ['repo'], summary: 'Hook pf tools into this repo or update them (pf repo)', group: 'Tools' },
+  { names: ['u'], target: ['update'], summary: 'Update pf, its plugins and skills (pf update)', group: 'Tools' },
   { names: ['up'], target: ['s3'], summary: 'Upload to the exchange bucket (pf s3)', group: 'AWS' },
 ];
 
