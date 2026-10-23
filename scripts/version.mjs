@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 // Revision of this CLI, bumped whenever it changes. `--cli-version` prints it so the /ver skill
 // can tell whether a repo's copy is older than the skill's. Copies without it count as 0.
-const CLI_VERSION = 2;
+const CLI_VERSION = 4;
 const MANIFEST = 'versions.json';
 const SKIP_DIRS = new Set([
   'node_modules', 'dist', 'build', 'out', 'coverage', 'venv', 'env', '__pycache__',
@@ -25,12 +25,17 @@ With no command in a terminal, opens an interactive list: click a MINOR or MAJOR
 bump (any key exits). Without a terminal (pipes, CI) or with --json it prints "list".
 
 Commands:
-  list                    Show stack and package versions with bump commands (static output)
-  bump <target> <part>    Bump a version. <target> is "stack", a package path, or a
+  list                    Show stack and package versions, the date each was assigned,
+                          and bump commands (static output)
+  bump <target> <part> [<target> <part> ...]
+                          Bump versions. <target> is "stack", a package path, or a
                           package name. <part> is "major" or "minor".
-                          Bumping any package also bumps the stack minor.
+                          Bumping any number of packages also bumps the stack minor
+                          once for this command. Each version this command changes
+                          records today's date as "since".
   init                    Create versions.json from discovered packages, or add newly
-                          discovered packages to an existing one
+                          discovered packages to an existing one. New versions record
+                          today's date as "since".
   sync                    Rewrite package.json / pyproject.toml versions from versions.json
 
 Options:
@@ -119,6 +124,43 @@ function parseVersion(v, where) {
 function bumpVersion(v, part, where) {
   const { major, minor } = parseVersion(v, where);
   return part === 'major' ? `${major + 1}.0` : `${major}.${minor + 1}`;
+}
+
+// Local calendar date. `since` is the day the current version was assigned, not a timestamp,
+// so versions.json stays stable across timezones and repeat bumps on the same day.
+function today() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+function isCalendarDate(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return false;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  return dt.getUTCFullYear() === year && dt.getUTCMonth() === month - 1 && dt.getUTCDate() === day;
+}
+
+function checkSince(value, where) {
+  if (value == null) return;
+  if (typeof value !== 'string' || !isCalendarDate(value)) {
+    throw new CliError(`Invalid since "${value}" for ${where}: expected YYYY-MM-DD`);
+  }
+}
+
+// Rewrites version and since, keeping type and any extra keys. since sits next to version.
+function stampVersion(entry, version, since) {
+  const next = { version, since };
+  if (entry.type) next.type = entry.type;
+  for (const [key, value] of Object.entries(entry)) {
+    if (key === 'version' || key === 'since' || key === 'type') continue;
+    next[key] = value;
+  }
+  return next;
 }
 
 function majorMinor(native) {
@@ -484,9 +526,11 @@ function loadManifest(root) {
   const data = readJson(file);
   if (!data.stack) throw new CliError(`${MANIFEST} is missing "stack"`);
   parseVersion(data.stack.version, 'stack');
+  checkSince(data.stack.since, 'stack');
   data.packages ??= {};
   for (const [rel, pkg] of Object.entries(data.packages)) {
     parseVersion(pkg.version, rel);
+    checkSince(pkg.since, rel);
     if (!TYPES.includes(pkg.type)) {
       throw new CliError(`Invalid type "${pkg.type}" for ${rel} in ${MANIFEST}: expected ${TYPES.join(' or ')}`);
     }
@@ -601,6 +645,7 @@ function cmdList(root, flags) {
     name: readNative(root, rel, pkg.type).name,
     type: pkg.type,
     version: pkg.version,
+    since: pkg.since ?? null,
     commands: { minor: cmd(rel, 'minor'), major: cmd(rel, 'major') },
   }));
 
@@ -612,6 +657,7 @@ function cmdList(root, flags) {
       stack: {
         name: stackName(root),
         version: manifest.stack.version,
+        since: manifest.stack.since ?? null,
         commands: { minor: cmd('stack', 'minor'), major: cmd('stack', 'major') },
       },
       packages,
@@ -623,15 +669,20 @@ function cmdList(root, flags) {
 
   const tooling = [discovered.turbo && 'turborepo', discovered.packageManager].filter(Boolean).join(', ');
   console.log(`${c.dim('Repo:')} ${c.bold(root)}${tooling ? ` ${c.dim(`(${tooling})`)}` : ''}\n`);
+  const sinceCell = (since) => cell(since ?? '-', c.dim);
   const rows = [
-    header(['TARGET', 'TYPE', 'VERSION', 'NAME']),
-    [cell('stack', c.boldMagenta), cell('stack', c.magenta), cell(manifest.stack.version, c.boldMagenta), cell(stackName(root), c.dim)],
+    header(['TARGET', 'TYPE', 'VERSION', 'SINCE', 'NAME']),
+    [
+      cell('stack', c.boldMagenta), cell('stack', c.magenta), cell(manifest.stack.version, c.boldMagenta),
+      sinceCell(manifest.stack.since), cell(stackName(root), c.dim),
+    ],
     ...packages.map((p) => [
-      cell(p.path, c.cyan), cell(p.type, colorType(p.type)), cell(p.version, c.bold), cell(p.name ?? '-', c.dim),
+      cell(p.path, c.cyan), cell(p.type, colorType(p.type)), cell(p.version, c.bold),
+      sinceCell(p.since), cell(p.name ?? '-', c.dim),
     ]),
   ];
   console.log(table(rows));
-  console.log(`\n${c.bold('Bump commands')} ${c.dim('(bumping a package also bumps the stack minor):')}`);
+  console.log(`\n${c.bold('Bump commands')} ${c.dim('(package bumps raise the stack minor once per command):')}`);
   const cmdRows = [
     [commandCell(prefix, 'stack', 'minor'), commandCell(prefix, 'stack', 'major')],
     ...packages.map((p) => [commandCell(prefix, p.path, 'minor'), commandCell(prefix, p.path, 'major')]),
@@ -643,39 +694,71 @@ function cmdList(root, flags) {
   }
 }
 
-// Applies a bump and writes versions.json plus native manifests. Shared by `bump` and the interactive list.
-function applyBump(root, target, part, dryRun) {
-  if (!PARTS.includes(part)) throw new CliError(`Invalid part "${part}": expected major or minor`);
+// One command (or one interactive session) raises the stack minor at most once, however
+// many packages it bumps. An explicit stack bump in that same command is the only stack
+// change. `stackMinorDone` is set once this process has already raised the stack, so later
+// package bumps in the interactive list do not raise it again.
+function applyBumps(root, bumps, dryRun, { stackMinorDone = false } = {}) {
+  if (!bumps.length) throw new CliError('Usage: bump <target> <major|minor> [<target> <major|minor> ...]');
+  for (const { part } of bumps) {
+    if (!PARTS.includes(part)) throw new CliError(`Invalid part "${part}": expected major or minor`);
+  }
   const manifest = loadManifest(root);
-  const rel = resolveTarget(root, manifest, target);
+  const resolved = bumps.map(({ target, part }) => ({ rel: resolveTarget(root, manifest, target), part }));
   const changes = [];
+  const packageRels = [];
+  const assigned = today();
+  let explicitStack = false;
 
-  if (rel) {
+  for (const { rel, part } of resolved) {
+    if (!rel) {
+      explicitStack = true;
+      const nextStack = bumpVersion(manifest.stack.version, part, 'stack');
+      changes.push(['stack', manifest.stack.version, nextStack, assigned]);
+      manifest.stack = stampVersion(manifest.stack, nextStack, assigned);
+      continue;
+    }
     const pkg = manifest.packages[rel];
     const next = bumpVersion(pkg.version, part, rel);
-    changes.push([rel, pkg.version, next]);
-    pkg.version = next;
+    changes.push([rel, pkg.version, next, assigned]);
+    manifest.packages[rel] = stampVersion(pkg, next, assigned);
+    if (!packageRels.includes(rel)) packageRels.push(rel);
   }
-  const stackPart = rel ? 'minor' : part;
-  const nextStack = bumpVersion(manifest.stack.version, stackPart, 'stack');
-  changes.push(['stack', manifest.stack.version, nextStack]);
-  manifest.stack.version = nextStack;
+
+  let consumedStackMinor = stackMinorDone;
+  if (explicitStack) consumedStackMinor = true;
+  else if (packageRels.length && !stackMinorDone) {
+    const nextStack = bumpVersion(manifest.stack.version, 'minor', 'stack');
+    changes.push(['stack', manifest.stack.version, nextStack, assigned]);
+    manifest.stack = stampVersion(manifest.stack, nextStack, assigned);
+    consumedStackMinor = true;
+  }
 
   saveManifest(root, manifest, dryRun);
   const results = [];
-  if (rel) results.push(syncPackage(root, rel, manifest.packages[rel].type, manifest.packages[rel].version, dryRun));
-  results.push(...syncStack(root, nextStack, dryRun));
-  return { changes, results };
+  for (const rel of packageRels) {
+    results.push(syncPackage(root, rel, manifest.packages[rel].type, manifest.packages[rel].version, dryRun));
+  }
+  if (changes.some(([t]) => t === 'stack')) results.push(...syncStack(root, manifest.stack.version, dryRun));
+  return { changes, results, consumedStackMinor };
+}
+
+function parseBumpArgs(positional) {
+  if (positional.length < 2 || positional.length % 2 !== 0) {
+    throw new CliError('Usage: bump <target> <major|minor> [<target> <major|minor> ...]');
+  }
+  const bumps = [];
+  for (let i = 0; i < positional.length; i += 2) bumps.push({ target: positional[i], part: positional[i + 1] });
+  return bumps;
 }
 
 function cmdBump(root, positional, flags) {
-  const [target, part] = positional;
-  if (!target || !part) throw new CliError('Usage: bump <target> <major|minor>');
-  const { changes, results } = applyBump(root, target, part, flags.dryRun);
+  const { changes, results } = applyBumps(root, parseBumpArgs(positional), flags.dryRun);
 
   console.log(flags.dryRun ? c.yellow('Dry run, no files written:') : c.green(`Updated ${MANIFEST}:`));
-  const changeRows = changes.map(([t, from, to]) => [
+  const changeRows = changes.map(([t, from, to, since]) => [
     cell(t, () => colorTarget(t)), cell(from, c.dim), cell('->', c.dim), cell(to, c.boldGreen),
+    cell(`since ${since}`, c.dim),
   ]);
   console.log(table(changeRows, '  '));
   printSyncResults(root, results, flags.dryRun);
@@ -704,21 +787,23 @@ function clipVisible(s, max) {
 }
 
 // Builds the screen as lines plus the clickable button regions (1-based screen coordinates).
-function buildInteractiveView(root, flags, status, columns, hover) {
+function buildInteractiveView(root, flags, status, columns, hover, stackMinorDone) {
   const manifest = loadManifest(root);
   const discovered = discover(root);
   const warnings = collectWarnings(root, manifest, discovered);
   const tooling = [discovered.turbo && 'turborepo', discovered.packageManager].filter(Boolean).join(', ');
 
   const rows = [
-    { target: 'stack', type: 'stack', version: manifest.stack.version, name: stackName(root) },
+    { target: 'stack', type: 'stack', version: manifest.stack.version, since: manifest.stack.since ?? '-', name: stackName(root) },
     ...Object.entries(manifest.packages).map(([rel, pkg]) => ({
-      target: rel, type: pkg.type, version: pkg.version, name: readNative(root, rel, pkg.type).name ?? '-',
+      target: rel, type: pkg.type, version: pkg.version, since: pkg.since ?? '-',
+      name: readNative(root, rel, pkg.type).name ?? '-',
     })),
   ];
   const wTarget = Math.max('TARGET'.length, ...rows.map((r) => r.target.length));
   const wType = Math.max('TYPE'.length, ...rows.map((r) => r.type.length));
   const wVersion = Math.max('VERSION'.length, ...rows.map((r) => r.version.length));
+  const wSince = Math.max('SINCE'.length, ...rows.map((r) => r.since.length));
   const pad = (s, w) => s + ' '.repeat(Math.max(0, w - s.length));
   const center = (s, w) => pad(' '.repeat(Math.floor((w - s.length) / 2)) + s, w);
   // A version cell reads "[+] 0.10 [+]": the left [+] bumps major, the right [+] bumps minor.
@@ -730,16 +815,18 @@ function buildInteractiveView(root, flags, status, columns, hover) {
   const xCell = wTarget + 2 + wType + 2; // 0-based column where the version cell starts
   const xMajor = xCell; // "[+]" is 3 wide
   const xMinor = xCell + 3 + 1 + wVersion + 1;
-  const wName = Math.max(0, columns - (xCell + wVersion + 8 + 2));
+  // version cell "[+] <version> [+]" is wVersion + 8 wide, then SINCE, then NAME
+  const wName = Math.max(0, columns - (xCell + wVersion + 8 + 2 + wSince + 2));
 
   const lines = [];
   const buttons = [];
   lines.push(`${c.dim('Repo:')} ${c.bold(root)}${tooling ? ` ${c.dim(`(${tooling})`)}` : ''}${flags.dryRun ? c.yellow('  dry run') : ''}`);
-  lines.push(c.dim('Click [+] before the version for major, after it for minor.'));
+  lines.push(c.dim('Click [+] before the version for major, after it for minor. Package bumps raise the stack minor once.'));
   lines.push('');
   lines.push([
     c.bold(pad('TARGET', wTarget)), c.bold(pad('TYPE', wType)),
-    c.bold(`${' '.repeat(4)}${pad('VERSION', wVersion)}${' '.repeat(4)}`), c.bold('NAME'),
+    c.bold(`${' '.repeat(4)}${pad('VERSION', wVersion)}${' '.repeat(4)}`),
+    c.bold(pad('SINCE', wSince)), c.bold('NAME'),
   ].join('  '));
   for (const r of rows) {
     const screenRow = lines.length + 1;
@@ -749,17 +836,25 @@ function buildInteractiveView(root, flags, status, columns, hover) {
       (r.target === 'stack' ? c.boldMagenta : c.cyan)(pad(r.target, wTarget)),
       typePaint(pad(r.type, wType)),
       `${plus(r, 'major', c.yellow)} ${c.bold(center(r.version, wVersion))} ${plus(r, 'minor', c.green)}`,
+      c.dim(pad(r.since, wSince)),
       c.dim(name),
     ].join('  '));
     buttons.push({ row: screenRow, x1: xMajor + 1, x2: xMajor + 3, target: r.target, part: 'major' });
     buttons.push({ row: screenRow, x1: xMinor + 1, x2: xMinor + 3, target: r.target, part: 'minor' });
   }
   // Hovering a [+] previews what a click would do.
+  const stackVersion = rows[0].version;
   const hovered = hover && rows.find((r) => r.target === hover.target);
+  const preview = () => {
+    if (!hovered) return '';
+    const next = bumpVersion(hovered.version, hover.part, 'list');
+    const self = `${c.dim(`${hover.part}:`)} ${colorTarget(hovered.target)} ${c.dim(hovered.version)} ${c.dim('->')} ${c.bold(next)}`;
+    if (hovered.target === 'stack' || stackMinorDone) return self;
+    const nextStack = bumpVersion(stackVersion, 'minor', 'stack');
+    return `${self}${c.dim(',')} ${c.boldMagenta('stack')} ${c.dim(stackVersion)} ${c.dim('->')} ${c.bold(nextStack)}`;
+  };
   lines.push('');
-  lines.push(hovered
-    ? `${c.dim(`${hover.part}:`)} ${colorTarget(hovered.target)} ${c.dim(hovered.version)} ${c.dim('->')} ${c.bold(bumpVersion(hovered.version, hover.part, 'list'))}`
-    : '');
+  lines.push(preview());
   lines.push('');
   lines.push(status || '');
   lines.push(c.bold('Press any key to exit'));
@@ -778,11 +873,12 @@ function cmdInteractive(root, flags) {
   let status = '';
   let buttons = [];
   let hover = null; // { target, part } of the button under the pointer
+  let stackMinorDone = false;
 
   const render = () => {
     let lines;
     try {
-      ({ lines, buttons } = buildInteractiveView(root, flags, status, out.columns || 100, hover));
+      ({ lines, buttons } = buildInteractiveView(root, flags, status, out.columns || 100, hover, stackMinorDone));
     } catch (e) {
       if (!(e instanceof CliError)) throw e;
       lines = [`${c.red(c.bold('error:'))} ${e.message}`];
@@ -822,7 +918,9 @@ function cmdInteractive(root, flags) {
     const hit = buttonAt(x, y);
     if (!hit) return;
     try {
-      const { changes } = applyBump(root, hit.target, hit.part, flags.dryRun);
+      const applied = applyBumps(root, [{ target: hit.target, part: hit.part }], flags.dryRun, { stackMinorDone });
+      const { changes } = applied;
+      stackMinorDone = applied.consumedStackMinor;
       const text = changes.map(([t, from, to]) => `${t} ${from} -> ${to}`).join(', ');
       const prefix = flags.dryRun ? 'would bump' : 'bumped';
       log.push(`${prefix} ${hit.target} ${hit.part}: ${text}`);
@@ -868,16 +966,17 @@ function cmdInit(root, flags) {
   const manifest = existing ? loadManifest(root) : { stack: { version: null }, packages: {} };
   const added = [];
   const removed = [];
+  const assigned = today();
 
   if (!existing) {
     const seed = stackNativeVersions(root).map((n) => majorMinor(n.version)).find(Boolean);
-    manifest.stack.version = seed ?? '0.1';
+    manifest.stack = stampVersion(manifest.stack, seed ?? '0.1', assigned);
   }
   for (const [rel, type] of discovered.packages) {
     if (manifest.packages[rel]) continue;
     const version = majorMinor(readNative(root, rel, type).version) ?? '0.1';
-    manifest.packages[rel] = { version, type };
-    added.push([rel, type, version]);
+    manifest.packages[rel] = stampVersion({ type }, version, assigned);
+    added.push([rel, type, version, assigned]);
   }
   if (flags.prune) {
     for (const rel of Object.keys(manifest.packages)) {
@@ -890,13 +989,13 @@ function cmdInit(root, flags) {
 
   saveManifest(root, manifest, flags.dryRun);
   const verb = existing ? (flags.dryRun ? 'Would update' : 'Updated') : flags.dryRun ? 'Would create' : 'Created';
-  const stackNote = existing ? '' : ` ${c.dim('(stack')} ${c.boldMagenta(manifest.stack.version)}${c.dim(')')}`;
+  const stackNote = existing ? '' : ` ${c.dim('(stack')} ${c.boldMagenta(manifest.stack.version)} ${c.dim(`since ${manifest.stack.since})`)}`;
   console.log(`${(flags.dryRun ? c.yellow : c.green)(`${verb} ${MANIFEST}`)}${stackNote}`);
   if (added.length) {
-    const addedRows = added.map(([rel, type, version]) => [
-      cell(rel, c.cyan), cell(type, colorType(type)), cell(version, c.bold),
+    const addedRows = added.map(([rel, type, version, since]) => [
+      cell(rel, c.cyan), cell(type, colorType(type)), cell(version, c.bold), cell(since, c.dim),
     ]);
-    console.log(table([header(['ADDED', 'TYPE', 'VERSION']), ...addedRows], '  '));
+    console.log(table([header(['ADDED', 'TYPE', 'VERSION', 'SINCE']), ...addedRows], '  '));
   } else console.log(`  ${c.dim('no new packages found')}`);
   for (const rel of removed) console.log(`  ${c.red('removed')} ${rel}`);
 }

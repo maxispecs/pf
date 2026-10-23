@@ -18,6 +18,23 @@ importers:
         specifier: ^7.0.0
         version: 7.0.2
 
+  packages/core:
+    dependencies:
+      '@pulpfixer/kit':
+        specifier: workspace:*
+        version: link:../kit
+      '@pulpfixer/plugin-aws':
+        specifier: workspace:*
+        version: link:../plugin-aws
+
+  packages/kit: {}
+
+  packages/plugin-aws:
+    dependencies:
+      '@pulpfixer/kit':
+        specifier: workspace:*
+        version: link:../kit
+
 packages:
 
   '@esbuild/aix-ppc64@0.28.2':

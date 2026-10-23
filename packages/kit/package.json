@@ -1,0 +1,23 @@
+{
+  "name": "@pulpfixer/kit",
+  "version": "3.16.0",
+  "description": "pf shared kit: detection, exec, ui, config and the plugin API",
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    "./*": {
+      "source": "./src/*.ts",
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  }
+}

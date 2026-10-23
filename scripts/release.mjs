@@ -4,8 +4,9 @@
 //   node scripts/release.mjs             checks + build + `npm publish --dry-run` (publishes nothing)
 //   node scripts/release.mjs --publish   the same, then a real publish after you type the version to confirm
 //
-// The version to publish is package.json's, which `pnpm ver bump stack minor` keeps in step with
-// versions.json. A published version can never be reused, so bump first.
+// Publishes every package under packages/ whose version the registry does not have yet, in dependency
+// order (kit, plugins, core). Versions come from each package.json, which `pnpm ver bump <package> minor`
+// keeps in step with versions.json. A published version can never be reused, so bump first.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,6 +33,7 @@ const die = (s) => {
 // token saved by `npm login` is shadowed. When NPM_TOKEN is unset, load it from the user .npmrc into this
 // process's environment (child processes inherit it). The value is never printed.
 const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: root, stdio: 'inherit', ...opts });
+const ORDER = ['kit', 'plugin-aws', 'core'];
 const capture = (cmd, args) => spawnSync(cmd, args, { cwd: root, encoding: 'utf8' });
 
 function userNpmrcToken() {
@@ -69,29 +71,42 @@ function cmp(a, b) {
   return 0;
 }
 
-const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-console.log(`${bold('release')} ${pkg.name}@${pkg.version} ${dim(publish ? '(publish)' : '(dry run: nothing is published)')}`);
+const pkgs = ORDER.map((name) => {
+  const dir = path.join(root, 'packages', name);
+  return { dir, ...JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')), rel: `packages/${name}` };
+});
+console.log(`${bold('release')} ${pkgs.map((p) => `${p.name}@${p.version}`).join(', ')} ${dim(publish ? '(publish)' : '(dry run: nothing is published)')}`);
 
 step('Version');
+let versions = null;
 try {
-  const versions = JSON.parse(fs.readFileSync(path.join(root, 'versions.json'), 'utf8'));
-  const stack = String(versions.stack?.version ?? versions.version ?? '');
-  const mm = pkg.version.split('.').slice(0, 2).join('.');
-  if (stack && stack !== mm) die(`versions.json says ${stack} but package.json is ${pkg.version}. Run: pnpm ver sync`);
-  ok(`package.json ${pkg.version} matches versions.json`);
+  versions = JSON.parse(fs.readFileSync(path.join(root, 'versions.json'), 'utf8'));
 } catch {
   warn('no readable versions.json: skipping the drift check');
 }
+for (const p of pkgs) {
+  const want = versions && String(versions.packages?.[p.rel]?.version ?? '');
+  const mm = p.version.split('.').slice(0, 2).join('.');
+  if (want && want !== mm) die(`versions.json says ${p.rel} is ${want} but its package.json is ${p.version}. Run: pnpm ver sync`);
+  if (want) ok(`${p.name} ${p.version} matches versions.json`);
+}
 
 ensureAuth();
-const latest = capture('npm', ['view', pkg.name, 'version', '--registry', REGISTRY]);
-const published = latest.status === 0 ? latest.stdout.trim().split('\n').pop().trim() : null;
-if (published) {
-  if (cmp(pkg.version, published) > 0) ok(`${pkg.version} is newer than the registry's ${published}`);
-  else if (publish) die(`the registry already has ${published}: bump first (pnpm ver bump stack minor)`);
-  else warn(`the registry already has ${published}, so ${pkg.version} could not be published. Bump first: pnpm ver bump stack minor`);
-} else {
-  warn('could not read the registry (offline, or NPM_TOKEN is not set). Version freshness not checked');
+const todo = [];
+for (const p of pkgs) {
+  const latest = capture('npm', ['view', p.name, 'version', '--registry', REGISTRY]);
+  const published = latest.status === 0 ? latest.stdout.trim().split('\n').pop().trim() : null;
+  if (published && cmp(p.version, published) <= 0) {
+    ok(`${p.name} ${p.version}: registry has ${published}, nothing to publish`);
+  } else {
+    if (published) ok(`${p.name} ${p.version} is newer than the registry's ${published}`);
+    else warn(`${p.name}: could not read the registry (offline, or NPM_TOKEN is not set) or not published yet`);
+    todo.push(p);
+  }
+}
+if (!todo.length) {
+  if (publish) die('every package is already published: bump first (pnpm ver bump <package> minor)');
+  warn('nothing is newer than the registry, so a publish would do nothing. Bump first: pnpm ver bump <package> minor');
 }
 
 step('Checks');
@@ -103,23 +118,31 @@ for (const script of ['typecheck', 'test', 'build']) {
 }
 
 step('Package contents');
-const pack = run('npm', ['pack', '--dry-run']);
-if (pack.status !== 0) die('npm pack failed');
+for (const p of todo) {
+  console.log(dim(`$ npm pack --dry-run (${p.rel})`));
+  if (run('npm', ['pack', '--dry-run'], { cwd: p.dir }).status !== 0) die(`npm pack failed for ${p.name}`);
+}
 
 step(publish ? 'Publish' : 'Publish (dry run)');
+const label = todo.map((p) => `${p.name}@${p.version}`).join(', ');
+// pnpm publish turns the workspace:* dependencies into the real versions; npm publish would not.
+const pub = (p, extra = []) => run('pnpm', ['publish', '--no-git-checks', '--registry', REGISTRY, ...extra], { cwd: p.dir });
 if (publish) {
   if (!ensureAuth()) die('no valid registry token (npm whoami failed): run `npm login --auth-type=web --registry ' + REGISTRY + '`');
   ok(`registry auth ok (${capture('npm', ['whoami', '--registry', REGISTRY]).stdout.trim()})`);
   if (!process.stdin.isTTY) die('publishing needs a terminal to confirm');
+  const confirmWord = pkgs.find((p) => p.name === 'pulpfixer').version;
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await new Promise((resolve) => rl.question(`Type ${bold(pkg.version)} to publish ${pkg.name} to ${REGISTRY}: `, resolve));
+  const answer = await new Promise((resolve) => rl.question(`Publishing ${label} to ${REGISTRY}\nType ${bold(confirmWord)} to confirm: `, resolve));
   rl.close();
-  if (answer.trim() !== pkg.version) die('cancelled');
-  const r = run('npm', ['publish', '--registry', REGISTRY]);
-  if (r.status !== 0) die('npm publish failed');
-  ok(`published ${pkg.name}@${pkg.version}`);
+  if (answer.trim() !== confirmWord) die('cancelled');
+  for (const p of todo) {
+    if (pub(p).status !== 0) die(`publish failed for ${p.name}`);
+    ok(`published ${p.name}@${p.version}`);
+  }
 } else {
-  const r = run('npm', ['publish', '--dry-run', '--registry', REGISTRY]);
-  if (r.status !== 0) die('npm publish --dry-run failed');
+  for (const p of todo) {
+    if (pub(p, ['--dry-run']).status !== 0) die(`publish --dry-run failed for ${p.name}`);
+  }
   ok('dry run passed. Publish for real with: pnpm publish:cellars');
 }

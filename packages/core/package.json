@@ -1,0 +1,27 @@
+{
+  "name": "pulpfixer",
+  "version": "3.16.0",
+  "description": "pf: unified developer CLI for any repo, any language",
+  "license": "UNLICENSED",
+  "author": "Max Glotov, Sam Pretorius",
+  "type": "module",
+  "bin": {
+    "pf": "./dist/bin/pf.js"
+  },
+  "files": [
+    "dist",
+    "assets",
+    "scripts/install.sh",
+    "README.md"
+  ],
+  "dependencies": {
+    "@pulpfixer/kit": "workspace:*",
+    "@pulpfixer/plugin-aws": "workspace:*"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  }
+}

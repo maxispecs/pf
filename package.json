@@ -1,32 +1,21 @@
 {
-  "name": "pulpfixer",
-  "version": "3.15.0",
-  "description": "pf: unified developer CLI for any repo, any language",
+  "name": "pulpfixer-monorepo",
+  "private": true,
+  "version": "3.16.0",
+  "type": "module",
+  "description": "pf: unified developer CLI for any repo, any language (monorepo root)",
   "license": "UNLICENSED",
   "author": "Max Glotov, Sam Pretorius",
-  "type": "module",
-  "bin": {
-    "pf": "./dist/bin/pf.js"
-  },
-  "files": [
-    "dist",
-    "assets",
-    "scripts/install.sh",
-    "README.md"
-  ],
   "engines": {
     "node": ">=18"
   },
-  "publishConfig": {
-    "registry": "https://cellars.staging.pangenea.com/"
-  },
   "scripts": {
-    "dev": "tsx src/bin/pf.ts",
+    "dev": "tsx --conditions=source packages/core/src/bin/pf.ts",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.check.json",
-    "test": "node --import tsx --test \"tests/**/*.test.ts\"",
-    "pf": "node dist/bin/pf.js",
-    "install:local": "bash scripts/install.sh --from-source",
+    "test": "node scripts/test.mjs",
+    "pf": "node packages/core/dist/bin/pf.js",
+    "install:local": "bash packages/core/scripts/install.sh --from-source",
     "release": "node scripts/release.mjs",
     "publish:cellars": "node scripts/release.mjs --publish",
     "ver": "node scripts/version.mjs",
@@ -39,18 +28,18 @@
       "pf": "Run the built pf from dist"
     },
     "Build & check": {
-      "build": "Compile TypeScript to dist",
+      "build": "Compile every package to its dist",
       "typecheck": "Type-check without emitting",
-      "test": "Run the test suite"
+      "test": "Run every package's tests"
     },
     "Deploy": {
-      "install:local": "Build and install pf globally from this checkout",
-      "release": "Check, build and dry-run publish to cellars",
-      "publish:cellars": "Publish to the cellars registry"
+      "install:local": "Build, pack and install pf globally from this checkout",
+      "release": "Check, build and dry-run publish of every package to cellars",
+      "publish:cellars": "Publish the new package versions to the cellars registry"
     },
     "Tools": {
       "ver": "List versions and bump commands",
-      "logo": "Regenerate the header art from assets/pulpfixer.png (--preview to see it)"
+      "logo": "Regenerate the header art from packages/core/assets/pulpfixer.png (--preview to see it)"
     },
     "Help": {
       "ask": "Show this list"
