@@ -5,6 +5,8 @@ import { err, type Palette } from './palette.js';
 export const LOST_WIDTH = TRAVOLTA_DOTS[0]!.length;
 /** Terminal rows the picture takes, including the blank line above it. */
 export const LOST_HEIGHT = TRAVOLTA_DOTS.length + 1;
+/** Fewest terminal rows that get Travolta (he may scroll off the top); only very short windows (10 rows or less) skip him. */
+export const LOST_MIN_ROWS = 11;
 
 /** Whether the terminal takes 24-bit colors (COLORTERM is how terminals say so). */
 export function trueColor(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -57,7 +59,7 @@ export function renderLost(c: Palette = err(), full = trueColor()): string {
 
 /** Whether Travolta fits the terminal. A missing size counts as too small. */
 export function lostFits(cols: number | undefined, rows: number | undefined): boolean {
-  return (cols ?? 0) >= LOST_WIDTH + 2 && (rows ?? 0) >= LOST_HEIGHT + 4;
+  return (cols ?? 0) >= LOST_WIDTH + 2 && (rows ?? 0) >= LOST_MIN_ROWS;
 }
 
 /** Print Travolta to stderr, only on a terminal big enough for him (never into logs or pipes). */

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { LOST_HEIGHT, LOST_WIDTH, lostFits, renderLost, trueColor, xterm256 } from '../src/ui/lost.js';
+import { LOST_HEIGHT, LOST_MIN_ROWS, LOST_WIDTH, lostFits, renderLost, trueColor, xterm256 } from '../src/ui/lost.js';
 import { palette, stripAnsi, type Palette } from '../src/ui/palette.js';
 import { TRAVOLTA_BG, TRAVOLTA_CHARS, TRAVOLTA_DOTS, TRAVOLTA_FG } from '../src/ui/travolta-art.js';
 
@@ -43,6 +43,8 @@ test('colors map to true color or the nearest xterm-256 color', () => {
 
 test('travolta only shows on a terminal big enough for him', () => {
   assert.equal(lostFits(undefined, undefined), false);
-  assert.equal(lostFits(LOST_WIDTH + 2, 10), false);
+  assert.equal(lostFits(LOST_WIDTH + 2, 10), false, 'a very short window skips him');
+  assert.equal(lostFits(LOST_WIDTH + 2, LOST_MIN_ROWS), true, 'a window shorter than the picture still gets him');
+  assert.equal(lostFits(LOST_WIDTH + 1, 40), false);
   assert.equal(lostFits(80, 40), true);
 });

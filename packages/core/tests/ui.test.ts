@@ -129,7 +129,9 @@ test('the logo is for narrow-safe terminals and the menu, about and help only', 
   assert.equal(logoFits(LOGO_MIN_COLS - 1), false);
   assert.equal(logoFits(undefined), false);
   assert.equal(logoFits(200, LOGO_MIN_ROWS), true);
-  assert.equal(logoFits(200, LOGO_MIN_ROWS - 1), false, 'a short window gets the one-line banner');
+  assert.equal(logoFits(200, LOGO_MIN_ROWS - 1), false, 'a very short window gets the one-line banner');
+  assert.equal(logoFits(200, 11), true, 'a window shorter than the logo still gets it');
+  assert.equal(logoFits(200, 10), false);
   for (const c of [undefined, 'menu', 'about', 'help', '--help']) assert.equal(wantsLogo(c), true, String(c));
   for (const c of ['dev', 'build', 'list', '--version', 'ver']) assert.equal(wantsLogo(c), false, c);
 });

@@ -41,8 +41,8 @@ const TEXT_TOP = 4;
 
 /** Narrowest terminal the full logo fits in. */
 export const LOGO_MIN_COLS = 2 + LOGO_ART[0]!.length + GAP.length + RULE_WIDTH + 4;
-/** Fewest terminal rows worth spending on the logo; shorter windows get the one-line banner. */
-export const LOGO_MIN_ROWS = 28;
+/** Fewest terminal rows that get the logo; only very short windows (10 rows or less) get the one-line banner. */
+export const LOGO_MIN_ROWS = 11;
 
 /** Whether the big header fits the terminal. A missing size counts as too small. */
 export function logoFits(cols: number | undefined, rows: number = Infinity): boolean {

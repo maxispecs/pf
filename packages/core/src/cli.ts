@@ -19,11 +19,12 @@ export function helpText(): string {
   const lines: string[] = [];
   lines.push(`${h2('Usage', c)}  ${termLine('pf [command] [args]', c)}`);
   lines.push(c.dim('        pf with no command opens the menu for the current repo (or a fallback menu outside one)'));
-  const cmds = allCommands();
+  // Commands stay grouped by category, separated by a blank line, without the category names.
+  const cmds = allCommands().filter((cmd) => !cmd.hidden);
   for (const g of GROUPS) {
-    const inGroup = cmds.filter((cmd) => cmd.group === g && !cmd.hidden);
+    const inGroup = cmds.filter((cmd) => cmd.group === g);
     if (!inGroup.length) continue;
-    lines.push('', h2(g, c));
+    lines.push('');
     const width = Math.max(...inGroup.map((x) => x.usage.length));
     for (const cmd of inGroup) lines.push(`  ${termLine(cmd.usage, c)}${' '.repeat(width - cmd.usage.length)}  ${cmd.summary}`);
   }

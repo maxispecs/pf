@@ -7,7 +7,7 @@ import { doctorCommand } from './doctor.js';
 import { hostCommand } from './host.js';
 import { initCommand } from './init.js';
 import { setupCommand } from './setup.js';
-import { SHORTCUTS, shortcutCommand } from './shortcuts.js';
+import { SHORTCUTS, shortcutCommands } from './shortcuts.js';
 import { skillCommand } from './skill.js';
 import { TASK_COMMANDS } from './tasks.js';
 import type { Command } from '@pulpfixer/kit/types';
@@ -34,7 +34,7 @@ export function allCommands(): Command[] {
     setupCommand,
     hostCommand,
     pluginCommand,
-    ...SHORTCUTS.map((sc) => shortcutCommand(sc, findCommand)),
+    ...SHORTCUTS.flatMap((sc) => shortcutCommands(sc, findCommand)),
     updateCommand,
     uninstallCommand,
     aboutCommand,

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { allCommands } from '../src/commands/index.js';
-import { SHORTCUTS, shortcutCommand } from '../src/commands/shortcuts.js';
+import { SHORTCUTS, shortcutCommand, shortcutCommands } from '../src/commands/shortcuts.js';
 import { buildContext } from '@pulpfixer/kit/context';
 import { detectProduction } from '@pulpfixer/kit/detect/deploy';
 import { json, lines, mkRepo } from './helpers.js';
@@ -22,17 +22,24 @@ function pf(cwd: string, ...args: string[]) {
 test('shortcut names are unique and do not shadow other commands', () => {
   const names = allCommands().map((c) => c.name);
   assert.equal(new Set(names).size, names.length);
-  for (const s of SHORTCUTS) assert.ok(names.includes(s.name));
+  for (const s of SHORTCUTS) for (const n of s.names) assert.ok(names.includes(n));
 });
 
 test('a shortcut runs its target with the fixed args first', async () => {
   let got: string[] = [];
   const cmd = shortcutCommand(
-    { name: 'x', target: ['deploy', 'staging'], summary: '', group: 'Tools' },
+    { names: ['x'], target: ['deploy', 'staging'], summary: '', group: 'Tools' },
+    'x',
     () => ({ name: 'deploy', summary: '', group: 'Tools', usage: '', run: async (_c, a) => ((got = a), 7) }),
   );
   assert.equal(await cmd.run({} as never, ['--dry-run']), 7);
   assert.deepEqual(got, ['staging', '--dry-run']);
+});
+
+test('a shortcut can have several names, all running the same target', () => {
+  const cmds = shortcutCommands({ names: ['up', 'put'], target: ['s3'], summary: '', group: 'AWS' }, () => undefined);
+  assert.deepEqual(cmds.map((c) => c.name), ['up', 'put']);
+  assert.ok(allCommands().some((c) => c.name === 'up'));
 });
 
 test('production is only taken from pf.json or a production script', () => {
