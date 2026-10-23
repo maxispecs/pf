@@ -1,16 +1,16 @@
 {
   "stack": {
-    "version": "4.9",
+    "version": "4.10",
     "since": "2026-10-23"
   },
   "packages": {
     "packages/core": {
-      "version": "4.9",
+      "version": "4.10",
       "since": "2026-10-23",
       "type": "node"
     },
     "packages/kit": {
-      "version": "4.3",
+      "version": "4.4",
       "since": "2026-10-23",
       "type": "node"
     },

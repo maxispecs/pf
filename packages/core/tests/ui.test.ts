@@ -69,6 +69,8 @@ test('picker rows group items and keep selection indexes', () => {
   ];
   const rows = buildRows(items);
   assert.deepEqual(rows.map((r) => ('header' in r ? r.header : `${r.item.label}:${r.index}`)), ['G1', 'a:0', 'c:1', 'G2', 'b:2']);
+  const plain = buildRows(items, false);
+  assert.deepEqual(plain.map((r) => ('header' in r ? r.header : `${r.item.label}:${r.index}`)), ['a:0', 'c:1', '', 'b:2']);
 });
 
 test('picker filter matches label, hint and group', () => {

@@ -144,7 +144,7 @@ export function printList(ctx: Context, entries: Entry[] = entriesFor(ctx), head
   for (const e of entries) {
     if (e.group !== group) {
       group = e.group;
-      w(`\n${h2(group, c)}`);
+      w(heading ? `\n${h2(group, c)}` : '');
     }
     w(`  ${termLine(key(e), c)}${' '.repeat(width - key(e).length)}  ${e.detail ? e.summary.padEnd(sw) + c.dim('  ' + e.detail) : e.summary}`);
   }
@@ -174,7 +174,8 @@ export async function runMenu(
       group: e.group,
       ...(e.detail ? { detail: e.detail } : {}),
     })),
-    last ? { initial: last } : {},
+    // The main menu keeps its grouping but not the group names; custom menus (the ./pf launcher) keep them.
+    { ...(last ? { initial: last } : {}), ...(custom ? {} : { groupNames: false }) },
   );
   if (!chosen) return 0;
   rememberMenuChoice(historyKey, chosen.name);

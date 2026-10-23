@@ -22,6 +22,8 @@ export interface PickOptions<T> {
   initial?: T;
   /** Multi-select: values that start checked. */
   defaults?: T[];
+  /** Show group names as headers (default). When false, groups are separated by a blank line instead. */
+  groupNames?: boolean;
 }
 
 /** Lists longer than this open in type-to-filter mode. */
@@ -46,8 +48,8 @@ export function filterItems<T>(items: PickItem<T>[], query: string): PickItem<T>
     .map((x) => x.item);
 }
 
-/** Lay items out as header and item rows, grouped in first-seen order. */
-export function buildRows<T>(items: PickItem<T>[]): Row<T>[] {
+/** Lay items out as header and item rows, grouped in first-seen order. An empty header is a blank separator. */
+export function buildRows<T>(items: PickItem<T>[], names = true): Row<T>[] {
   const groups = new Map<string, PickItem<T>[]>();
   for (const it of items) {
     const g = it.group ?? '';
@@ -57,7 +59,7 @@ export function buildRows<T>(items: PickItem<T>[]): Row<T>[] {
   const rows: Row<T>[] = [];
   let index = 0;
   for (const [g, list] of groups) {
-    if (g) rows.push({ header: g });
+    if (names ? g : rows.length) rows.push({ header: names ? g : '' });
     for (const item of list) rows.push({ item, index: index++ });
   }
   return rows;
@@ -231,13 +233,14 @@ export function chosenValues<T>(st: PickerState, cfg: PickerConfig<T>): PickItem
 export interface PickerView<T> extends PickerConfig<T> {
   title: string;
   footer?: string;
+  groupNames?: boolean;
 }
 
 /** Draw the picker as lines, each already cut to the terminal width. */
 export function renderPicker<T>(v: PickerView<T>, st: PickerState, cols: number, termRows: number, c: Palette): string[] {
   const list = filterItems(v.items, st.query);
   const cursor = Math.min(st.cursor, Math.max(0, list.length - 1));
-  const rows = buildRows(list);
+  const rows = buildRows(list, v.groupNames ?? true);
   const hasDetail = v.items.some((i) => i.detail);
   const maxRows = Math.max(5, termRows - (hasDetail ? 8 : 7));
   const selRow = rows.findIndex((r) => 'item' in r && r.index === cursor);
@@ -256,7 +259,7 @@ export function renderPicker<T>(v: PickerView<T>, st: PickerState, cols: number,
   if (start > 0) lines.push(c.dim('  ↑ more'));
   for (const r of shown) {
     if ('header' in r) {
-      lines.push(`  ${c.dim(c.bold(r.header))}`);
+      lines.push(r.header ? `  ${c.dim(c.bold(r.header))}` : '');
       continue;
     }
     const { item } = r;
@@ -302,6 +305,7 @@ function session<T>(title: string, items: PickItem<T>[], multi: boolean, opts: P
       search: opts.search ?? items.length > SEARCH_AFTER,
       page: Math.max(1, rowsNow() - 10),
       ...(opts.footer ? { footer: opts.footer } : {}),
+      ...(opts.groupNames === false ? { groupNames: false } : {}),
     };
     const st = initialState(items, opts);
     let drawn = 0;
