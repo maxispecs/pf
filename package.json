@@ -1,7 +1,7 @@
 {
   "name": "pulpfixer-monorepo",
   "private": true,
-  "version": "4.4.0",
+  "version": "4.5.0",
   "type": "module",
   "description": "pf: unified developer CLI for any repo, any language (monorepo root)",
   "license": "UNLICENSED",
@@ -20,6 +20,7 @@
     "publish:cellars": "node scripts/release.mjs --publish",
     "ver": "node scripts/version.mjs",
     "logo": "node scripts/logo-art.mjs",
+    "skills:sync": "node scripts/sync-skills.mjs",
     "ask": "node scripts/tasks.mjs ask"
   },
   "scriptsInfo": {
@@ -39,6 +40,7 @@
     },
     "Tools": {
       "ver": "List versions and bump commands",
+      "skills:sync": "Refresh the bundled /ver and /pnpm helpers from the skills checkout",
       "logo": "Regenerate the header art from packages/core/assets/pulpfixer.png (--preview to see it)"
     },
     "Help": {

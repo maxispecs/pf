@@ -44,7 +44,8 @@ New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json 
 | `core/src/skills/` | skill discovery and runner (direct scripts, else an agent CLI) |
 | `core/assets/skills/` | skills that ship with pf (a same-named user or repo skill wins) |
 | `core/src/install/`, `core/src/update/` | machine setup helpers, update check |
-| `core/assets/version.mjs` | bundled copy of the `/ver` CLI (same file as `scripts/version.mjs`). Copy it from the skill, do not rewrite it |
+| `core/assets/version.mjs`, `core/assets/tasks.mjs` | bundled copies of the `/ver` CLI and the `/pnpm` helper (same files as `scripts/version.mjs`, `scripts/tasks.mjs`). Refresh them with `pnpm skills:sync`, never rewrite them |
+| `core/src/commands/repo.ts` | `pf repo` / `pf r`: installs or updates those helpers in a repo (pnpm root commands, versioning) and wires its `package.json`; rerun after `pf update` |
 | `core/scripts/install.sh` | install on a machine without pf (`--from-source` for a checkout) |
 | `scripts/logo-art.mjs` | turns `core/assets/pulpfixer.png` into the header art in `kit/src/ui/logo-art.ts` (generated, commit the output) |
 | `scripts/travolta-art.mjs`, `kit/src/ui/lost.ts` | confused Travolta (`scripts/art/travolta.png`, a frame of the cutout GIF -> `kit/src/ui/travolta-art.ts`, generated; quadrant blocks in true color or 256 colors, braille without color) printed on an unknown command or an uncaught error, TTY only, `PF_NO_TRAVOLTA=1` turns it off |

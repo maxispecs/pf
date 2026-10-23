@@ -15,6 +15,7 @@ import { uninstallCommand } from './uninstall.js';
 import { updateCommand } from './update.js';
 import { verCommand } from './ver.js';
 import { pluginCommand } from './plugin.js';
+import { repoCommand } from './repo.js';
 import { pluginCommands } from '../plugins/index.js';
 
 /** Built-in commands except the ones that live in cli.ts (help, list, menu, version). */
@@ -28,6 +29,7 @@ export function allCommands(): Command[] {
     verCommand,
     skillCommand,
     initCommand,
+    repoCommand,
     doctorCommand,
     setupCommand,
     hostCommand,

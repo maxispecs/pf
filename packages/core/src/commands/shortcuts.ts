@@ -11,6 +11,7 @@ export interface Shortcut {
 
 export const SHORTCUTS: Shortcut[] = [
   { name: 'ds', target: ['deploy', 'staging'], summary: 'Deploy to staging (pf deploy staging)', group: 'Docs & deploy' },
+  { name: 'r', target: ['repo'], summary: 'Hook pf tools into this repo or update them (pf repo)', group: 'Tools' },
   { name: 'dp', target: ['deploy', 'production'], summary: 'Deploy to production (pf deploy production)', group: 'Docs & deploy' },
 ];
 

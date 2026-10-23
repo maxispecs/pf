@@ -45,6 +45,7 @@ scripts/install.sh --dry-run      # show what would happen
 | `pf plugin [list\|available\|install\|update\|remove]` | Administer plugins from the registry. Without a command it opens an interactive menu. See [Plugins](#plugins) |
 | `pf update` | Update pf, then installed plugins and registry skills. `--check`, `--yes`, `--dry-run` |
 | `pf init` | Write `pf.json` for this repo from what was detected |
+| `pf repo` (`pf r`) | Hook pf's tools into this repo, or update them: the `/pnpm` root commands (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`) and `/ver` versioning (`versions.json`, `pnpm ver`). Updates every older ver CLI copy, prints what it did. `--dry-run`, `--no-pnpm`, `--no-ver`. Never commits |
 | `pf host ...` | pf on EC2 instances: install, login, update, security patching and the fix agent. See [Hosts](#hosts-ec2) |
 | `pf s3 <file...>`, `pf dl [name]` | AWS plugin: upload to and download from a shared exchange bucket. See [AWS plugin](#aws-plugin) |
 | `pf setup`, `update`, `uninstall`, `doctor` | Machine tooling |
@@ -220,4 +221,4 @@ pnpm publish:cellars        # the real publish (asks you to type the version)
 
 ## Shortcuts
 
-`pf ds` is `pf deploy staging` and `pf dp` is `pf deploy production` (only a `deploy:production` script or `pf.json` entry; always confirms). Add more in `packages/core/src/commands/shortcuts.ts`.
+`pf r` is `pf repo`, `pf ds` is `pf deploy staging` and `pf dp` is `pf deploy production` (only a `deploy:production` script or `pf.json` entry; always confirms). Add more in `packages/core/src/commands/shortcuts.ts`.
