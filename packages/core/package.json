@@ -1,6 +1,6 @@
 {
   "name": "pulpfixer",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "description": "pf: unified developer CLI for any repo, any language",
   "license": "UNLICENSED",
   "author": "Max Glotov, Sam Pretorius",

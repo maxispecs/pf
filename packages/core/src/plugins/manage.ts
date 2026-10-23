@@ -10,14 +10,17 @@ import { shortDescription } from '../skills/discover.js';
 import { loadFailures } from './loader.js';
 import { BUILTIN_PLUGINS } from './index.js';
 import {
+  bundledVersion,
   ensurePluginsDir,
   installArgv,
   installedPlugins,
   parseSpec,
   pluginsDir,
+  searchBuiltins,
   searchRemote,
   uninstallArgv,
   viewRemote,
+  type RemotePlugin,
 } from './registry.js';
 
 const AUTH_HINT = 'Check NPM_TOKEN and the auth line in ~/.npmrc (pf setup fixes the latter)';
@@ -46,30 +49,68 @@ export function listPlugins(): number {
   return failed.size ? 1 : 0;
 }
 
-/** `pf plugin available`: what the registry has, and what is installed here. */
+export interface BuiltinRow {
+  name: string;
+  summary: string;
+  /** Version bundled with this pf; '' when pf does not ship it. */
+  bundled: string;
+  /** Latest version on the registry; '' when unpublished or not searched. */
+  published: string;
+}
+
+/** Built-in plugins next to their published packages, plus published ones this pf does not ship yet. */
+export function builtinRows(builtins: { name: string; summary: string; bundled: string }[], published: RemotePlugin[]): BuiltinRow[] {
+  const rows: BuiltinRow[] = builtins.map((b) => ({ ...b, published: published.find((p) => p.name === b.name)?.version ?? '' }));
+  for (const p of published) {
+    if (!rows.some((r) => r.name === p.name)) rows.push({ name: p.name, summary: p.description, bundled: '', published: p.version });
+  }
+  return rows;
+}
+
+/** `pf plugin available`: built-in plugins and what the registry has, with what is installed here. */
 export function listAvailable(): number {
   const c = out();
+  const w = (s: string) => process.stdout.write(s + '\n');
+  const builtins = searchBuiltins();
   const found = searchRemote();
-  if (!found.plugins) {
-    process.stderr.write(`${badgeLabel('error', err())} could not search ${REGISTRY_URL}: ${found.error}\n${AUTH_HINT}\n`);
+  const rows = builtinRows(
+    BUILTIN_PLUGINS.map((p) => ({ name: p.name, summary: p.summary, bundled: bundledVersion(p.name) })),
+    builtins.plugins ?? [],
+  );
+  const remote = found.plugins ?? [];
+  const width = Math.max(8, ...rows.map((r) => r.name.length), ...remote.map((p) => p.name.length));
+  const ver = (v: string) => (v ? `v${short(v)}` : '').padEnd(6);
+
+  w(c.bold('Built in') + c.dim('  ship with pf, published as @pulpfixer/plugin-<name>'));
+  for (const r of rows) {
+    const state = !r.bundled
+      ? c.yellow('newer pf ships it: pf update')
+      : r.published && compareVersions(r.published, r.bundled) > 0
+        ? c.yellow(`v${short(r.published)} on the registry: pf update`)
+        : c.green('built in');
+    w(`  ${c.bold(r.name.padEnd(width))}  ${ver(r.bundled || r.published)}  ${c.dim(shortDescription(r.summary, 60))}  ${state}`);
+  }
+  w('');
+  w(c.bold('Registry') + c.dim('  @pf-plugins/<name>, install with pf plugin install'));
+  if (found.plugins && !remote.length) w(`  ${c.dim(`none on ${REGISTRY_URL}`)}`);
+  const installed = installedPlugins();
+  for (const p of remote) {
+    const mine = installed.find((i) => i.name === p.name);
+    const state = BUILTIN_PLUGINS.some((b) => b.name === p.name)
+      ? c.dim('built into pf: not installable')
+      : !mine
+        ? c.dim('not installed')
+        : compareVersions(p.version, mine.version) > 0
+          ? c.yellow(`update: v${short(mine.version)}`)
+          : c.green('installed');
+    w(`  ${c.bold(p.name.padEnd(width))}  ${ver(p.version)}  ${c.dim(shortDescription(p.description, 60))}  ${state}`);
+  }
+  const error = found.error ?? builtins.error;
+  if (error) {
+    process.stderr.write(`${badgeLabel('error', err())} could not search ${REGISTRY_URL}: ${error}\n${AUTH_HINT}\n`);
     return 1;
   }
-  if (!found.plugins.length) {
-    process.stdout.write(`No @pf-plugins packages on ${REGISTRY_URL}.\n`);
-    return 0;
-  }
-  const installed = installedPlugins();
-  const width = Math.max(0, ...found.plugins.map((p) => p.name.length));
-  for (const p of found.plugins) {
-    const mine = installed.find((i) => i.name === p.name);
-    const state = !mine
-      ? c.dim('not installed')
-      : compareVersions(p.version, mine.version) > 0
-        ? c.yellow(`update: v${short(mine.version)}`)
-        : c.green('installed');
-    process.stdout.write(`  ${c.bold(p.name.padEnd(width))}  v${short(p.version).padEnd(5)}  ${c.dim(shortDescription(p.description, 60))}  ${state}\n`);
-  }
-  process.stdout.write(`\n${c.dim('install:')} ${termLine('pf plugin install <name>', c)}\n`);
+  w(`\n${c.dim('install:')} ${termLine('pf plugin install <name>', c)}`);
   return 0;
 }
 

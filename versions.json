@@ -1,11 +1,11 @@
 {
   "stack": {
-    "version": "4.2",
+    "version": "4.3",
     "since": "2026-10-23"
   },
   "packages": {
     "packages/core": {
-      "version": "4.2",
+      "version": "4.3",
       "since": "2026-10-23",
       "type": "node"
     },

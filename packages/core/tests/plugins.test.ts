@@ -5,7 +5,8 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { allCommands } from '../src/commands/index.js';
 import { loadFailures, loadInstalledPlugins, loadedPlugins, validatePlugin } from '../src/plugins/loader.js';
-import { candidatePackages, entryOf, installArgv, installedPlugins, parseSpec, pickPluginPackages, pluginOfPackage, uninstallArgv } from '../src/plugins/registry.js';
+import { builtinRows } from '../src/plugins/manage.js';
+import { builtinOfPackage, builtinPackage, bundledVersion, candidatePackages, entryOf, installArgv, installedPlugins, parseSpec, pickBuiltinPackages, pickPluginPackages, pluginOfPackage, uninstallArgv } from '../src/plugins/registry.js';
 import { json, mkRepo } from './helpers.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -159,4 +160,38 @@ test('`pf plugin install` needs names and refuses packages outside the plugin sc
   assert.equal(r.code, 1);
   assert.match(r.out + r.err, /not a plugin name/);
   assert.equal(pf(home, 'plugin', 'bogus').code, 1);
+});
+
+test('built-in plugins: package names, published packages and the bundled version', () => {
+  assert.equal(builtinOfPackage('@pulpfixer/plugin-aws'), 'aws');
+  assert.equal(builtinOfPackage('@pulpfixer/kit'), null);
+  assert.equal(builtinOfPackage('pulpfixer'), null);
+  assert.equal(builtinPackage('aws'), '@pulpfixer/plugin-aws');
+  const picked = pickBuiltinPackages([
+    { name: '@pulpfixer/kit', version: '4.1.0' },
+    { name: 'pulpfixer', version: '4.1.0' },
+    { name: '@pulpfixer/plugin-zeta', version: '1.0.0' },
+    { name: '@pulpfixer/plugin-aws', version: '4.0.0', description: 'AWS' },
+  ]);
+  assert.deepEqual(picked.map((p) => p.package), ['@pulpfixer/plugin-aws', '@pulpfixer/plugin-zeta']);
+  assert.match(bundledVersion('aws'), /^\d+\.\d+\.\d+$/);
+  assert.equal(bundledVersion('nope'), '');
+});
+
+test('builtinRows pairs bundled plugins with the registry and adds ones this pf lacks', () => {
+  const rows = builtinRows(
+    [
+      { name: 'aws', summary: 'AWS', bundled: '4.0.0' },
+      { name: 'git', summary: 'Git', bundled: '1.0.0' },
+    ],
+    [
+      { name: 'aws', package: '@pulpfixer/plugin-aws', version: '4.1.0', description: 'AWS' },
+      { name: 'jira', package: '@pulpfixer/plugin-jira', version: '1.0.0', description: 'Jira' },
+    ],
+  );
+  assert.deepEqual(rows, [
+    { name: 'aws', summary: 'AWS', bundled: '4.0.0', published: '4.1.0' },
+    { name: 'git', summary: 'Git', bundled: '1.0.0', published: '' },
+    { name: 'jira', summary: 'Jira', bundled: '', published: '1.0.0' },
+  ]);
 });

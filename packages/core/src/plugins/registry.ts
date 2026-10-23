@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { REGISTRY_URL, pfHome } from '@pulpfixer/kit/constants';
@@ -19,6 +20,33 @@ export const PLUGIN_SCOPE = '@pf-plugins';
 const NAME = '[a-z0-9]+(?:-[a-z0-9]+)*';
 const PACKAGE_RE = new RegExp(`^${PLUGIN_SCOPE}(?:-${NAME})?/(${NAME})$`);
 const SPEC_RE = /^(.+?)(?:@(latest|\d[\w.+-]*))?$/;
+
+/** Plugins from this monorepo ship inside pf and are published too, as `@pulpfixer/plugin-<name>`. */
+export const BUILTIN_SCOPE = '@pulpfixer';
+const BUILTIN_RE = new RegExp(`^${BUILTIN_SCOPE}/plugin-(${NAME})$`);
+
+/** `@pulpfixer/plugin-aws` -> `aws`. */
+export function builtinOfPackage(name: string): string | null {
+  return BUILTIN_RE.exec(name)?.[1] ?? null;
+}
+
+export function builtinPackage(plugin: string): string {
+  return `${BUILTIN_SCOPE}/plugin-${plugin}`;
+}
+
+/** Version of a built-in plugin bundled with this pf, read from its package.json; '' when it cannot be found. */
+export function bundledVersion(plugin: string): string {
+  try {
+    let dir = path.dirname(createRequire(import.meta.url).resolve(builtinPackage(plugin)));
+    for (let i = 0; i < 4; i++, dir = path.dirname(dir)) {
+      const pkg = readJson<{ name?: string; version?: string }>(dir, 'package.json');
+      if (pkg?.name === builtinPackage(plugin)) return pkg.version ?? '';
+    }
+  } catch {
+    // not resolvable from here
+  }
+  return '';
+}
 
 export function isPluginPackage(name: string): boolean {
   return PACKAGE_RE.test(name);
@@ -120,6 +148,17 @@ export function pickPluginPackages(results: { name?: unknown; version?: unknown;
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Keep the published built-in plugin packages (`@pulpfixer/plugin-<name>`). */
+export function pickBuiltinPackages(results: { name?: unknown; version?: unknown; description?: unknown }[]): RemotePlugin[] {
+  const found: RemotePlugin[] = [];
+  for (const r of results) {
+    if (typeof r.name !== 'string' || typeof r.version !== 'string') continue;
+    const name = builtinOfPackage(r.name);
+    if (name) found.push({ name, package: r.name, version: r.version, description: typeof r.description === 'string' ? r.description : '' });
+  }
+  return found.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Parse `npm search --json` output, which may carry notices before the array. */
 export function parseSearch(stdout: string): { name?: unknown; version?: unknown; description?: unknown }[] {
   const start = stdout.indexOf('[');
@@ -132,14 +171,24 @@ export function parseSearch(stdout: string): { name?: unknown; version?: unknown
   }
 }
 
-/** Every plugin on the registry, from `npm search`. */
-export function searchRemote(timeoutMs = 30_000): { plugins?: RemotePlugin[]; error?: string } {
-  const r = capture(['npm', 'search', PLUGIN_SCOPE.slice(1), '--json', '--searchlimit', '250', '--registry', REGISTRY_URL], {
+function search(query: string, timeoutMs: number): { results?: ReturnType<typeof parseSearch>; error?: string } {
+  const r = capture(['npm', 'search', query, '--json', '--searchlimit', '250', '--registry', REGISTRY_URL], {
     timeout: timeoutMs,
     cwd: os.tmpdir(),
   });
-  if (!r.ok) return { error: npmError(r.stderr) };
-  return { plugins: pickPluginPackages(parseSearch(r.stdout)) };
+  return r.ok ? { results: parseSearch(r.stdout) } : { error: npmError(r.stderr) };
+}
+
+/** Every installable plugin on the registry, from `npm search`. */
+export function searchRemote(timeoutMs = 30_000): { plugins?: RemotePlugin[]; error?: string } {
+  const r = search(PLUGIN_SCOPE.slice(1), timeoutMs);
+  return r.results ? { plugins: pickPluginPackages(r.results) } : { error: r.error };
+}
+
+/** Built-in plugins as published on the registry. */
+export function searchBuiltins(timeoutMs = 30_000): { plugins?: RemotePlugin[]; error?: string } {
+  const r = search(BUILTIN_SCOPE, timeoutMs);
+  return r.results ? { plugins: pickBuiltinPackages(r.results) } : { error: r.error };
 }
 
 /** Latest version of one plugin (or of the exact `version`). Tries the default package, then the plugin's own. */

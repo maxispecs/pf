@@ -21,6 +21,7 @@ const ALIASES: Record<string, Action> = {
 async function adminMenu(dryRun: boolean): Promise<number> {
   const action = await pick<Action>('Plugins', [
     { value: 'list', label: 'List', hint: 'built-in and installed plugins' },
+    { value: 'available', label: 'Available', hint: 'built-in and registry plugins, with versions' },
     { value: 'install', label: 'Install', hint: 'pick from the registry' },
     { value: 'update', label: 'Update', hint: 'bring installed plugins to the latest' },
     { value: 'remove', label: 'Remove', hint: 'delete installed plugins' },
@@ -28,6 +29,7 @@ async function adminMenu(dryRun: boolean): Promise<number> {
   if (!action) return 130;
   const c = err();
   if (action === 'list') return listPlugins();
+  if (action === 'available') return listAvailable();
   if (action === 'update') return updatePlugins([], { dryRun });
   if (action === 'install') {
     const found = searchRemote();
