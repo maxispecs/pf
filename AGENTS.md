@@ -9,7 +9,8 @@
 - Colors follow `NO_COLOR` / `FORCE_COLOR` (`src/ui/palette.ts`). Anything with a terminal-only mode (the menu, prompts) must fall back to static output without a TTY.
 - Never read, print or write a registry token. Only check that an auth line exists. `.npmrc` uses `${NPM_TOKEN}`. The one exception is host mode, which reads secrets with the instance role into a child process's env only, never to disk or output.
 - Host mode (`pf host fix`) gives the agent no shell or file tools. Anything that changes the host is a pf host tool, and the MCP server refuses it without `--apply`.
-- Commands that run something support `--dry-run`. Deploys target staging only and never production.
+- Commands that run something support `--dry-run`. `pf deploy staging` auto-detects its target. `pf deploy production` runs only a `deploy:production` script or `pf.json` entry the repo defines (never guessed from platform configs), always asks for confirmation, and needs `--yes` without a TTY. The agent and MCP tools deploy to staging only.
+- Shortcuts: a short name for a full command (`pf ds` = `pf deploy staging`, `pf dp` = `pf deploy production`) is one entry in `SHORTCUTS` in `src/commands/shortcuts.ts`. Extra args pass through to the target.
 - New command: add `src/commands/<name>.ts`, register it in `src/commands/index.ts`, show it in `src/menu.ts` if it belongs in the menu, add a test.
 - Command resolution order is `pf.json` override, then scripts/targets the repo defines, then stack defaults (`src/detect/`). New stacks go in `src/detect/stacks.ts` with a test in `tests/`.
 
@@ -20,10 +21,12 @@
 | `src/bin/pf.ts`, `src/cli.ts` | entry point, banner, dispatch |
 | `src/menu.ts` | repo menu, fallback menu, static list |
 | `src/detect/` | repo, stack, docs and staging detection, command resolution |
+| `src/ui/prompt.ts` | `confirm` (yes/no) and `ask` (single-line text input with default, placeholder and `validate`). Use `ask` for any input field; it returns null without a TTY or on cancel, so give commands flags too |
 | `src/ui/text.ts` | text helpers: colored command samples (`termLine`, `promptLine`), badges, headings, lists, tables. Return strings, take a `Palette`. Use these instead of hand-coloring messages |
 | `src/commands/` | built-in commands |
 | `src/agent/` | coding agent: persona, tool registry, MCP server, launchers for claude, codex and cursor |
 | `src/host/` | host mode (`pf host`): host config, IMDS identity and secrets via the aws CLI, SSM send-command, OS security patching, host MCP tools, the headless fix agent and its audit log |
+| `src/plugins/` | plugins: `types.ts`, registry in `index.ts`, saved settings in `settings.ts`. `aws/` is the AWS plugin (exchange bucket: `pf s3`, `pf dl`); add AWS shortcuts under `aws/commands/` |
 | `src/skills/` | skill discovery and runner (direct scripts, else an agent CLI) |
 | `assets/skills/` | skills that ship with pf (a same-named user or repo skill wins) |
 | `src/install/`, `src/update/` | machine setup helpers, update check |

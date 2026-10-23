@@ -130,3 +130,26 @@ export function detectStaging(ctx: Context): StagingPlan {
   }
   return { steps, skipped };
 }
+
+export const PRODUCTION_SCRIPTS = ['deploy:production', 'deploy:prod', 'deploy-production', 'production:deploy', 'prod:deploy'];
+
+/**
+ * Find what `pf deploy production` would run. Only something the repo defines explicitly
+ * counts (pf.json or a production deploy script): platform configs are never guessed for production.
+ */
+export function detectProduction(ctx: Context): StagingPlan {
+  const root = ctx.repo?.root ?? ctx.workdir;
+  const override = ctx.config.commands['deploy:production'];
+  if (override) {
+    return { steps: [{ cmd: shellCmd(override.run, path.resolve(root, override.cwd ?? '.')), source: 'pf.json' }], skipped: [] };
+  }
+  for (const d of workspaceDirs(root)) {
+    const pkg = readJson<Pkg>(d, 'package.json');
+    const name = PRODUCTION_SCRIPTS.find((s) => typeof pkg?.scripts?.[s] === 'string');
+    if (name) {
+      const rel = path.relative(root, d) || '.';
+      return { steps: [{ cmd: { argv: nodeRun(nodeManager(root), name), cwd: d }, source: `${rel}/package.json script ${name}` }], skipped: [] };
+    }
+  }
+  return { steps: [], skipped: [] };
+}

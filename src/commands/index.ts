@@ -7,12 +7,14 @@ import { doctorCommand } from './doctor.js';
 import { hostCommand } from './host.js';
 import { initCommand } from './init.js';
 import { setupCommand } from './setup.js';
+import { SHORTCUTS, shortcutCommand } from './shortcuts.js';
 import { skillCommand } from './skill.js';
 import { TASK_COMMANDS } from './tasks.js';
 import type { Command } from './types.js';
 import { uninstallCommand } from './uninstall.js';
 import { updateCommand } from './update.js';
 import { verCommand } from './ver.js';
+import { pluginCommands } from '../plugins/index.js';
 
 /** Built-in commands except the ones that live in cli.ts (help, list, menu, version). */
 export function allCommands(): Command[] {
@@ -28,6 +30,8 @@ export function allCommands(): Command[] {
     doctorCommand,
     setupCommand,
     hostCommand,
+    ...pluginCommands(),
+    ...SHORTCUTS.map((sc) => shortcutCommand(sc, findCommand)),
     updateCommand,
     uninstallCommand,
     aboutCommand,

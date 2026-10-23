@@ -23,6 +23,7 @@ import { lastMenuChoice, rememberMenuChoice } from './config.js';
 import { err, out } from './ui/palette.js';
 import { pick } from './ui/picker.js';
 import { h2, termLine } from './ui/text.js';
+import { pluginEntries } from './plugins/index.js';
 import { interactive } from './util.js';
 
 const BUILTIN_NAMES = new Set(['dev', 'build', 'test', 'lint', 'install', 'doc', 'docs', 'deploy:staging']);
@@ -119,6 +120,7 @@ export function entriesFor(ctx: Context): Entry[] {
     entries.push(tool(updateCommand, 'Tools'));
     entries.push(tool(aboutCommand, 'Help'));
   }
+  entries.push(...pluginEntries(ctx));
   return entries
     .map((e, i) => ({ e, i }))
     .sort((a, b) => groupRank(a.e.group) - groupRank(b.e.group) || a.i - b.i)

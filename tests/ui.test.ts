@@ -4,7 +4,7 @@ import { wantsLogo } from '../src/cli.js';
 import { LOGO_MIN_COLS, LOGO_MIN_ROWS, logoFits, renderBanner, renderLogo } from '../src/ui/banner.js';
 import { fitLine, palette, stripAnsi, type Palette } from '../src/ui/palette.js';
 import { LOGO_ART, LOGO_COLORS } from '../src/ui/logo-art.js';
-import { confirmKey, renderConfirm } from '../src/ui/prompt.js';
+import { confirmKey, inputKey, renderConfirm, renderInput, type InputState } from '../src/ui/prompt.js';
 import {
   buildRows,
   chosenValues,
@@ -307,4 +307,42 @@ test('confirm keys: y/n answer at once, enter keeps the default, arrows toggle, 
 test('confirm line shows the current answer', () => {
   assert.equal(renderConfirm('Go?', true, off), '? Go?  ● Yes  ○ No  (y/n)');
   assert.equal(renderConfirm('Go?', false, off), '? Go?  ○ Yes  ● No  (y/n)');
+});
+
+const k = (name: string, extra: Record<string, boolean> = {}) => ({ name, ...extra }) as import('node:readline').Key;
+
+test('inputKey edits text at the caret', () => {
+  const st: InputState = { value: 'ab', cursor: 2 };
+  assert.equal(inputKey(st, 'c', k('c')), 'render');
+  assert.deepEqual(st, { value: 'abc', cursor: 3 });
+  inputKey(st, undefined, k('left'));
+  inputKey(st, 'X', k('x'));
+  assert.deepEqual(st, { value: 'abXc', cursor: 3 });
+  inputKey(st, undefined, k('backspace'));
+  assert.deepEqual(st, { value: 'abc', cursor: 2 });
+  inputKey(st, undefined, k('delete'));
+  assert.deepEqual(st, { value: 'ab', cursor: 2 });
+  inputKey(st, undefined, k('a', { ctrl: true }));
+  assert.equal(st.cursor, 0);
+  assert.equal(inputKey(st, undefined, k('backspace')), 'ignore');
+  inputKey(st, 'hello world', k('x')); // paste
+  assert.equal(st.value, 'hello worldab');
+  inputKey(st, undefined, k('w', { ctrl: true }));
+  assert.equal(st.value, 'helloab');
+  inputKey(st, undefined, k('u', { ctrl: true }));
+  assert.equal(st.value, 'ab');
+  assert.equal(inputKey(st, undefined, k('return')), 'submit');
+  assert.equal(inputKey(st, undefined, k('escape')), 'cancel');
+  assert.equal(inputKey(st, '\x03', k('c', { ctrl: true })), 'cancel');
+});
+
+test('renderInput shows the value, a placeholder when empty, and an error line', () => {
+  const c = plain;
+  assert.match(stripAnsi(renderInput('Bucket', { value: 'abc', cursor: 3 }, c, 80)[0]!), /^\? Bucket abc/);
+  assert.match(stripAnsi(renderInput('Bucket', { value: '', cursor: 0 }, c, 80, { placeholder: 'my-bucket' })[0]!), /my-bucket/);
+  const lines = renderInput('Bucket', { value: 'x', cursor: 1 }, c, 80, { error: 'bad name' });
+  assert.equal(lines.length, 2);
+  assert.match(stripAnsi(lines[1]!), /bad name/);
+  const long = renderInput('Bucket', { value: 'a'.repeat(200), cursor: 200 }, c, 40)[0]!;
+  assert.ok(stripAnsi(long).length <= 40);
 });

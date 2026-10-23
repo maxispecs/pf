@@ -43,6 +43,7 @@ scripts/install.sh --dry-run      # show what would happen
 | `pf skill [name]` | Pick and run an agent skill. `available`, `install`, `update`, `remove` manage skills from the registry |
 | `pf init` | Write `pf.json` for this repo from what was detected |
 | `pf host ...` | pf on EC2 instances: install, login, update, security patching and the fix agent. See [Hosts](#hosts-ec2) |
+| `pf s3 <file...>`, `pf dl [name]` | AWS plugin: upload to and download from a shared exchange bucket. See [AWS plugin](#aws-plugin) |
 | `pf setup`, `update`, `uninstall`, `doctor` | Machine tooling |
 | `pf about`, `pf help`, `pf --version` | Info |
 
@@ -91,6 +92,22 @@ pf skill remove ver                 # delete a registry install
 `pf agent` (also the Agent entry in the `pf` menu) starts Claude Code, Codex or Cursor with a system prompt built from this repo, the pf tools (`pf mcp`) and the skills above. The agent CLI is chosen with `--agent`, `PF_AGENT`, or `"agent"` in `~/.pf/config.json` (`claude`, `codex` or `cursor`; `claude-code` and `cursor-agent` are accepted too). Otherwise the first installed CLI is used, and a terminal asks the first time more than one is installed. `pf agent use cursor` also registers the pf MCP server in `~/.cursor/mcp.json`.
 
 The tools can list and run this repo's commands, bump versions and deploy to staging. A staging deploy returns the plan until the call passes `confirm`, and the agent CLI asks before running it. Production is never targeted.
+
+## AWS plugin
+
+Plugins live in `src/plugins/<name>/` and are listed in `src/plugins/index.ts`; each one contributes commands and optional menu entries. The `aws` plugin wraps the aws CLI (it must be on PATH) and starts with a shared **exchange bucket**:
+
+```bash
+pf s3 --setup              # wizard: asks for bucket, profile, folder and region (prefilled with what is saved)
+pf s3 --setup --bucket my-exchange [--profile exchange] [--prefix shared] [--region eu-west-1]   # no questions
+pf s3 report.pdf            # upload to s3://my-exchange/shared/report.pdf (profile "exchange")
+pf s3 a.zip b.zip           # several files; --as <name> renames a single one
+pf dl                       # pick a file (newest first, arrows + enter) and download it to the current dir
+pf dl report.pdf            # download by name (exact, case-insensitive, or a unique part of the name)
+pf dl --list                # print the listing (also what you get when piped); -o <dir>, --force
+```
+
+Settings live in `plugins.aws.exchange` of `~/.pf/config.json`; `PF_EXCHANGE_BUCKET`, `PF_EXCHANGE_PROFILE`, `PF_EXCHANGE_PREFIX` and `PF_EXCHANGE_REGION` override them. The profile defaults to `exchange`. pf never reads credentials; the aws CLI resolves them from the profile. All commands support `--dry-run`, and `pf dl` is also in the menu. To add another AWS shortcut, put a command in `src/plugins/aws/commands/` and list it in `src/plugins/aws/index.ts`.
 
 ## Hosts (EC2)
 
@@ -180,3 +197,7 @@ pnpm ver bump stack minor   # a published version cannot be reused
 pnpm release                # typecheck, test, build, npm publish --dry-run
 pnpm publish:cellars        # the real publish (asks you to type the version)
 ```
+
+## Shortcuts
+
+`pf ds` is `pf deploy staging` and `pf dp` is `pf deploy production` (only a `deploy:production` script or `pf.json` entry; always confirms). Add more in `src/commands/shortcuts.ts`.
