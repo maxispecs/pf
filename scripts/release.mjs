@@ -2,7 +2,7 @@
 // Check, build and publish pf to the cellars registry.
 //
 //   node scripts/release.mjs             checks + build + `npm publish --dry-run` (publishes nothing)
-//   node scripts/release.mjs --publish   the same, then a real publish after you type the version to confirm
+//   node scripts/release.mjs --publish   the same, then a real publish
 //
 // Publishes every package under packages/ whose version the registry does not have yet, in dependency
 // order (kit, plugins, core). Versions come from each package.json, which `pnpm ver bump <package> minor`
@@ -10,7 +10,6 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -137,12 +136,7 @@ const pub = (p, extra = []) => run('pnpm', ['publish', '--no-git-checks', '--reg
 if (publish) {
   if (!ensureAuth()) die('no valid registry token (npm whoami failed): run `npm login --auth-type=web --registry ' + REGISTRY + '`');
   ok(`registry auth ok (${capture('npm', ['whoami', '--registry', REGISTRY]).stdout.trim()})`);
-  if (!process.stdin.isTTY) die('publishing needs a terminal to confirm');
-  const confirmWord = pkgs.find((p) => p.name === 'pulpfixer').version;
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await new Promise((resolve) => rl.question(`Publishing ${label} to ${REGISTRY}\nType ${bold(confirmWord)} to confirm: `, resolve));
-  rl.close();
-  if (answer.trim() !== confirmWord) die('cancelled');
+  console.log(`Publishing ${label} to ${REGISTRY}`);
   for (const p of todo) {
     if (pub(p).status !== 0) die(`publish failed for ${p.name}`);
     ok(`published ${p.name}@${p.version}`);

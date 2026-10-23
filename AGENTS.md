@@ -61,4 +61,4 @@ When a change is made in a module (package), bump that module's minor version be
 `pnpm ver bump <module> minor`. This also bumps the stack minor. Use `major` only for breaking changes.
 Never edit versions in manifests by hand. Modules are the packages: `pnpm ver bump packages/core minor`, `pnpm ver bump packages/kit minor`, `pnpm ver bump packages/plugin-aws minor` (several targets may share one command; the stack minor rises once). Bump a package only when its own files changed; a core change that depends on a new kit change bumps both.
 
-Publishing: `pnpm release` is always a dry run and publishes every package whose version the registry lacks, in dependency order. `pnpm publish:cellars` publishes and asks for confirmation. Never publish without the user asking.
+Publishing: `pnpm release` is always a dry run and publishes every package whose version the registry lacks, in dependency order. `pnpm publish:cellars` publishes without a confirmation prompt. Never publish without the user asking.
