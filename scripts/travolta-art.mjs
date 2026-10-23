@@ -68,9 +68,9 @@ const hex = (rgb) => rgb.map((v) => Math.round(v).toString(16).padStart(2, '0'))
 // Color: quadrant bits are 1 upper left, 2 upper right, 4 lower left, 8 lower right.
 const QUADRANT = ' ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█';
 const px = sample(cols * 2, rows * 2);
-// Terminals whose font lacks the quadrant characters (Apple Terminal) get the half-block version.
+// Terminals that draw block glyphs unevenly (Apple Terminal) get a version with only left/right halves and full blocks: they fill the cell the full height.
 const ALL = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-const HALF = [3, 5, 10, 12, 15];
+const HALF = [5, 10, 15];
 const bits = (m) => [0, 1, 2, 3].filter((q) => m & (1 << q)).length;
 function paint(masks) {
   const chars = [];
@@ -154,7 +154,7 @@ fs.writeFileSync(
 /** The color picture: one quadrant character per cell, one string per terminal row. */
 export const TRAVOLTA_CHARS: string[] = ${list(chars)};
 
-/** The same picture with half blocks only (▀▄▌▐█), for fonts without the quadrant characters. */
+/** The same picture with only left/right half blocks and full blocks (▌▐█), for terminals that draw ▀▄ and the quadrants unevenly. */
 export const TRAVOLTA_HALF_CHARS: string[] = ${list(half.chars)};
 export const TRAVOLTA_HALF_FG: string[] = ${list(half.fgs)};
 export const TRAVOLTA_HALF_BG: string[] = ${list(half.bgs)};
