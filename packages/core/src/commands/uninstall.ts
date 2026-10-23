@@ -36,7 +36,7 @@ export const uninstallCommand: Command = {
           [
             { value: 'package', label: 'pf package', hint: `global ${PACKAGE_NAME} (npm rm -g)` },
             { value: 'shell', label: 'shell completions', hint: 'the pf block in your shell rc, fish completions' },
-            { value: 'data', label: 'pf data', hint: `${pfHome()} (config, state, completions)` },
+            { value: 'data', label: 'pf data', hint: `${pfHome()} (config, state, installed plugins and skills)` },
           ],
           { defaults: (Object.keys(what) as Part[]).filter((k) => what[k]) },
         );

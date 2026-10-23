@@ -14,11 +14,12 @@ import type { Command } from '@pulpfixer/kit/types';
 import { uninstallCommand } from './uninstall.js';
 import { updateCommand } from './update.js';
 import { verCommand } from './ver.js';
+import { pluginCommand } from './plugin.js';
 import { pluginCommands } from '../plugins/index.js';
 
 /** Built-in commands except the ones that live in cli.ts (help, list, menu, version). */
 export function allCommands(): Command[] {
-  return [
+  const all: Command[] = [
     agentCommand,
     mcpCommand,
     ...TASK_COMMANDS,
@@ -30,14 +31,18 @@ export function allCommands(): Command[] {
     doctorCommand,
     setupCommand,
     hostCommand,
-    ...pluginCommands(),
+    pluginCommand,
     ...SHORTCUTS.map((sc) => shortcutCommand(sc, findCommand)),
     updateCommand,
     uninstallCommand,
     aboutCommand,
     { name: 'list', summary: 'List available commands (static)', group: 'Help', usage: 'pf list', run: async () => 0 },
     { name: 'help', summary: 'Show help', group: 'Help', usage: 'pf help', run: async () => 0 },
+    // Last, so a plugin can add commands but never shadow a built-in one (first definition wins).
+    ...pluginCommands(),
   ];
+  const seen = new Set<string>();
+  return all.filter((c) => !seen.has(c.name) && !!seen.add(c.name));
 }
 
 export function findCommand(name: string): Command | undefined {

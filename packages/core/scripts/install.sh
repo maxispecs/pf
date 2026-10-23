@@ -2,7 +2,7 @@
 # Install pf (the pulpfixer CLI) on this machine.
 #
 #   scripts/install.sh                  install the latest published version from the cellars registry
-#   scripts/install.sh --from-source    build this checkout and link it globally (for development)
+#   scripts/install.sh --from-source    build this monorepo checkout, pack its packages and install them globally
 #   scripts/install.sh --host           set up an EC2 instance (as root; `pf host install` sends this via SSM)
 #
 # Options:
@@ -10,6 +10,7 @@
 #   --dry-run      print what would happen, change nothing
 #   --registry U   registry URL (default: the cellars staging registry)
 #   --no-setup     skip `pf setup` at the end
+#   --plugin N     also install the registry plugin N (@pf-plugins/N) with `pf plugin install` (repeatable)
 #
 # Host options (with --host; the rest are passed to `pf host init`):
 #   --secrets S    ssm (default) or secretsmanager: where NPM_TOKEN and the agent key live
@@ -19,6 +20,10 @@
 #   --budget USD   spending cap per agent run
 #   --timer        daily `pf host update` systemd timer
 #   --no-agent     do not install Claude Code
+#
+# pf is a monorepo: the `pulpfixer` package pulls in @pulpfixer/kit and the built-in plugins as
+# dependencies, so one `npm install -g` is enough. Plugins from the registry live in ~/.pf/plugins
+# (managed with `pf plugin`); `pf update` updates pf, those plugins and registry skills together.
 #
 # Needs Node >= 18 and npm (--host installs Node with dnf/yum/apt when it is missing).
 # Installing from the registry needs NPM_TOKEN (token from #frontend) or an existing auth line
@@ -38,6 +43,7 @@ SECRETS="ssm"
 PREFIX="/pulpfixer"
 AWS_REGION_ARG=""
 INIT_ARGS=()
+PLUGINS=()
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   B=$'\033[1m'; D=$'\033[2m'; R=$'\033[31m'; G=$'\033[32m'; Y=$'\033[33m'; O=$'\033[38;5;208m'; Z=$'\033[0m'
@@ -59,6 +65,7 @@ while [ $# -gt 0 ]; do
     --yes|-y) YES=1 ;;
     --dry-run|-n) DRY=1 ;;
     --no-setup) SETUP=0 ;;
+    --plugin) shift; PLUGINS+=("${1:?--plugin needs a name}") ;;
     --registry) shift; REGISTRY="${1:?--registry needs a URL}" ;;
     --host) HOST=1; YES=1; SETUP=0 ;;
     --no-agent) AGENT=0 ;;
@@ -68,7 +75,7 @@ while [ $# -gt 0 ]; do
     --service) shift; INIT_ARGS+=(--service "${1:?--service needs a unit}") ;;
     --budget) shift; INIT_ARGS+=(--budget "${1:?--budget needs a number}") ;;
     --timer) INIT_ARGS+=(--timer) ;;
-    -h|--help) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 0 ;;
     *) die "unknown option: $1 (try --help)" ;;
   esac
   shift
@@ -119,15 +126,17 @@ NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
 ok "Node $(node -v), npm $(npm -v)"
 
 # 2. Registry auth (presence only, never the token)
-HOST="${REGISTRY#*://}"; HOST="${HOST%%/*}"
+REG_HOST="${REGISTRY#*://}"; REG_HOST="${REG_HOST%%/*}"
 NPMRC="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
 if [ "$FROM_SOURCE" = 0 ] && [ "$HOST" = 0 ]; then
-  if [ -f "$NPMRC" ] && grep -q "^//${HOST}/:_authToken=" "$NPMRC"; then
-    ok "registry auth line for $HOST found in $NPMRC"
+  if [ -f "$NPMRC" ] && grep -q "^//${REG_HOST}/:_authToken=" "$NPMRC"; then
+    ok "registry auth line for $REG_HOST found in $NPMRC"
   elif [ -n "${NPM_TOKEN:-}" ]; then
-    warn "no auth line for $HOST in $NPMRC: pf setup will add one that reads \$NPM_TOKEN"
+    warn "no auth line for $REG_HOST in $NPMRC: pf setup will add one that reads \$NPM_TOKEN"
+  elif [ "$DRY" = 1 ]; then
+    warn "no registry auth found (a real install needs NPM_TOKEN or an auth line in $NPMRC)"
   else
-    die "no registry auth. Export NPM_TOKEN (token from #frontend) and rerun, or add '//${HOST}/:_authToken=\${NPM_TOKEN}' to $NPMRC."
+    die "no registry auth. Export NPM_TOKEN (token from #frontend) and rerun, or add '//${REG_HOST}/:_authToken=\${NPM_TOKEN}' to $NPMRC."
   fi
 fi
 
@@ -181,6 +190,12 @@ fi
 export PATH="$PATH:$(npm prefix -g)/bin"
 command -v pf >/dev/null 2>&1 || die "installed, but \`pf\` is not on PATH. Add \"$(npm prefix -g)/bin\" to PATH."
 ok "pf is on PATH: $(command -v pf)"
+if [ "${#PLUGINS[@]}" -gt 0 ]; then
+  say "Installing plugins"
+  for plugin in "${PLUGINS[@]}"; do
+    pf plugin install "$plugin" || warn "could not install plugin $plugin: retry with pf plugin install $plugin"
+  done
+fi
 if [ "$HOST" = 1 ]; then
   if [ "$AGENT" = 1 ] && ! command -v claude >/dev/null 2>&1; then
     npm install -g @anthropic-ai/claude-code || die "could not install Claude Code"

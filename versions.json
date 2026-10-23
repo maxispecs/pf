@@ -1,21 +1,21 @@
 {
   "stack": {
-    "version": "3.16",
+    "version": "4.1",
     "since": "2026-10-23"
   },
   "packages": {
     "packages/core": {
-      "version": "3.16",
+      "version": "4.1",
       "since": "2026-10-23",
       "type": "node"
     },
     "packages/kit": {
-      "version": "3.16",
+      "version": "4.1",
       "since": "2026-10-23",
       "type": "node"
     },
     "packages/plugin-aws": {
-      "version": "3.16",
+      "version": "4.0",
       "since": "2026-10-23",
       "type": "node"
     }

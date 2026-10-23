@@ -24,10 +24,11 @@ Or on a machine that has nothing yet, from a checkout of this repo:
 ```bash
 scripts/install.sh                # latest published version
 scripts/install.sh --from-source  # build this checkout, pack its packages and install them globally
+scripts/install.sh --plugin jira  # also install a registry plugin (repeatable)
 scripts/install.sh --dry-run      # show what would happen
 ```
 
-`pf` replaces the legacy `pulpfixer` 1.x package. The installer and `pf setup` remove the old global install (its data in `~/.pulpfixer` is left alone). Update with `pf update`; remove with `pf uninstall`. `pf doctor` checks the machine.
+`pf` replaces the legacy `pulpfixer` 1.x package. The installer and `pf setup` remove the old global install (its data in `~/.pulpfixer` is left alone). `pf` is a monorepo: the `pulpfixer` package depends on `@pulpfixer/kit` and the built-in plugins, so one global install brings them all. Update with `pf update` (pf, installed plugins and registry skills in one go); remove with `pf uninstall`. `pf doctor` checks the machine.
 
 ## Commands
 
@@ -41,6 +42,8 @@ scripts/install.sh --dry-run      # show what would happen
 | `pf doc` | Run the docs site (Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo) |
 | `pf deploy staging` | Deploy to staging. `--dry-run`, `--yes`. Never production |
 | `pf skill [name]` | Pick and run an agent skill. `available`, `install`, `update`, `remove` manage skills from the registry |
+| `pf plugin [list\|available\|install\|update\|remove]` | Administer plugins from the registry. Without a command it opens an interactive menu. See [Plugins](#plugins) |
+| `pf update` | Update pf, then installed plugins and registry skills. `--check`, `--yes`, `--dry-run` |
 | `pf init` | Write `pf.json` for this repo from what was detected |
 | `pf host ...` | pf on EC2 instances: install, login, update, security patching and the fix agent. See [Hosts](#hosts-ec2) |
 | `pf s3 <file...>`, `pf dl [name]` | AWS plugin: upload to and download from a shared exchange bucket. See [AWS plugin](#aws-plugin) |
@@ -92,6 +95,23 @@ pf skill remove ver                 # delete a registry install
 `pf agent` (also the Agent entry in the `pf` menu) starts Claude Code, Codex or Cursor with a system prompt built from this repo, the pf tools (`pf mcp`) and the skills above. The agent CLI is chosen with `--agent`, `PF_AGENT`, or `"agent"` in `~/.pf/config.json` (`claude`, `codex` or `cursor`; `claude-code` and `cursor-agent` are accepted too). Otherwise the first installed CLI is used, and a terminal asks the first time more than one is installed. `pf agent use cursor` also registers the pf MCP server in `~/.cursor/mcp.json`.
 
 The tools can list and run this repo's commands, bump versions and deploy to staging. A staging deploy returns the plan until the call passes `confirm`, and the agent CLI asks before running it. Production is never targeted.
+
+## Plugins
+
+A plugin adds commands (and menu entries) to pf. Some ship inside pf (the built-in `aws` plugin); the rest come from the cellars registry as `@pf-plugins/<name>` (or `@pf-plugins-<name>/<name>`) and are remembered per user.
+
+```bash
+pf plugin                          # interactive: list, install, update, remove
+pf plugin list                     # built-in and installed plugins; a plugin that fails to load is named with the reason
+pf plugin available                # what the registry has, and what is installed
+pf plugin install jira [x@1.2]     # latest (or that version) into ~/.pf/plugins
+pf plugin update [name...]         # bring installed plugins to the latest (--check only reports)
+pf plugin remove jira
+```
+
+Installed plugins live in an npm prefix at `~/.pf/plugins`; its `package.json` `dependencies` are the list pf remembers, so a plugin stays installed across `pf update`, which updates them along with pf and the registry skills. Only the `@pf-plugins` scope installs, because a plugin runs inside pf with your rights. A plugin can add commands but never replaces a built-in one, and one that throws on load is skipped with a note in `pf plugin list`. `PF_NO_PLUGINS=1` skips loading them (to debug).
+
+**Writing a plugin:** a package named `@pf-plugins/<name>` whose entry point default-exports a `Plugin` (`@pulpfixer/kit/plugin`: `name`, `summary`, `commands`, optional `entries(ctx)` and `api`). Depend on `@pulpfixer/kit` for the types and helpers. Publish it to cellars; `pf plugin install <name>` does the rest.
 
 ## AWS plugin
 

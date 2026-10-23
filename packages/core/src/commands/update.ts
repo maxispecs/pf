@@ -9,6 +9,7 @@ import { confirm, reporter } from '@pulpfixer/kit/ui/prompt';
 import { compareVersions, readJson, readText, takeFlag } from '@pulpfixer/kit/util';
 import { displayVersion } from '@pulpfixer/kit/version';
 import { fetchLatest } from '../update/check.js';
+import { updatePlugins } from '../plugins/manage.js';
 import { updateSkills } from '../skills/manage.js';
 import { bundledVerCli, cliRevision, findVersionsRoot } from './ver.js';
 import type { Command } from '@pulpfixer/kit/types';
@@ -55,15 +56,19 @@ function refreshRepoCli(ctx: Context, dryRun: boolean): number {
   return 0;
 }
 
-/** Skills installed from the registry (pf skill install) follow pf: `pf update` updates them too. */
-function refreshSkills(check: boolean, dryRun: boolean): number {
-  reporter(out()).step('Skills');
-  return updateSkills([], { check, dryRun });
+/** Skills and plugins installed from the registry follow pf: `pf update` updates them too. */
+async function refreshAddons(check: boolean, dryRun: boolean): Promise<number> {
+  const r = reporter(out());
+  r.step('Plugins');
+  const plugins = await updatePlugins([], { check, dryRun });
+  r.step('Skills');
+  const skills = updateSkills([], { check, dryRun });
+  return plugins || skills;
 }
 
 export const updateCommand: Command = {
   name: 'update',
-  summary: 'Update pf and its registry skills from cellars',
+  summary: 'Update pf, its plugins and registry skills from cellars',
   group: 'Tools',
   usage: 'pf update [--check] [--yes] [--dry-run]',
   async run(ctx, args) {
@@ -82,7 +87,7 @@ export const updateCommand: Command = {
     if (!found.version) {
       r.fail(`could not reach ${REGISTRY_URL}: ${found.error}`);
       r.info('Check NPM_TOKEN and the auth line in ~/.npmrc (pf setup fixes the latter)');
-      refreshSkills(check, dryRun);
+      await refreshAddons(check, dryRun);
       refreshRepoCli(ctx, dryRun);
       return 1;
     }
@@ -90,14 +95,14 @@ export const updateCommand: Command = {
     const cmp = compareVersions(found.version, ctx.version);
     if (cmp <= 0) {
       r.ok(`pf v${displayVersion()} is the latest${cmp < 0 ? ` (registry has v${displayVersion(found.version)})` : ''}`);
-      const skills = refreshSkills(check, dryRun);
+      const skills = await refreshAddons(check, dryRun);
       return refreshRepoCli(ctx, dryRun) || skills;
     }
     r.warn(`v${displayVersion(found.version)} is available (you have v${displayVersion()})`);
-    if (check) return refreshSkills(true, dryRun);
+    if (check) return await refreshAddons(true, dryRun);
     if (!(yes || (await confirm(`Install pf v${displayVersion(found.version)} now?`, true, { flag: '--yes' })))) {
       r.info('skipped');
-      return refreshSkills(false, dryRun);
+      return await refreshAddons(false, dryRun);
     }
     const code = await runCmd(
       { argv: ['npm', 'install', '-g', `${PACKAGE_NAME}@latest`, '--registry', REGISTRY_URL] },
@@ -108,7 +113,7 @@ export const updateCommand: Command = {
       return code;
     }
     if (!dryRun) r.ok(`updated to v${displayVersion(found.version)}`);
-    const skills = refreshSkills(false, dryRun);
+    const skills = await refreshAddons(false, dryRun);
     if (dryRun) return skills;
     // The repo refresh must use the new version's bundled CLI, so hand over to the new binary.
     if (findVersionsRoot(ctx.cwd)) return (await runCmd({ argv: ['pf', 'update', '--repo-only'], cwd: ctx.cwd }, { quiet: true })) || skills;

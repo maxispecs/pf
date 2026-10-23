@@ -12,7 +12,8 @@ pnpm workspace, three packages (versioned together by `versions.json`, published
 
 Dependencies point one way: core -> plugins -> kit. A plugin never imports core. Anything a plugin needs from core moves into kit.
 Each package exports `source` / `types` / `default` conditions: dev, tests and typecheck run with `--conditions=source` (straight from `src/`), builds and installs use `dist/`. Root `scripts/` hold the cross-package commands (build, test, release, ver, logo, ask).
-New plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json and tsconfig), add it to `scripts/build.mjs`, `scripts/release.mjs` (`ORDER`), the `core` dependencies and `packages/core/src/plugins/index.ts`, then `pnpm ver init`.
+Registry plugins (user-installed): `@pf-plugins/<name>` packages live in the npm prefix `~/.pf/plugins` (its `package.json` is the remembered list). `packages/core/src/plugins/registry.ts` (npm ops, names), `loader.ts` (import at startup in `main()`, failures never stop pf), `manage.ts` (list/install/update/remove, reused by `pf update`) and `commands/plugin.ts`. Plugin commands are appended after every built-in and de-duplicated, so a plugin never shadows a built-in. Core pins kit and the built-in plugins to exact versions and users only update `pulpfixer`, so the release script refuses to publish a dependency without a new core.
+New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json and tsconfig), add it to `scripts/build.mjs`, `scripts/release.mjs` (`ORDER`), the `core` dependencies and `packages/core/src/plugins/index.ts`, then `pnpm ver init`.
 
 ## Conventions
 

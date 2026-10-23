@@ -104,6 +104,13 @@ for (const p of pkgs) {
     todo.push(p);
   }
 }
+// core pins kit and the plugins to exact versions, and users only update `pulpfixer` itself, so a
+// dependency published without a new core would never reach anyone.
+if (todo.length && !todo.some((p) => p.name === 'pulpfixer')) {
+  const msg = `${todo.map((p) => p.name).join(', ')} changed but pulpfixer (core) did not: users update core, which pins its dependencies. Bump it too: pnpm ver bump packages/core minor`;
+  if (publish) die(msg);
+  warn(msg);
+}
 if (!todo.length) {
   if (publish) die('every package is already published: bump first (pnpm ver bump <package> minor)');
   warn('nothing is newer than the registry, so a publish would do nothing. Bump first: pnpm ver bump <package> minor');

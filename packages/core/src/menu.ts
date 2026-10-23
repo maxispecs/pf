@@ -11,6 +11,7 @@ import { skillCommand } from './commands/skill.js';
 import { runTask, TASK_COMMANDS } from './commands/tasks.js';
 import { GROUPS, type Entry } from '@pulpfixer/kit/types';
 import { updateCommand } from './commands/update.js';
+import { pluginCommand } from './commands/plugin.js';
 import { verCommand } from './commands/ver.js';
 import type { Context } from '@pulpfixer/kit/context';
 import { detectDocs } from '@pulpfixer/kit/detect/docs';
@@ -108,6 +109,7 @@ export function entriesFor(ctx: Context): Entry[] {
     }
     entries.push(tool(verCommand, 'Tools', findVersionsRoot(ctx.cwd) ? 'versions.json' : 'not set up yet'));
     entries.push(tool(skillCommand, 'Tools'));
+    entries.push(tool(pluginCommand, 'Tools'));
     if (!ctx.repo.hasConfig) entries.push(tool(initCommand, 'Tools'));
     entries.push(tool(doctorCommand, 'Tools'));
     entries.push(tool(updateCommand, 'Tools'));
@@ -115,6 +117,7 @@ export function entriesFor(ctx: Context): Entry[] {
   } else {
     entries.push(agentEntry(ctx));
     entries.push({ ...tool(skillCommand, 'Tools'), name: 'skill', summary: 'Run a skill' });
+    entries.push(tool(pluginCommand, 'Tools'));
     entries.push(tool(doctorCommand, 'Tools'));
     entries.push(tool(setupCommand, 'Tools'));
     entries.push(tool(updateCommand, 'Tools'));
