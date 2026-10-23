@@ -35,8 +35,8 @@ export function xterm256(r: number, g: number, b: number): number {
 }
 
 /**
- * Whether to draw with the column-only blocks (▌▐█). Apple Terminal draws ▀▄ and the quadrant characters
- * unevenly (vertical gaps and offsets), so the picture comes out jagged. `PF_TRAVOLTA_BLOCKS=half|quadrant` overrides.
+ * Whether to draw flat (spaces on background colors, no block characters). Apple Terminal draws block
+ * characters unevenly (gaps and offsets), so the picture comes out jagged. `PF_TRAVOLTA_BLOCKS=half|quadrant` overrides.
  */
 export function halfBlocks(env: NodeJS.ProcessEnv = process.env): boolean {
   const forced = env.PF_TRAVOLTA_BLOCKS;

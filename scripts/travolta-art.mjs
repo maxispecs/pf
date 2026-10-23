@@ -68,11 +68,10 @@ const hex = (rgb) => rgb.map((v) => Math.round(v).toString(16).padStart(2, '0'))
 // Color: quadrant bits are 1 upper left, 2 upper right, 4 lower left, 8 lower right.
 const QUADRANT = ' ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█';
 const px = sample(cols * 2, rows * 2);
-// Terminals that draw block glyphs unevenly (Apple Terminal) get a version with only left/right halves and full blocks: they fill the cell the full height.
+// Terminals that draw block glyphs unevenly (Apple Terminal) get a flat version: spaces on background colors.
 const ALL = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-const HALF = [5, 10, 15];
 const bits = (m) => [0, 1, 2, 3].filter((q) => m & (1 << q)).length;
-function paint(masks) {
+function paint(masks, flat = false) {
   const chars = [];
   const fgs = [];
   const bgs = [];
@@ -84,7 +83,11 @@ function paint(masks) {
       const quad = [0, 1, 2, 3].map((q) => px[(row * 2 + (q >> 1)) * cols * 2 + col * 2 + (q & 1)]);
       const solid = quad.map((p) => p.alpha >= 0.5);
       let best = { mask: 0, fg: null, bg: null };
-      if (solid.every((s) => !s)) {
+      if (flat) {
+        // One color per cell, drawn as a space on a background color: exact in every terminal.
+        const on = quad.filter((_, q) => solid[q]);
+        if (on.length >= 2) best = { mask: 0, fg: null, bg: mean(on.map((p) => p.rgb)) };
+      } else if (solid.every((s) => !s)) {
         // Nothing here: the terminal's own background.
       } else if (solid.some((s) => !s)) {
         // At the outline the see-through pixels are the background half.
@@ -116,7 +119,7 @@ function paint(masks) {
   return { chars, fgs, bgs };
 }
 const { chars, fgs, bgs } = paint(ALL);
-const half = paint(HALF);
+const half = paint(ALL, true);
 
 // Braille: cells are 2 dots wide and 4 tall.
 const W = cols * 2;
@@ -154,7 +157,7 @@ fs.writeFileSync(
 /** The color picture: one quadrant character per cell, one string per terminal row. */
 export const TRAVOLTA_CHARS: string[] = ${list(chars)};
 
-/** The same picture with only left/right half blocks and full blocks (▌▐█), for terminals that draw ▀▄ and the quadrants unevenly. */
+/** The same picture as spaces on background colors, for terminals that draw block characters unevenly. */
 export const TRAVOLTA_HALF_CHARS: string[] = ${list(half.chars)};
 export const TRAVOLTA_HALF_FG: string[] = ${list(half.fgs)};
 export const TRAVOLTA_HALF_BG: string[] = ${list(half.bgs)};
