@@ -48,7 +48,7 @@ New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json 
 | `core/src/commands/repo.ts` | `pf repo` / `pf r`: installs or updates those helpers in a repo (pnpm root commands, versioning) and wires its `package.json`; rerun after `pf update` |
 | `core/scripts/install.sh` | install on a machine without pf (`--from-source` for a checkout) |
 | `scripts/logo-art.mjs` | turns `core/assets/pulpfixer.png` into the header art in `kit/src/ui/logo-art.ts` (generated, commit the output) |
-| `scripts/travolta-art.mjs`, `kit/src/ui/lost.ts` | confused Travolta (`scripts/art/travolta.png`, a frame of the cutout GIF -> `kit/src/ui/travolta-art.ts`, generated; quadrant blocks in true color or 256 colors, braille without color) printed on an unknown command or an uncaught error, TTY only, `PF_NO_TRAVOLTA=1` turns it off |
+| `scripts/travolta-art.mjs`, `kit/src/ui/lost.ts` | confused Travolta (`scripts/art/travolta.png`, a frame of the cutout GIF -> `kit/src/ui/travolta-art.ts`, generated; half blocks in true color or 256 colors, braille without color) printed on an unknown command or an uncaught error, TTY only, `PF_NO_TRAVOLTA=1` turns it off |
 | `scripts/build.mjs`, `test.mjs` | build / test every package |
 | `scripts/release.mjs` | check, build, dry-run publish of every unpublished package (`--publish` for real) |
 
