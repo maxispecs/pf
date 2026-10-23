@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { printLost } from '@pulpfixer/kit/ui/lost';
 import { setPackageRoot } from '@pulpfixer/kit/version';
 import { main } from '../cli.js';
 
@@ -13,6 +14,7 @@ process.stdout.on('error', (e: NodeJS.ErrnoException) => {
 main(process.argv.slice(2)).then(
   (code) => process.exit(code),
   (e: unknown) => {
+    printLost();
     process.stderr.write(`pf: ${e instanceof Error ? e.message : String(e)}\n`);
     process.exit(1);
   },

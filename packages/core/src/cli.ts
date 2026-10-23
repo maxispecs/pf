@@ -4,6 +4,7 @@ import { buildContext, type Context } from '@pulpfixer/kit/context';
 import { localRoot, runLocalMenu } from './local.js';
 import { printList, runCustom, runMenu } from './menu.js';
 import { printBanner } from '@pulpfixer/kit/ui/banner';
+import { printLost } from '@pulpfixer/kit/ui/lost';
 import { err, out } from '@pulpfixer/kit/ui/palette';
 import { badge, h2, promptLine, termLine } from '@pulpfixer/kit/ui/text';
 import { BUILTIN_PLUGINS } from './plugins/index.js';
@@ -38,6 +39,7 @@ export function helpText(): string {
     `  ${c.green('NO_COLOR=1')}            Turn colors off (${c.green('FORCE_COLOR=1')} forces them on)`,
     `  ${c.green('PF_HOME=')}${c.blue('<dir>')}         Where pf keeps config and state (default ~/.pf)`,
     `  ${c.green('PF_NO_UPDATE_CHECK=1')}  Skip the daily background update check`,
+    `  ${c.green('PF_NO_TRAVOLTA=1')}      Don't draw confused Travolta on unknown commands and errors`,
     '',
     c.dim('Repo commands come from pf.json, package scripts, Makefile/justfile targets and stack defaults.'),
   );
@@ -105,6 +107,7 @@ export async function main(argv: string[]): Promise<number> {
 
   const c = err();
   const near = suggest(first, ctx);
+  printLost();
   process.stderr.write(
     `${badge.error(`unknown command "${first}".${near.length ? ` Did you mean: ${near.map((n) => c.bold(c.green(n))).join(', ')}?` : ''}`, c)}\n` +
       `Run ${termLine('pf list', c)} for what is available here, or ${termLine('pf help', c)}.\n`,
