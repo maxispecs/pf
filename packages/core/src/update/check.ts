@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import os from 'node:os';
 import path from 'node:path';
 import { PACKAGE_NAME, REGISTRY_URL, pfHome } from '@pulpfixer/kit/constants';
 import { capture } from '@pulpfixer/kit/exec';
@@ -24,6 +25,7 @@ export function cachedLatest(): string | undefined {
 export function fetchLatest(timeoutMs = 20_000): { version?: string; error?: string } {
   const r = capture(['npm', 'view', PACKAGE_NAME, 'version', '--registry', REGISTRY_URL], {
     timeout: timeoutMs,
+    cwd: os.tmpdir(),
   });
   const v = r.stdout.trim().split('\n').pop()?.trim() ?? '';
   if (r.ok && /^\d+\.\d+/.test(v)) return { version: v };
@@ -34,7 +36,7 @@ export function fetchLatest(timeoutMs = 20_000): { version?: string; error?: str
 const BACKGROUND_SCRIPT = `
 const [file, registry, pkg] = process.argv.slice(1);
 const fs = require('fs'), path = require('path');
-require('child_process').execFile('npm', ['view', pkg, 'version', '--registry', registry], { timeout: 20000 }, (e, o) => {
+require('child_process').execFile('npm', ['view', pkg, 'version', '--registry', registry], { timeout: 20000, cwd: require('os').tmpdir() }, (e, o) => {
   const v = String(o || '').trim().split('\\n').pop().trim();
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
