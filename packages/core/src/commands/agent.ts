@@ -1,6 +1,7 @@
 import { writeCursorMcp } from '../agent/adapters.js';
 import { saveAgent } from '../agent/agents.js';
 import { chooseSavedAgent, startAgent } from '../agent/launch.js';
+import { printMascot } from '@pulpfixer/kit/ui/mascot';
 import { err } from '@pulpfixer/kit/ui/palette';
 import { badgeLabel, termLine } from '@pulpfixer/kit/ui/text';
 import { splitDashes, takeFlag, takeOption, which } from '@pulpfixer/kit/util';
@@ -16,6 +17,7 @@ export const agentCommand: Command = {
     const dryRun = takeFlag(before, '--dry-run', '-n');
     if (before[0] === 'use') return useAgent(before.slice(1), dryRun);
     const agent = takeOption(before, '--agent');
+    printMascot('agent');
     const prompt = [...before, ...after].join(' ').trim();
     return startAgent(ctx, { prompt, ...(agent !== undefined ? { agent } : {}), dryRun });
   },

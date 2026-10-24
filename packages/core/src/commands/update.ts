@@ -4,6 +4,7 @@ import type { Context } from '@pulpfixer/kit/context';
 import { PACKAGE_NAME, REGISTRY_URL } from '@pulpfixer/kit/constants';
 import { writeHomeFile } from '@pulpfixer/kit/config';
 import { runCmd } from '@pulpfixer/kit/exec';
+import { printMascot } from '@pulpfixer/kit/ui/mascot';
 import { out } from '@pulpfixer/kit/ui/palette';
 import { confirm, reporter } from '@pulpfixer/kit/ui/prompt';
 import { compareVersions, readJson, readText, takeFlag } from '@pulpfixer/kit/util';
@@ -81,6 +82,7 @@ export const updateCommand: Command = {
     const r = reporter(c);
 
     if (repoOnly) return refreshRepoCli(ctx, dryRun);
+    printMascot('update');
 
     r.step('pf');
     const found = fetchLatest();

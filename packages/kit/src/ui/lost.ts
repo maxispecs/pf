@@ -44,7 +44,7 @@ export function halfBlocks(env: NodeJS.ProcessEnv = process.env): boolean {
 }
 
 /** SGR parameters for a stored color (`rrggbb`), as foreground (38) or background (48). */
-function sgr(hex: string, base: 38 | 48, full: boolean): string {
+export function sgr(hex: string, base: 38 | 48, full: boolean): string {
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
   return full ? `${base};2;${r};${g};${b}` : `${base};5;${xterm256(r, g, b)}`;
 }

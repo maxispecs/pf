@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Context } from '@pulpfixer/kit/context';
 import { capture, runCmd } from '@pulpfixer/kit/exec';
+import { printMascot } from '@pulpfixer/kit/ui/mascot';
 import { err } from '@pulpfixer/kit/ui/palette';
 import { badgeLabel, h2, termLine, ul } from '@pulpfixer/kit/ui/text';
 import { exists, readText, takeFlag } from '@pulpfixer/kit/util';
@@ -173,6 +174,7 @@ export const repoCommand: Command = {
     }
     const root = ctx.repo.root;
     const done: string[] = [];
+    printMascot('repo');
 
     if (!noPnpm) {
       process.stderr.write(`${h2('pnpm commands', c)}\n`);

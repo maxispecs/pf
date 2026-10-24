@@ -1,5 +1,6 @@
 import { aboutCommand } from './about.js';
 import { agentCommand } from './agent.js';
+import { artCommand } from './art.js';
 import { mcpCommand } from './mcp.js';
 import { deployCommand } from './deploy.js';
 import { docCommand } from './doc.js';
@@ -22,6 +23,7 @@ import { pluginCommands } from '../plugins/index.js';
 export function allCommands(): Command[] {
   const all: Command[] = [
     agentCommand,
+    artCommand,
     mcpCommand,
     ...TASK_COMMANDS,
     docCommand,
