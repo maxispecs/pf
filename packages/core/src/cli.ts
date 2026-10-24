@@ -5,6 +5,7 @@ import { localRoot, runLocalMenu } from './local.js';
 import { printList, runCustom, runMenu } from './menu.js';
 import { printBanner } from '@pulpfixer/kit/ui/banner';
 import { printLost } from '@pulpfixer/kit/ui/lost';
+import { printActionArt } from './art/index.js';
 import { err, out } from '@pulpfixer/kit/ui/palette';
 import { badge, h2, promptLine, termLine } from '@pulpfixer/kit/ui/text';
 import { BUILTIN_PLUGINS } from './plugins/index.js';
@@ -102,6 +103,7 @@ export async function main(argv: string[]): Promise<number> {
       process.stdout.write(`${out().bold(cmd.summary)}\n  ${promptLine(cmd.usage)}\n`);
       return 0;
     }
+    printActionArt(cmd.name, rest);
     return cmd.run(ctx, rest);
   }
   if (ctx.config.commands[first]) return runCustom(ctx, first, rest);

@@ -1,0 +1,7 @@
+{
+  "actions": {
+    "repo": "octopus-repo",
+    "update": "coffee",
+    "agent": "octopus-agent"
+  }
+}
