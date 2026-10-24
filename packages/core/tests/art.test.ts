@@ -9,13 +9,14 @@ import { allCommands } from '../src/commands/index.js';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'pf-art-'));
 
-test('the shipped art.json maps real commands to built-in pictures', () => {
+test('the shipped art.json maps real commands to pictures that exist', () => {
   const names = allCommands().map((c) => c.name);
-  const shipped = artActions([path.join(import.meta.dirname, '..', 'assets', 'art')]);
+  const dir = path.join(import.meta.dirname, '..', 'assets', 'art');
+  const shipped = artActions([dir]);
   assert.ok(Object.keys(shipped).length >= 3);
   for (const [cmd, art] of Object.entries(shipped)) {
     assert.ok(names.includes(cmd), cmd);
-    assert.ok(art in BUILTIN_ARTS, art);
+    assert.ok(art === 'none' || art in BUILTIN_ARTS || ansiFile(art, [dir]), `${cmd}: no picture named ${art}`);
   }
   assert.ok(names.includes('art'));
 });
