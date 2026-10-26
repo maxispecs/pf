@@ -26,6 +26,8 @@ New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json 
 - Shortcuts: a short name for a full command (`pf ds` = `pf deploy staging`, `pf dp` = `pf deploy production`) is one entry in `SHORTCUTS` in `packages/core/src/commands/shortcuts.ts`. Extra args pass through to the target.
 - New command: add `packages/core/src/commands/<name>.ts`, register it in `packages/core/src/commands/index.ts`, show it in `packages/core/src/menu.ts` if it belongs in the menu, add a test.
 - Command resolution order is `pf.json` override, then scripts/targets the repo defines, then stack defaults (`packages/kit/src/detect/`). New stacks go in `packages/kit/src/detect/stacks.ts` with a test in `packages/kit/tests/`.
+- PHP (`composer.json`): `dev`/`build`/`test`/`lint` come from composer scripts (`dev serve start`, `test tests phpunit`, `lint cs-check cs phpcs stan phpstan analyse`), else framework and tool defaults (Laravel `artisan`, CakePHP `bin/cake server`, built-in server on `public`/`webroot`; Pest, PHPUnit, Pint, PHP CS Fixer, PHP_CodeSniffer, PHPStan from `vendor/bin`). `pf deploy staging|production` also run a composer script named like the node ones (`deploy:staging`, ...).
+- Local repo CLI (`a` + `cli/run` + `cli/commands/**/*.sh`, `# desc:` / `# usage:` headers): `packages/kit/src/detect/localcli.ts`. A command named like a task (`dev`, `build`, `test`, `lint`, `install`/`setup`) is that task's repo script, `deploy:staging` / `deploy:production` are deploy targets (`-y` is added when its usage mentions it, pf already confirmed), and `pf tools [name] [args]` (`core/src/commands/tools.ts`) lists and runs the rest.
 
 ## Layout
 
@@ -33,7 +35,7 @@ New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json 
 |------|------|
 | `packages/core/src/bin/pf.ts`, `cli.ts` | entry point, banner, dispatch |
 | `core/src/menu.ts` | repo menu, fallback menu, static list |
-| `kit/src/detect/` | repo, stack, docs and staging detection, command resolution |
+| `kit/src/detect/` | repo, stack, docs and staging detection, command resolution; `localcli.ts` reads a repo's own `./a` CLI |
 | `kit/src/ui/prompt.ts` | `confirm` (yes/no) and `ask` (single-line text input with default, placeholder and `validate`). Use `ask` for any input field; it returns null without a TTY or on cancel, so give commands flags too |
 | `kit/src/ui/text.ts` | text helpers: colored command samples (`termLine`, `promptLine`), badges, headings, lists, tables. Return strings, take a `Palette`. Use these instead of hand-coloring messages |
 | `core/src/commands/` | built-in commands |

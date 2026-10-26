@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { buildContext } from '@pulpfixer/kit/context';
 import { candidates } from '@pulpfixer/kit/detect/resolve';
 import { detectDocs } from '@pulpfixer/kit/detect/docs';
-import { detectStaging } from '@pulpfixer/kit/detect/deploy';
+import { detectProduction, detectStaging } from '@pulpfixer/kit/detect/deploy';
 import { detectedEntries } from '../src/commands/init.js';
 import { json, lines, mkRepo } from './helpers.js';
 
@@ -79,4 +79,21 @@ test('init writes the first detected command per task and keeps existing entries
   assert.equal(added.dev!.group, 'Develop');
   assert.ok(!('build' in added));
   assert.equal(added.install!.run, 'pnpm install');
+});
+
+test('staging and production: a composer script or a local ./a command counts, -y only when the script takes it', () => {
+  const cli = {
+    a: '',
+    'cli/run': '',
+    'cli/commands/deploy/staging.sh': '# usage: ./a deploy:staging -y\n',
+    'cli/commands/deploy/production.sh': '# usage: ./a deploy:production\n',
+  };
+  const stg = detectStaging(buildContext(mkRepo({ '.git/HEAD': '', ...cli })));
+  assert.deepEqual(lines(stg.steps), ['./a deploy:staging -y']);
+  assert.equal(stg.steps[0]!.source, './a deploy:staging');
+  assert.deepEqual(lines(detectProduction(buildContext(mkRepo({ '.git/HEAD': '', ...cli }))).steps), ['./a deploy:production']);
+  const composer = json({ scripts: { 'deploy:staging': 'x', 'deploy:production': 'y' } });
+  assert.deepEqual(lines(detectStaging(buildContext(mkRepo({ '.git/HEAD': '', 'composer.json': composer, ...cli }))).steps), ['composer run deploy:staging']);
+  assert.deepEqual(lines(detectProduction(buildContext(mkRepo({ '.git/HEAD': '', 'composer.json': composer }))).steps), ['composer run deploy:production']);
+  assert.equal(detectProduction(buildContext(mkRepo({ '.git/HEAD': '', 'composer.json': '{}', 'public/index.php': '' }))).steps.length, 0);
 });

@@ -9,6 +9,7 @@ import { initCommand } from './commands/init.js';
 import { setupCommand } from './commands/setup.js';
 import { skillCommand } from './commands/skill.js';
 import { runTask, TASK_COMMANDS } from './commands/tasks.js';
+import { localCliFor, toolsCommand } from './commands/tools.js';
 import { GROUPS, type Entry } from '@pulpfixer/kit/types';
 import { updateCommand } from './commands/update.js';
 import { pluginCommand } from './commands/plugin.js';
@@ -109,6 +110,8 @@ export function entriesFor(ctx: Context): Entry[] {
       });
     }
     entries.push(tool(verCommand, 'Tools', findVersionsRoot(ctx.cwd) ? 'versions.json' : 'not set up yet'));
+    const localCli = localCliFor(ctx);
+    if (localCli) entries.push(tool(toolsCommand, 'Tools', `${localCli.commands.length} in ${localCli.entry}`));
     entries.push(tool(skillCommand, 'Tools'));
     entries.push(tool(pluginCommand, 'Tools'));
     entries.push(tool(repoCommand, 'Tools'));

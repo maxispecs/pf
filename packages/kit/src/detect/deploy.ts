@@ -2,6 +2,7 @@ import path from 'node:path';
 import type { Context } from '../context.js';
 import { shellCmd, type Cmd } from '../exec.js';
 import { exists, listDir, readJson, readText } from '../util.js';
+import { detectLocalCli } from './localcli.js';
 import { nodeManager, nodeRun, type Candidate } from './stacks.js';
 
 export interface StagingPlan {
@@ -28,6 +29,22 @@ const CLI_PACKAGES: Record<string, string> = {
   netlify: 'netlify-cli',
   vercel: 'vercel',
 };
+
+/**
+ * A deploy script the repo defines outside package.json: a composer script, else a `./a <name>` command
+ * of its local CLI. pf asks before deploying, so a CLI command that takes `-y` gets it.
+ */
+function repoDeployScript(root: string, names: string[]): Candidate | null {
+  const composer = readJson<{ scripts?: Record<string, unknown> }>(root, 'composer.json');
+  const script = names.find((n) => composer?.scripts && n in composer.scripts);
+  if (script) return { cmd: { argv: ['composer', 'run', script], cwd: root }, source: `composer script ${script}` };
+  const cli = detectLocalCli(root);
+  const command = cli && names.map((n) => cli.commands.find((c) => c.name === n)).find(Boolean);
+  if (cli && command) {
+    return { cmd: { argv: [cli.entry, command.name, ...(command.acceptsYes ? ['-y'] : [])], cwd: root }, source: `${cli.entry} ${command.name}` };
+  }
+  return null;
+}
 
 /** Run a platform CLI: the local install, else pnpm dlx / npx in Node repos, else the bare binary. */
 export function toolCmd(dir: string, root: string, bin: string, args: string[]): Cmd {
@@ -79,6 +96,10 @@ export function detectStaging(ctx: Context): StagingPlan {
       return { steps: [{ cmd: { argv: nodeRun(nodeManager(root), name), cwd: d }, source: `${rel(d)}/package.json script ${name}` }], skipped };
     }
   }
+
+  // 1b. A composer script or a local ./a command
+  const scripted = repoDeployScript(root, STAGING_SCRIPTS);
+  if (scripted) return { steps: [scripted], skipped };
 
   // 2. A staging workflow that can be dispatched
   const wfDir = path.join(root, '.github', 'workflows');
@@ -151,5 +172,6 @@ export function detectProduction(ctx: Context): StagingPlan {
       return { steps: [{ cmd: { argv: nodeRun(nodeManager(root), name), cwd: d }, source: `${rel}/package.json script ${name}` }], skipped: [] };
     }
   }
-  return { steps: [], skipped: [] };
+  const scripted = repoDeployScript(root, PRODUCTION_SCRIPTS);
+  return { steps: scripted ? [scripted] : [], skipped: [] };
 }

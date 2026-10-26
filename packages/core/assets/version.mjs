@@ -7,14 +7,16 @@ import { fileURLToPath } from 'node:url';
 
 // Revision of this CLI, bumped whenever it changes. `--cli-version` prints it so the /ver skill
 // can tell whether a repo's copy is older than the skill's. Copies without it count as 0.
-const CLI_VERSION = 4;
+const CLI_VERSION = 5;
 const MANIFEST = 'versions.json';
 const SKIP_DIRS = new Set([
   'node_modules', 'dist', 'build', 'out', 'coverage', 'venv', 'env', '__pycache__',
   'site-packages', 'target', 'vendor',
 ]);
+// Directories ending in one of these are backups or leftovers and are never discovered.
+const SKIP_SUFFIXES = ['.old', '.bak', '.orig'];
 const PY_MAX_DEPTH = 3;
-const TYPES = ['node', 'python', 'skill'];
+const TYPES = ['node', 'python', 'php', 'skill'];
 const PARTS = ['major', 'minor'];
 
 class CliError extends Error {}
@@ -36,7 +38,7 @@ Commands:
   init                    Create versions.json from discovered packages, or add newly
                           discovered packages to an existing one. New versions record
                           today's date as "since".
-  sync                    Rewrite package.json / pyproject.toml versions from versions.json
+  sync                    Rewrite package.json / pyproject.toml / composer.json / VERSION from versions.json
 
 Options:
   --json                  (list) machine-readable output
@@ -68,7 +70,7 @@ function palette(stream) {
 
 const c = palette(process.stdout);
 const cErr = palette(process.stderr);
-const colorType = (type) => ({ node: c.green, python: c.blue, skill: c.yellow, stack: c.magenta })[type] ?? String;
+const colorType = (type) => ({ node: c.green, python: c.blue, php: c.red, skill: c.yellow, stack: c.magenta })[type] ?? String;
 const colorTarget = (target) => (target === 'stack' ? c.boldMagenta(target) : c.cyan(target));
 
 // ---------- fs helpers
@@ -108,7 +110,8 @@ function listDirs(root, rel) {
     return [];
   }
   return entries
-    .filter((e) => e.isDirectory() && !e.name.startsWith('.') && !SKIP_DIRS.has(e.name))
+    .filter((e) => e.isDirectory() && !e.name.startsWith('.') && !SKIP_DIRS.has(e.name)
+      && !SKIP_SUFFIXES.some((x) => e.name.endsWith(x)))
     .map((e) => e.name)
     .sort();
 }
@@ -281,6 +284,64 @@ function writePythonVersion(dir, version, dryRun) {
   return { file: m.file, status: 'updated', version: native };
 }
 
+// ---------- composer.json (PHP)
+
+function readPhp(dir) {
+  const file = path.join(dir, 'composer.json');
+  if (!exists(file)) return { name: null, version: null };
+  const data = readJson(file);
+  return { name: data.name ?? null, version: data.version ?? null };
+}
+
+function writePhpVersion(dir, version, dryRun) {
+  const file = path.join(dir, 'composer.json');
+  if (!exists(file)) return { file, status: 'missing' };
+  const text = readText(file);
+  const native = toNative(version);
+  const indent = /^[ \t]+(?=")/m.exec(text)?.[0] ?? '    ';
+  const escaped = indent.replace(/\t/g, '\\t');
+  const re = new RegExp(`^(${escaped}"version"\\s*:\\s*")([^"]*)(")`, 'm');
+  let next;
+  if (re.test(text)) {
+    next = text.replace(re, (_, pre, _old, post) => `${pre}${native}${post}`);
+  } else {
+    const data = JSON.parse(text);
+    let out = data;
+    if ('name' in data) {
+      out = {};
+      for (const [k, v] of Object.entries(data)) {
+        out[k] = v;
+        if (k === 'name') out.version = native;
+      }
+    } else out = { version: native, ...data };
+    next = JSON.stringify(out, null, indent);
+    if (text.endsWith('\n')) next += '\n';
+  }
+  if (next === text) return { file, status: 'unchanged' };
+  if (!dryRun) writeAtomic(file, next);
+  return { file, status: 'updated', version: native };
+}
+
+// ---------- VERSION file (stack native copy for PHP apps)
+// A single line holding major.minor, read by apps themselves (for example a Version helper).
+
+const VERSION_FILE = 'VERSION';
+
+function readVersionFile(dir) {
+  const file = path.join(dir, VERSION_FILE);
+  if (!exists(file)) return null;
+  const v = readText(file).trim();
+  return v || null;
+}
+
+function writeVersionFile(dir, version, dryRun) {
+  const file = path.join(dir, VERSION_FILE);
+  const next = `${version}\n`;
+  if (exists(file) && readText(file) === next) return { file, status: 'unchanged' };
+  if (!dryRun) writeAtomic(file, next);
+  return { file, status: 'updated', version };
+}
+
 // ---------- SKILL.md (agent skills)
 // The version lives in the frontmatter as `metadata:\n  version: "x.y.0"`.
 
@@ -338,6 +399,7 @@ function readNative(root, rel, type) {
   const dir = path.join(root, rel);
   if (type === 'python') return readPython(dir);
   if (type === 'skill') return readSkill(dir);
+  if (type === 'php') return readPhp(dir);
   const pkg = readPackageJson(dir);
   return { name: pkg?.name ?? null, version: pkg?.version ?? null };
 }
@@ -345,7 +407,15 @@ function readNative(root, rel, type) {
 function syncPackage(root, rel, type, version, dryRun) {
   const dir = path.join(root, rel);
   if (type === 'skill') return writeSkillVersion(dir, version, dryRun);
+  if (type === 'php') return writePhpVersion(dir, version, dryRun);
   return type === 'python' ? writePythonVersion(dir, version, dryRun) : writeNodeVersion(dir, version, dryRun);
+}
+
+// The root VERSION file is a stack manifest when it exists, or when the repo is a PHP app
+// (root composer.json) with no package.json to hold the version.
+function usesVersionFile(root) {
+  if (exists(path.join(root, VERSION_FILE))) return true;
+  return exists(path.join(root, 'composer.json')) && !exists(path.join(root, 'package.json'));
 }
 
 function syncStack(root, version, dryRun) {
@@ -356,6 +426,7 @@ function syncStack(root, version, dryRun) {
     // A root pyproject without a version (e.g. a uv workspace root) is not a stack manifest.
     if (r.status !== 'skipped') results.push(r);
   }
+  if (usesVersionFile(root)) results.push(writeVersionFile(root, version, dryRun));
   return results;
 }
 
@@ -368,11 +439,14 @@ function stackNativeVersions(root) {
     const { version } = readPython(root);
     if (version) out.push({ file: path.basename(py.file), version });
   }
+  const fileVersion = readVersionFile(root);
+  if (fileVersion) out.push({ file: VERSION_FILE, version: fileVersion });
   return out;
 }
 
 function stackName(root) {
-  return readPackageJson(root)?.name ?? (pythonManifest(root) && readPython(root).name) ?? path.basename(root);
+  return readPackageJson(root)?.name ?? (pythonManifest(root) && readPython(root).name)
+    ?? readPhp(root).name ?? path.basename(root);
 }
 
 // ---------- discovery
@@ -484,6 +558,23 @@ function findSkillDirs(root, skip) {
   return out;
 }
 
+function findPhpDirs(root, skip) {
+  const out = [];
+  const walk = (rel, depth) => {
+    for (const name of listDirs(root, rel)) {
+      const child = joinRel(rel, name);
+      if (skip.has(child)) continue;
+      if (exists(path.join(root, child, 'composer.json'))) {
+        out.push(child);
+        continue;
+      }
+      if (depth < PY_MAX_DEPTH) walk(child, depth + 1);
+    }
+  };
+  walk('', 1);
+  return out;
+}
+
 function detectPackageManager(root) {
   const declared = readPackageJson(root)?.packageManager?.split('@')[0];
   if (declared) return declared;
@@ -500,7 +591,9 @@ function discover(root) {
   for (const d of nodeDirs) packages.set(d, 'node');
   const skillDirs = findSkillDirs(root, new Set(nodeDirs));
   for (const d of skillDirs) packages.set(d, 'skill');
-  for (const d of findPythonDirs(root, new Set([...nodeDirs, ...skillDirs]))) packages.set(d, 'python');
+  const pythonDirs = findPythonDirs(root, new Set([...nodeDirs, ...skillDirs]));
+  for (const d of pythonDirs) packages.set(d, 'python');
+  for (const d of findPhpDirs(root, new Set([...nodeDirs, ...skillDirs, ...pythonDirs]))) packages.set(d, 'php');
   return {
     packages: new Map([...packages].sort(([a], [b]) => a.localeCompare(b))),
     turbo: exists(path.join(root, 'turbo.json')),

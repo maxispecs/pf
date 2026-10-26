@@ -178,3 +178,23 @@ test('uninstall without a terminal or --yes cancels and names the flag; flags pi
   assert.doesNotMatch(dry.err, /npm rm/);
   assert.match(dry.out, /kept/);
 });
+
+test('tools lists the repo\'s ./a commands and runs one', () => {
+  const dir = mkRepo({
+    '.git/HEAD': '',
+    'composer.json': '{}',
+    a: '',
+    'cli/run': '',
+    'cli/commands/hello.sh': '# desc: say hi\n',
+  });
+  const list = pf(dir, 'tools');
+  assert.equal(list.code, 0, list.err);
+  assert.match(list.out, /pf tools hello\s+say hi/);
+  assert.match(pf(dir, 'list').out, /pf tools\s+Run this repo's own tools/);
+  const dry = pf(dir, 'tools', 'hello', 'x', '--dry-run');
+  assert.equal(dry.code, 0, dry.err);
+  assert.match(dry.err, /would run .*\.\/a hello x/);
+  assert.equal(pf(dir, 'tools', 'nope').code, 2);
+  assert.equal(pf(repo(), 'tools').code, 1);
+  assert.doesNotMatch(pf(repo(), 'list').out, /pf tools\s+Run this repo/);
+});

@@ -11,6 +11,7 @@ import { setupCommand } from './setup.js';
 import { SHORTCUTS, shortcutCommands } from './shortcuts.js';
 import { skillCommand } from './skill.js';
 import { TASK_COMMANDS } from './tasks.js';
+import { toolsCommand } from './tools.js';
 import type { Command } from '@pulpfixer/kit/types';
 import { uninstallCommand } from './uninstall.js';
 import { updateCommand } from './update.js';
@@ -29,6 +30,7 @@ export function allCommands(): Command[] {
     docCommand,
     deployCommand,
     verCommand,
+    toolsCommand,
     skillCommand,
     initCommand,
     repoCommand,

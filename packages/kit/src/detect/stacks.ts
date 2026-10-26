@@ -1,6 +1,7 @@
 import path from 'node:path';
 import type { Cmd } from '../exec.js';
 import { exists, listDir, readJson, readText } from '../util.js';
+import { detectLocalCli, LOCAL_CLI_TASKS } from './localcli.js';
 
 export type Task = 'dev' | 'build' | 'test' | 'lint' | 'install';
 export const TASKS: Task[] = ['dev', 'build', 'test', 'lint', 'install'];
@@ -210,21 +211,83 @@ function detectRuby(root: string): StackInfo | null {
   return s;
 }
 
+interface Composer {
+  require?: Record<string, string>;
+  'require-dev'?: Record<string, string>;
+  scripts?: Record<string, unknown>;
+}
+
+/** Composer script names that map to each task, best first. */
+const PHP_SCRIPTS: Record<Exclude<Task, 'install'>, string[]> = {
+  dev: ['dev', 'serve', 'start'],
+  build: ['build'],
+  test: ['test', 'tests', 'phpunit'],
+  lint: ['lint', 'cs-check', 'cs', 'phpcs', 'stan', 'phpstan', 'analyse', 'analyze'],
+};
+
 function detectPhp(root: string): StackInfo | null {
-  const composer = readJson<{ scripts?: Record<string, unknown> }>(root, 'composer.json');
+  const composer = readJson<Composer>(root, 'composer.json');
   if (!composer) return null;
-  const s = make('php', 'PHP', 'composer');
+  const deps = { ...composer.require, ...composer['require-dev'] };
+  const has = (pkg: string) => pkg in deps;
+  const bin = (name: string) => exists(root, 'vendor', 'bin', name);
+  const anyFile = (...names: string[]) => names.some((n) => exists(root, n));
+  const vbin = (name: string, ...a: string[]) => argv(root, `vendor/bin/${name}`, ...a);
+
+  const framework = exists(root, 'artisan') ? 'Laravel'
+    : has('cakephp/cakephp') ? 'CakePHP'
+    : has('symfony/framework-bundle') ? 'Symfony'
+    : null;
+  const s = make('php', framework ? `PHP (${framework})` : 'PHP', 'composer');
+
+  // Scripts the repo defines in composer.json
   const scripts = composer.scripts ?? {};
-  for (const [task, names] of [['dev', ['dev', 'serve', 'start']], ['test', ['test']], ['lint', ['lint', 'cs', 'cs-check']], ['build', ['build']]] as [Task, string[]][]) {
-    for (const n of names) if (n in scripts) add(s.scripts, task, argv(root, 'composer', 'run', n), `composer script ${n}`);
+  for (const task of ['dev', 'build', 'test', 'lint'] as const) {
+    for (const n of PHP_SCRIPTS[task]) if (n in scripts) add(s.scripts, task, argv(root, 'composer', 'run', n), `composer script ${n}`);
   }
-  if (exists(root, 'artisan')) {
-    add(s.defaults, 'dev', argv(root, 'php', 'artisan', 'serve'), 'laravel default');
-    add(s.defaults, 'test', argv(root, 'php', 'artisan', 'test'), 'laravel default');
-  } else if (exists(root, 'vendor', 'bin', 'phpunit')) {
-    add(s.defaults, 'test', argv(root, 'vendor/bin/phpunit'), 'composer default');
+
+  // dev server
+  if (framework === 'Laravel') add(s.defaults, 'dev', argv(root, 'php', 'artisan', 'serve'), 'laravel default');
+  else if (framework === 'CakePHP' && exists(root, 'bin', 'cake')) add(s.defaults, 'dev', argv(root, 'bin/cake', 'server'), 'cakephp default');
+  else {
+    const docroot = ['public', 'webroot', 'web'].find((d) => exists(root, d, 'index.php'));
+    if (docroot) add(s.defaults, 'dev', argv(root, 'php', '-S', 'localhost:8000', '-t', docroot), 'php default (built-in server)');
+    else if (exists(root, 'index.php')) add(s.defaults, 'dev', argv(root, 'php', '-S', 'localhost:8000'), 'php default (built-in server)');
   }
+
+  // tests
+  if (framework === 'Laravel') add(s.defaults, 'test', argv(root, 'php', 'artisan', 'test'), 'laravel default');
+  else if (has('pestphp/pest') || bin('pest')) add(s.defaults, 'test', vbin('pest'), 'composer default (Pest)');
+  else if (has('phpunit/phpunit') || bin('phpunit') || anyFile('phpunit.xml', 'phpunit.xml.dist')) add(s.defaults, 'test', vbin('phpunit'), 'composer default (PHPUnit)');
+
+  // lint: every tool the repo sets up, formatters before static analysis
+  if (has('laravel/pint') || bin('pint')) add(s.defaults, 'lint', vbin('pint', '--test'), 'composer default (Pint)');
+  if (has('friendsofphp/php-cs-fixer') || anyFile('.php-cs-fixer.php', '.php-cs-fixer.dist.php')) {
+    add(s.defaults, 'lint', vbin('php-cs-fixer', 'fix', '--dry-run', '--diff'), 'composer default (PHP CS Fixer)');
+  }
+  if (anyFile('phpcs.xml', 'phpcs.xml.dist', '.phpcs.xml', '.phpcs.xml.dist')) {
+    add(s.defaults, 'lint', vbin('phpcs'), 'composer default (PHP_CodeSniffer)');
+  } else if (has('cakephp/cakephp-codesniffer')) {
+    const dirs = ['src', 'tests', 'plugins'].filter((d) => exists(root, d));
+    add(s.defaults, 'lint', vbin('phpcs', '--colors', '-p', '--standard=vendor/cakephp/cakephp-codesniffer/CakePHP', ...dirs), 'composer default (CakePHP CodeSniffer)');
+  } else if (has('squizlabs/php_codesniffer')) {
+    add(s.defaults, 'lint', vbin('phpcs', '--standard=PSR12', ...['src', 'app', 'tests'].filter((d) => exists(root, d))), 'composer default (PHP_CodeSniffer)');
+  }
+  if (has('phpstan/phpstan') || anyFile('phpstan.neon', 'phpstan.neon.dist')) add(s.defaults, 'lint', vbin('phpstan', 'analyse'), 'composer default (PHPStan)');
+
   add(s.defaults, 'install', argv(root, 'composer', 'install'), 'composer default');
+  return s;
+}
+
+/** The repo's own `./a` developer CLI: its commands named after a task are that task's script. */
+function detectLocalCliStack(root: string): StackInfo | null {
+  const cli = detectLocalCli(root);
+  if (!cli) return null;
+  const s = make('localcli', `Local CLI (${cli.entry})`);
+  const names = new Set(cli.commands.map((c) => c.name));
+  for (const task of TASKS) {
+    for (const n of LOCAL_CLI_TASKS[task]) if (names.has(n)) add(s.scripts, task, argv(root, cli.entry, n), `${cli.entry} ${n}`);
+  }
   return s;
 }
 
@@ -303,7 +366,7 @@ function detectCompose(root: string): StackInfo | null {
 /** Detection order is also the priority order for resolving commands. */
 const DETECTORS = [
   detectNode, detectPython, detectGo, detectRust, detectMaven, detectGradle, detectDotnet,
-  detectRuby, detectPhp, detectElixir, detectSwift, detectMake, detectJust, detectCompose,
+  detectRuby, detectPhp, detectElixir, detectSwift, detectLocalCliStack, detectMake, detectJust, detectCompose,
 ];
 
 export function detectStacks(dir: string): StackInfo[] {

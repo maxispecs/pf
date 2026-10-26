@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { detectStacks, justRecipes, makeTargets, type StackInfo, type Task } from '../src/detect/stacks.js';
+import { detectLocalCli } from '../src/detect/localcli.js';
 import { json, lines, mkRepo } from './helpers.js';
 
 const get = (stacks: StackInfo[], id: string) => stacks.find((s) => s.id === id);
@@ -110,4 +111,73 @@ test('docker compose is a dev default', () => {
 
 test('an empty directory has no stacks', () => {
   assert.deepEqual(detectStacks(mkRepo({})), []);
+});
+
+const ADMIN_COMPOSER = json({
+  require: { 'cakephp/cakephp': '4.4.*' },
+  'require-dev': { 'cakephp/cakephp-codesniffer': '^4.5', 'phpunit/phpunit': '^9.3' },
+  scripts: { 'docker:start': 'x' },
+});
+
+test('php: CakePHP app gets server, phpunit, codesniffer and composer install', () => {
+  const s = get(detectStacks(mkRepo({ 'composer.json': ADMIN_COMPOSER, 'bin/cake': '', src: '', tests: '', 'phpunit.xml.dist': '' })), 'php')!;
+  assert.equal(s.label, 'PHP (CakePHP)');
+  assert.equal(first(s, 'dev'), 'bin/cake server');
+  assert.equal(first(s, 'test'), 'vendor/bin/phpunit');
+  assert.match(first(s, 'lint')!, /^vendor\/bin\/phpcs --colors -p --standard=vendor\/cakephp\/cakephp-codesniffer\/CakePHP src tests$/);
+  assert.equal(first(s, 'install'), 'composer install');
+  assert.equal(first(s, 'build'), undefined);
+});
+
+test('php: composer scripts beat framework defaults', () => {
+  const s = get(
+    detectStacks(mkRepo({ 'composer.json': json({ scripts: { dev: 'x', test: 'x', 'cs-check': 'x', stan: 'x' } }), artisan: '' })),
+    'php',
+  )!;
+  assert.equal(s.label, 'PHP (Laravel)');
+  assert.deepEqual(lines(s.scripts.lint!), ['composer run cs-check', 'composer run stan']);
+  assert.equal(first(s, 'dev'), 'composer run dev');
+  assert.equal(first(s, 'test'), 'composer run test');
+  assert.deepEqual(lines(s.defaults.dev!), ['php artisan serve']);
+});
+
+test('php: plain repos use the built-in server and the tools they set up', () => {
+  const web = get(detectStacks(mkRepo({ 'composer.json': '{}', 'public/index.php': '' })), 'php')!;
+  assert.equal(first(web, 'dev'), 'php -S localhost:8000 -t public');
+  assert.equal(first(web, 'test'), undefined);
+  const tools = get(
+    detectStacks(mkRepo({ 'composer.json': json({ 'require-dev': { 'pestphp/pest': '*', 'laravel/pint': '*', 'phpstan/phpstan': '*' } }) })),
+    'php',
+  )!;
+  assert.equal(first(tools, 'test'), 'vendor/bin/pest');
+  assert.deepEqual(lines(tools.defaults.lint!), ['vendor/bin/pint --test', 'vendor/bin/phpstan analyse']);
+  const phpcs = get(detectStacks(mkRepo({ 'composer.json': '{}', 'phpcs.xml': '' })), 'php')!;
+  assert.equal(first(phpcs, 'lint'), 'vendor/bin/phpcs');
+});
+
+const LOCAL_CLI = {
+  a: '#!/usr/bin/env bash\n',
+  'cli/run': '#!/usr/bin/env bash\n',
+  'cli/commands/dev.sh': '#!/usr/bin/env bash\n# desc: docker dev environment\n# usage: ./a dev\n',
+  'cli/commands/deploy/staging.sh': '#!/usr/bin/env bash\n# desc: roll staging\n# usage: ./a deploy:staging -y   skip the prompt\n',
+  'cli/commands/ssh.sh': '# desc: shell in\n',
+};
+
+test('local cli: ./a commands named after a task are that task', () => {
+  const stacks = detectStacks(mkRepo({ 'composer.json': ADMIN_COMPOSER, ...LOCAL_CLI }));
+  const cli = get(stacks, 'localcli')!;
+  assert.equal(cli.label, 'Local CLI (./a)');
+  assert.equal(first(cli, 'dev'), './a dev');
+  assert.equal(first(cli, 'test'), undefined);
+  assert.equal(detectStacks(mkRepo({ 'cli/commands/x.sh': '' })).length, 0);
+});
+
+test('local cli: commands, descriptions and -y support are read from the scripts', () => {
+  const cli = detectLocalCli(mkRepo(LOCAL_CLI))!;
+  assert.equal(cli.entry, './a');
+  assert.deepEqual(cli.commands.map((c) => c.name), ['deploy:staging', 'dev', 'ssh']);
+  assert.equal(cli.commands[1]!.desc, 'docker dev environment');
+  assert.deepEqual(cli.commands.map((c) => c.acceptsYes), [true, false, false]);
+  assert.equal(detectLocalCli(mkRepo({ 'cli/run': '' }))?.entry, undefined);
+  assert.equal(detectLocalCli(mkRepo({ 'cli/run': '', 'cli/commands/a.sh': '' }))?.entry, './cli/run');
 });
