@@ -221,4 +221,4 @@ pnpm publish:cellars        # the real publish (asks you to type the version)
 
 ## Shortcuts
 
-`pf r` is `pf repo`, `pf ds` is `pf deploy staging` and `pf dp` is `pf deploy production` (only a `deploy:production` script or `pf.json` entry; always confirms). Add more in `packages/core/src/commands/shortcuts.ts`.
+`pf r` is `pf repo`, `pf ds` is `pf deploy staging` and `pf dp` is `pf deploy production` (only a `deploy:production` script or `pf.json` entry; always confirms). `pf ps` is `pf publish staging`: it runs the repo's `publish:cellars` (or `publish:staging`) script, or the `publish:staging` / `publish:cellars` entry in `pf.json`, and always confirms (`--yes` without a TTY, `--dry-run` to preview). Add more in `packages/core/src/commands/shortcuts.ts`.

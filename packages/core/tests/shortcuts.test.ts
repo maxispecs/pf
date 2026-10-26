@@ -60,6 +60,17 @@ test('pf ds and pf dp preview with --dry-run', () => {
   assert.match(dp.err, /pnpm run deploy:production/);
 });
 
+test('pf ps previews the repo publish:cellars script with --dry-run', () => {
+  const dir = mkRepo({ '.git/HEAD': '', 'package.json': json({ scripts: { 'publish:cellars': 'x' } }), 'pnpm-lock.yaml': '' });
+  const ps = pf(dir, 'ps', '--dry-run');
+  assert.equal(ps.code, 0);
+  assert.match(ps.err, /pnpm run publish:cellars/);
+  assert.equal(pf(dir, 'ps').code, 2); // no terminal: needs --yes
+  assert.equal(pf(mkRepo({ '.git/HEAD': '', 'package.json': json({ scripts: {} }) }), 'ps', '--dry-run').code, 1);
+  const override = mkRepo({ '.git/HEAD': '', 'pf.json': json({ commands: { 'publish:staging': { run: 'echo hi' } } }) });
+  assert.match(pf(override, 'ps', '--dry-run').err, /echo hi/);
+});
+
 test('pf dp without --yes refuses without a terminal', () => {
   const dir = mkRepo({ '.git/HEAD': '', 'package.json': json({ scripts: { 'deploy:production': 'b' } }) });
   assert.equal(pf(dir, 'dp').code, 2);

@@ -13,6 +13,7 @@ export interface Shortcut {
 export const SHORTCUTS: Shortcut[] = [
   { names: ['ds'], target: ['deploy', 'staging'], summary: 'Deploy to staging (pf deploy staging)', group: 'Docs & deploy' },
   { names: ['dp'], target: ['deploy', 'production'], summary: 'Deploy to production (pf deploy production)', group: 'Docs & deploy' },
+  { names: ['ps'], target: ['publish', 'staging'], summary: 'Publish to the staging registry, cellars (pf publish staging)', group: 'Docs & deploy' },
   { names: ['r'], target: ['repo'], summary: 'Hook pf tools into this repo or update them (pf repo)', group: 'Tools' },
   { names: ['u'], target: ['update'], summary: 'Update pf, its plugins and skills (pf update)', group: 'Tools' },
   { names: ['v'], target: ['ver'], summary: 'List versions and bump them (pf ver)', group: 'Tools' },

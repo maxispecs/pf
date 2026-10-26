@@ -17,6 +17,7 @@ import { uninstallCommand } from './uninstall.js';
 import { updateCommand } from './update.js';
 import { verCommand } from './ver.js';
 import { pluginCommand } from './plugin.js';
+import { publishCommand } from './publish.js';
 import { repoCommand } from './repo.js';
 import { pluginCommands } from '../plugins/index.js';
 
@@ -29,6 +30,7 @@ export function allCommands(): Command[] {
     ...TASK_COMMANDS,
     docCommand,
     deployCommand,
+    publishCommand,
     verCommand,
     toolsCommand,
     skillCommand,

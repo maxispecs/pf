@@ -34,7 +34,7 @@ const CLI_PACKAGES: Record<string, string> = {
  * A deploy script the repo defines outside package.json: a composer script, else a `./a <name>` command
  * of its local CLI. pf asks before deploying, so a CLI command that takes `-y` gets it.
  */
-function repoDeployScript(root: string, names: string[]): Candidate | null {
+export function repoDeployScript(root: string, names: string[]): Candidate | null {
   const composer = readJson<{ scripts?: Record<string, unknown> }>(root, 'composer.json');
   const script = names.find((n) => composer?.scripts && n in composer.scripts);
   if (script) return { cmd: { argv: ['composer', 'run', script], cwd: root }, source: `composer script ${script}` };
