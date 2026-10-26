@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { bundledVerCli, findVersionsRoot } from '../commands/ver.js';
+import { findVersionsRoot, resolveVerCli } from '../commands/ver.js';
 import type { Context } from '@pulpfixer/kit/context';
 import { detectDocs } from '@pulpfixer/kit/detect/docs';
 import { detectStaging } from '@pulpfixer/kit/detect/deploy';
@@ -135,7 +135,7 @@ export const TOOLS: Tool[] = [
     async run(ctx) {
       const root = findVersionsRoot(ctx.cwd);
       if (!root) return fail('Versioning is not set up (no versions.json). The user can run `pf ver init`.');
-      const r = await runCaptured({ argv: [process.execPath, bundledVerCli(), 'list', '--root', root], cwd: root }, rootOf(ctx), 60_000);
+      const r = await runCaptured({ argv: [process.execPath, resolveVerCli(), 'list', '--root', root], cwd: root }, rootOf(ctx), 60_000);
       return { ok: r.code === 0, text: r.text };
     },
   },
@@ -158,7 +158,7 @@ export const TOOLS: Tool[] = [
       const level = str(input, 'level');
       if (!module) return fail('module is required');
       if (level !== 'minor' && level !== 'major') return fail('level must be "minor" or "major"');
-      const r = await runCaptured({ argv: [process.execPath, bundledVerCli(), 'bump', module, level, '--root', root], cwd: root }, rootOf(ctx), 60_000);
+      const r = await runCaptured({ argv: [process.execPath, resolveVerCli(), 'bump', module, level, '--root', root], cwd: root }, rootOf(ctx), 60_000);
       return { ok: r.code === 0, text: r.text };
     },
   },

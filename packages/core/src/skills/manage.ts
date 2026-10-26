@@ -21,6 +21,7 @@ import {
   type RemoteSkill,
   type TargetId,
 } from './registry.js';
+import { STACK_SKILLS } from './stack.js';
 
 const AUTH_HINT = 'Check NPM_TOKEN and the auth line in ~/.npmrc (pf setup fixes the latter)';
 
@@ -112,18 +113,47 @@ function place(skill: RemoteSkill, targets: TargetId[], opts: { dryRun?: boolean
 }
 
 /**
+ * The stack skills (ver, pnpm) in pf's own folder: installed when missing, updated when older. A
+ * symlinked checkout or a hand-made folder is left alone. `check` only reports.
+ */
+export function refreshStackSkills(opts: { check?: boolean; dryRun?: boolean; home?: string } = {}): number {
+  if (!opts.check) return installSkills([...STACK_SKILLS], ['pf'], { dryRun: opts.dryRun, home: opts.home });
+  const r = reporter(out());
+  let fails = 0;
+  for (const name of STACK_SKILLS) {
+    const found = viewRemote(name);
+    if (!found.skill) {
+      r.fail(`${name}: ${found.error}`);
+      fails++;
+      continue;
+    }
+    const mine = inspectPath(path.join(targetDir('pf', opts.home), name));
+    if (mine.kind === 'missing') r.warn(`${name} v${short(found.skill.version)} is available (not installed in ${targetLabel('pf')})`);
+    else if (mine.kind !== 'registry') r.info(`${name}: ${mine.kind === 'link' ? 'a symlink' : 'not a registry install'} in ${targetLabel('pf')}, left alone`);
+    else if (compareVersions(found.skill.version, mine.version!) > 0) r.warn(`${name} v${short(found.skill.version)} is available (you have v${short(mine.version!)})`);
+    else r.ok(`${name} v${short(mine.version!)} is the latest`);
+  }
+  if (fails) r.info(AUTH_HINT);
+  return fails ? 1 : 0;
+}
+
+/**
  * `pf skill update [name...]` and the skills step of `pf update`: bring every registry install
  * (or the named ones) to the latest version. `check` only reports.
  */
-export function updateSkills(names: string[], opts: { check?: boolean; dryRun?: boolean; home?: string } = {}): number {
+export function updateSkills(
+  names: string[],
+  opts: { check?: boolean; dryRun?: boolean; home?: string; skipStack?: boolean } = {},
+): number {
   const c = out();
   const r = reporter(c);
-  const all = installedSkills(opts.home);
+  // `skipStack`: the stack skills in pf's folder were just handled by refreshStackSkills.
+  const all = installedSkills(opts.home).filter((s) => !(opts.skipStack && s.target === 'pf' && STACK_SKILLS.includes(s.name)));
   const chosen = names.length ? all.filter((s) => names.includes(s.name)) : all;
   const unknown = names.filter((n) => !all.some((s) => s.name === n));
   for (const n of unknown) r.warn(`${n} is not installed from the registry (pf skill install ${n})`);
   if (!chosen.length) {
-    if (!names.length) r.info(`no skills installed from the registry (see ${'pf skill available'})`);
+    if (!names.length && !opts.skipStack) r.info(`no skills installed from the registry (see ${'pf skill available'})`);
     return unknown.length ? 1 : 0;
   }
   const latest = new Map<string, RemoteSkill | string>();

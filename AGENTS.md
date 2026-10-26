@@ -46,7 +46,7 @@ New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json 
 | `core/src/skills/` | skill discovery and runner (direct scripts, else an agent CLI) |
 | `core/assets/skills/` | skills that ship with pf (a same-named user or repo skill wins) |
 | `core/src/install/`, `core/src/update/` | machine setup helpers, update check |
-| `core/assets/version.mjs`, `core/assets/tasks.mjs` | bundled copies of the `/ver` CLI and the `/pnpm` helper (same files as `scripts/version.mjs`, `scripts/tasks.mjs`). Refresh them with `pnpm skills:sync`, never rewrite them |
+| `core/assets/version.mjs`, `core/assets/tasks.mjs` | bundled copies of the `/ver` CLI and the `/pnpm` helper (same files as `scripts/version.mjs`, `scripts/tasks.mjs`), the offline fallback. Refresh them with `pnpm skills:sync`, never rewrite them. `pf update` keeps the `ver` and `pnpm` skills (`STACK_SKILLS` in `core/src/skills/stack.ts`) current in `~/.pf/skills` and refreshes a repo's copies from the newest of that and the bundled file (`resolveVerCli`, `resolveTasksHelper`); run helpers through those, not `bundledVerCli()` |
 | `core/src/commands/repo.ts` | `pf repo` / `pf r`: installs or updates those helpers in a repo (pnpm root commands, versioning) and wires its `package.json`; rerun after `pf update` |
 | `core/scripts/install.sh` | install on a machine without pf (`--from-source` for a checkout) |
 | `scripts/logo-art.mjs` | turns `core/assets/pulpfixer.png` into the header art in `kit/src/ui/logo-art.ts` (generated, commit the output) |

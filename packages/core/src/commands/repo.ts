@@ -7,12 +7,27 @@ import { badgeLabel, h2, termLine, ul } from '@pulpfixer/kit/ui/text';
 import { exists, readText, takeFlag } from '@pulpfixer/kit/util';
 import { packageRoot } from '@pulpfixer/kit/version';
 import type { Command } from '@pulpfixer/kit/types';
-import { bundledVerCli, cliRevision } from './ver.js';
+import { homeSkillFile } from '../skills/stack.js';
+import { cliRevision, resolveVerCli } from './ver.js';
 
-/** Path of the /pnpm skill helper bundled with pf (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`). */
+/** Path of the /pnpm skill helper bundled with pf (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`); the offline fallback. */
 export function bundledTasksHelper(): string {
   return path.join(packageRoot(), 'assets', 'tasks.mjs');
 }
+
+/**
+ * The /pnpm helper pf copies into repos: the `pnpm` skill in pf's own folder (kept current by
+ * `pf update`), else the bundled copy. The helper has no revision, so the registry copy counts as latest.
+ */
+export function resolveTasksHelper(skillsDir?: string): string {
+  return homeSkillFile('pnpm', path.join('scripts', 'tasks.mjs'), skillsDir) ?? bundledTasksHelper();
+}
+
+/** Repo-relative paths where a repo may keep its copy of the pnpm helper. */
+export const TASKS_HELPER_PATHS = ['scripts/tasks.mjs', 'scripts/pnpm-tasks.mjs'];
+
+/** Marker line of the pnpm helper, to tell it from an unrelated tasks.mjs. */
+export const isTasksHelper = (text: string | null): boolean => !!text && text.includes('@skill pnpm');
 
 const isVerCli = (file: string): boolean => (readText(file) ?? '').includes('const CLI_VERSION');
 
@@ -74,16 +89,16 @@ export function wireVerScript(pkg: Pkg, cliRel: string): string[] {
 /** pnpm commands through the bundled /pnpm skill helper. */
 async function setupPnpm(root: string, dryRun: boolean, done: string[]): Promise<number> {
   const c = err();
-  const helper = bundledTasksHelper();
+  const helper = resolveTasksHelper();
   if (!fs.existsSync(helper)) {
-    process.stderr.write(`${badgeLabel('error', c)} the bundled pnpm helper is missing (${helper}). Reinstall pf.\n`);
+    process.stderr.write(`${badgeLabel('error', c)} the pnpm helper is missing (${helper}). Reinstall pf.\n`);
     return 1;
   }
   if (!exists(root, 'package.json')) {
     done.push('pnpm commands: skipped, no package.json at the repo root');
     return 0;
   }
-  const targets = ['scripts/tasks.mjs', 'scripts/pnpm-tasks.mjs'];
+  const targets = TASKS_HELPER_PATHS;
   const before = targets.map((t) => readText(root, t));
   const pkgBefore = readText(root, 'package.json');
   const code = await runCmd({ argv: [process.execPath, helper, 'setup', '--root', root, ...(dryRun ? ['--dry-run'] : [])], cwd: root }, { quiet: true });
@@ -103,9 +118,9 @@ async function setupPnpm(root: string, dryRun: boolean, done: string[]): Promise
 /** Versioning through the bundled /ver CLI: set it up, or bring every copy up to pf's revision. */
 async function setupVer(root: string, dryRun: boolean, done: string[]): Promise<number> {
   const c = err();
-  const bundled = bundledVerCli();
+  const bundled = resolveVerCli();
   if (!fs.existsSync(bundled)) {
-    process.stderr.write(`${badgeLabel('error', c)} the bundled ver CLI is missing (${bundled}). Reinstall pf.\n`);
+    process.stderr.write(`${badgeLabel('error', c)} the ver CLI is missing (${bundled}). Reinstall pf.\n`);
     return 1;
   }
   const rev = cliRevision(bundled);

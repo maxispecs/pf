@@ -9,7 +9,7 @@ import { err } from '@pulpfixer/kit/ui/palette';
 import { badgeLabel } from '@pulpfixer/kit/ui/text';
 import { confirm } from '@pulpfixer/kit/ui/prompt';
 import { quote, readJson, takeFlag } from '@pulpfixer/kit/util';
-import { bundledVerCli, findVersionsRoot } from './ver.js';
+import { findVersionsRoot, resolveVerCli } from './ver.js';
 import type { Command } from '@pulpfixer/kit/types';
 
 interface Entry {
@@ -86,7 +86,7 @@ export const initCommand: Command = {
       const doIt = withVer || (await confirm('Set up major.minor versioning too (pf ver init)?', false, { flag: '--ver' }));
       if (doIt) {
         const code = await runCmd(
-          { argv: [process.execPath, bundledVerCli(), 'init', '--root', root, ...(dryRun ? ['--dry-run'] : [])], cwd: root },
+          { argv: [process.execPath, resolveVerCli(), 'init', '--root', root, ...(dryRun ? ['--dry-run'] : [])], cwd: root },
           { quiet: true },
         );
         if (code !== 0) return code;

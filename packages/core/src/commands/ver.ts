@@ -7,11 +7,22 @@ import { badgeLabel, termLine } from '@pulpfixer/kit/ui/text';
 import { confirm } from '@pulpfixer/kit/ui/prompt';
 import { exists } from '@pulpfixer/kit/util';
 import { packageRoot } from '@pulpfixer/kit/version';
+import { homeSkillFile } from '../skills/stack.js';
 import type { Command } from '@pulpfixer/kit/types';
 
-/** Path of the /ver CLI bundled with pf. */
+/** Path of the /ver CLI bundled with pf (the offline fallback, see resolveVerCli). */
 export function bundledVerCli(): string {
   return path.join(packageRoot(), 'assets', 'version.mjs');
+}
+
+/**
+ * The /ver CLI pf runs and copies into repos: the newest of the `ver` skill in pf's own folder
+ * (kept current by `pf update`) and the copy bundled with pf. A tie goes to the skill's copy.
+ */
+export function resolveVerCli(skillsDir?: string): string {
+  const bundled = bundledVerCli();
+  const home = homeSkillFile('ver', path.join('scripts', 'version.mjs'), skillsDir);
+  return home && cliRevision(home) >= cliRevision(bundled) ? home : bundled;
 }
 
 /** Nearest ancestor of `from` holding a versions.json. */
@@ -43,7 +54,7 @@ export const verCommand: Command = {
   usage: 'pf ver [list|bump <target> <major|minor>|init|sync] [--dry-run]',
   async run(ctx: Context, args: string[]) {
     const c = err();
-    const cli = bundledVerCli();
+    const cli = resolveVerCli();
     if (!fs.existsSync(cli)) {
       process.stderr.write(`${badgeLabel('error', c)} the bundled ver CLI is missing (${cli}). Reinstall pf.\n`);
       return 1;

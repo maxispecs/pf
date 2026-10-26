@@ -43,7 +43,7 @@ scripts/install.sh --dry-run      # show what would happen
 | `pf deploy staging` | Deploy to staging. `--dry-run`, `--yes`. Never production |
 | `pf skill [name]` | Pick and run an agent skill. `available`, `install`, `update`, `remove` manage skills from the registry |
 | `pf plugin [list\|available\|install\|update\|remove]` | Administer plugins from the registry. Without a command it opens an interactive menu. See [Plugins](#plugins) |
-| `pf update` | Update pf, then installed plugins and registry skills. `--check`, `--yes`, `--dry-run` |
+| `pf update` (`pf u`) | Update pf, installed plugins, the `ver` and `pnpm` skills and registry skills, then this repo's copies of their helpers. `--check`, `--yes`, `--dry-run` |
 | `pf init` | Write `pf.json` for this repo from what was detected |
 | `pf repo` (`pf r`) | Hook pf's tools into this repo, or update them: the `/pnpm` root commands (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`) and `/ver` versioning (`versions.json`, `pnpm ver`). Updates every older ver CLI copy, prints what it did. `--dry-run`, `--no-pnpm`, `--no-ver`. Never commits |
 | `pf host ...` | pf on EC2 instances: install, login, update, security patching and the fix agent. See [Hosts](#hosts-ec2) |
@@ -90,6 +90,10 @@ pf skill remove ver                 # delete a registry install
 ```
 
 `--to` takes `pf` (the default), `cursor`, `claude`, `agents` or `all` (comma-separated); use an agent folder when that agent should see the skill outside `pf agent`. An install keeps the package's `package.json` in the skill folder; that marks it as a registry install. pf never replaces a symlink (a skills repo checkout) or a folder it did not install unless you pass `--force`. `pf update` also updates every registry install. A skill named `available`, `install`, `update`, `remove` or `run` runs as `pf skill run <name>`.
+
+#### Stack skills (ver, pnpm)
+
+The `ver` and `pnpm` skills change often and pf runs their helper files itself (`pf ver`, `pf repo`, the agent's version tools). `pf update` therefore installs them into `~/.pf/skills` when missing and updates them there (a symlinked checkout or a hand-made folder is left alone). pf uses the newest of that copy and the one bundled in the pf package, which stays as the offline fallback (`pnpm skills:sync` refreshes it). Inside a repo, `pf update` then refreshes the repo's own copies from there: `scripts/version.mjs` (when its revision is older; a newer one is kept) and `scripts/tasks.mjs` (only a copy that is already the pnpm helper). It never installs a helper (that is `pf repo`), never commits, and `--check` / `--dry-run` only report.
 
 ### Agent
 
