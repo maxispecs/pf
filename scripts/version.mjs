@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // major.minor versioning for a repo ("stack") and its sub-packages.
 // Source of truth is versions.json at the repo root. Zero dependencies, Node >= 18.
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Revision of this CLI, bumped whenever it changes. `--cli-version` prints it so the /ver skill
 // can tell whether a repo's copy is older than the skill's. Copies without it count as 0.
-const CLI_VERSION = 5;
+const CLI_VERSION = 6;
 const MANIFEST = 'versions.json';
 const SKIP_DIRS = new Set([
   'node_modules', 'dist', 'build', 'out', 'coverage', 'venv', 'env', '__pycache__',
@@ -18,13 +19,16 @@ const SKIP_SUFFIXES = ['.old', '.bak', '.orig'];
 const PY_MAX_DEPTH = 3;
 const TYPES = ['node', 'python', 'php', 'skill'];
 const PARTS = ['major', 'minor'];
+// Marks the interactive commit button (it shares the button hit-box list with the [+] buttons).
+const COMMIT_BUTTON = '\0commit';
 
 class CliError extends Error {}
 
 const HELP = `Usage: node scripts/version.mjs <command> [options]
 
 With no command in a terminal, opens an interactive list: click a MINOR or MAJOR button to
-bump (any key exits). Without a terminal (pipes, CI) or with --json it prints "list".
+bump (any key exits). After bumping, a [ Commit changed files ] button commits the files
+the bumps changed (versions.json and the synced manifests, nothing else). Without a terminal (pipes, CI) or with --json it prints "list".
 
 Commands:
   list                    Show stack and package versions, the date each was assigned,
@@ -65,6 +69,7 @@ function palette(stream) {
   return {
     bold: paint('1'), dim: paint('2'), red: paint('31'), green: paint('32'), yellow: paint('33'),
     blue: paint('34'), magenta: paint('35'), cyan: paint('36'), boldGreen: paint('1;32'), boldMagenta: paint('1;35'),
+    boldCyan: paint('1;36'),
   };
 }
 
@@ -857,6 +862,63 @@ function cmdBump(root, positional, flags) {
   printSyncResults(root, results, flags.dryRun);
 }
 
+// ---------- git helpers (interactive commit button)
+
+function git(root, args) {
+  return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+}
+
+function isGitRepo(root) {
+  try {
+    git(root, ['rev-parse', '--is-inside-work-tree']);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Files git would refuse to add (ignored and untracked). check-ignore exits 0 when ignored.
+function isIgnored(root, rel) {
+  try {
+    git(root, ['check-ignore', '-q', '--', rel]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Commits exactly `files` (paths relative to root), leaving other staged or unstaged work alone.
+function commitFiles(root, files, message) {
+  const paths = files.filter((f) => !isIgnored(root, f));
+  if (!paths.length) throw new CliError('Nothing to commit: every changed file is git-ignored');
+  try {
+    git(root, ['add', '--', ...paths]);
+    git(root, ['commit', '-m', message, '--', ...paths]);
+  } catch (e) {
+    const detail = `${e.stderr ?? ''}${e.stdout ?? ''}`.trim().split('\n').filter(Boolean).slice(0, 2).join(' ');
+    throw new CliError(`git commit failed${detail ? `: ${detail}` : ''}`);
+  }
+  return paths;
+}
+
+// Collects what the bumps of a session changed so the commit button can commit it.
+// `pending` is { files: Set<relative path>, targets: Map<target, { from, to }> }.
+function recordPending(root, pending, { changes, results }) {
+  for (const r of results) {
+    if (r.status === 'updated') pending.files.add(toPosix(path.relative(root, r.file)));
+  }
+  pending.files.add(MANIFEST);
+  for (const [target, from, to] of changes) {
+    const prev = pending.targets.get(target);
+    pending.targets.set(target, { from: prev?.from ?? from, to });
+  }
+}
+
+function pendingMessage(pending) {
+  const parts = [...pending.targets].map(([t, { from, to }]) => `${t} ${from} -> ${to}`);
+  return `Bump versions: ${parts.join(', ')}`;
+}
+
 // ---------- interactive list (mouse clickable MINOR / MAJOR buttons)
 
 // Cuts a string to `max` visible characters, keeping ANSI color sequences intact.
@@ -880,7 +942,8 @@ function clipVisible(s, max) {
 }
 
 // Builds the screen as lines plus the clickable button regions (1-based screen coordinates).
-function buildInteractiveView(root, flags, status, columns, hover, stackMinorDone) {
+// `commit` is { available, pending } where pending.files is non-empty once something was bumped.
+function buildInteractiveView(root, flags, status, columns, hover, stackMinorDone, commit) {
   const manifest = loadManifest(root);
   const discovered = discover(root);
   const warnings = collectWarnings(root, manifest, discovered);
@@ -938,7 +1001,12 @@ function buildInteractiveView(root, flags, status, columns, hover, stackMinorDon
   // Hovering a [+] previews what a click would do.
   const stackVersion = rows[0].version;
   const hovered = hover && rows.find((r) => r.target === hover.target);
+  const canCommit = commit.available && !flags.dryRun && commit.pending.files.size > 0;
   const preview = () => {
+    if (hover?.target === COMMIT_BUTTON && canCommit) {
+      const n = commit.pending.files.size;
+      return `${c.dim('commit:')} ${c.dim(`${n} file${n === 1 ? '' : 's'},`)} ${pendingMessage(commit.pending)}`;
+    }
     if (!hovered) return '';
     const next = bumpVersion(hovered.version, hover.part, 'list');
     const self = `${c.dim(`${hover.part}:`)} ${colorTarget(hovered.target)} ${c.dim(hovered.version)} ${c.dim('->')} ${c.bold(next)}`;
@@ -949,6 +1017,14 @@ function buildInteractiveView(root, flags, status, columns, hover, stackMinorDon
   lines.push('');
   lines.push(preview());
   lines.push('');
+  // The commit button line is always present (blank until there is something to commit) so
+  // the rows below it never shift when it appears.
+  if (canCommit) {
+    const label = '[ Commit changed files ]';
+    const hot = hover?.target === COMMIT_BUTTON;
+    lines.push(hot ? `\x1b[1;7m${label}\x1b[0m` : c.boldCyan(label));
+    buttons.push({ row: lines.length, x1: 1, x2: label.length, target: COMMIT_BUTTON, part: COMMIT_BUTTON });
+  } else lines.push('');
   lines.push(status || '');
   lines.push(c.bold('Press any key to exit'));
   if (warnings.length) {
@@ -967,11 +1043,13 @@ function cmdInteractive(root, flags) {
   let buttons = [];
   let hover = null; // { target, part } of the button under the pointer
   let stackMinorDone = false;
+  // Files and version changes from bumps not yet committed (see the commit button).
+  const commit = { available: !flags.dryRun && isGitRepo(root), pending: { files: new Set(), targets: new Map() } };
 
   const render = () => {
     let lines;
     try {
-      ({ lines, buttons } = buildInteractiveView(root, flags, status, out.columns || 100, hover, stackMinorDone));
+      ({ lines, buttons } = buildInteractiveView(root, flags, status, out.columns || 100, hover, stackMinorDone, commit));
     } catch (e) {
       if (!(e instanceof CliError)) throw e;
       lines = [`${c.red(c.bold('error:'))} ${e.message}`];
@@ -1004,16 +1082,35 @@ function cmdInteractive(root, flags) {
     inp.setRawMode(false);
     inp.pause();
     for (const line of log) console.log(line);
+    if (commit.available && commit.pending.files.size) console.log(`not committed: ${[...commit.pending.files].join(', ')}`);
     process.exit(code);
+  };
+
+  const commitPending = () => {
+    const { files, targets } = commit.pending;
+    if (!files.size) return;
+    const message = pendingMessage(commit.pending);
+    const committed = commitFiles(root, [...files], message);
+    files.clear();
+    targets.clear();
+    hover = null;
+    log.push(`committed ${committed.length} file${committed.length === 1 ? '' : 's'}: ${message}`);
+    status = `${c.green('committed')} ${c.dim(`${committed.length} file${committed.length === 1 ? '' : 's'}: ${message}`)}`;
   };
 
   const click = (x, y) => {
     const hit = buttonAt(x, y);
     if (!hit) return;
     try {
+      if (hit.target === COMMIT_BUTTON) {
+        commitPending();
+        render();
+        return;
+      }
       const applied = applyBumps(root, [{ target: hit.target, part: hit.part }], flags.dryRun, { stackMinorDone });
       const { changes } = applied;
       stackMinorDone = applied.consumedStackMinor;
+      if (!flags.dryRun) recordPending(root, commit.pending, applied);
       const text = changes.map(([t, from, to]) => `${t} ${from} -> ${to}`).join(', ');
       const prefix = flags.dryRun ? 'would bump' : 'bumped';
       log.push(`${prefix} ${hit.target} ${hit.part}: ${text}`);
