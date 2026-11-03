@@ -134,6 +134,26 @@ pf dl --list                # print the listing (also what you get when piped); 
 
 Settings live in `plugins.aws.exchange` of `~/.pf/config.json`; `PF_EXCHANGE_BUCKET`, `PF_EXCHANGE_PROFILE`, `PF_EXCHANGE_PREFIX` and `PF_EXCHANGE_REGION` override them. The profile defaults to `exchange`. pf never reads credentials; the aws CLI resolves them from the profile. All commands support `--dry-run`, and `pf dl` is also in the menu. To add another AWS shortcut, put a command in `packages/plugin-aws/src/commands/` and list it in `packages/plugin-aws/src/index.ts`.
 
+## YubiKey plugin
+
+The `yubikey` plugin wraps [`ykman`](https://docs.yubico.com/software/yubikey/tools/ykman/) (it must be on PATH: `brew install ykman`). pf never sees a secret: ykman asks for the OATH password and for a touch itself, and the code is calculated on the key.
+
+```bash
+pf otp                      # pick an account (type to filter), then touch the key if it asks: the code prints on stdout
+pf otp github               # straight to one account (a unique part of its name); several matches are listed
+pf otp github --copy        # also put the code on the clipboard (pbcopy, wl-copy, xclip, xsel or clip)
+pf otp --list               # account names, no codes (also what you get when piped with no account)
+pf otp --all                # ykman's table of every code (touch accounts show [Requires Touch])
+pf otp -d 11447176 github   # with several keys plugged in; --hidden includes hidden accounts
+
+pf yk                       # in a terminal: pick audit, status, list, oath, fido, creds, piv or pgp
+pf yk audit                 # read-only security check, with the command that fixes each finding
+pf yk audit --strict        # exit 1 when there is a warning
+pf yk status | list | oath | fido | creds | piv | pgp    # the matching ykman info view
+```
+
+The audit reads `ykman info` and each enabled application's info, and flags: firmware before 5.7 (EUCLEAK, YSA-2024-03), OATH accounts without a password, no FIDO2 PIN, PINs with attempts used up, a TDES PIV management key on firmware that defaults to AES, OpenPGP without KDF or with the signature PIN cached, and Yubico OTP left enabled. It never changes the key. Commands support `--dry-run` and `--device <serial>`; both appear in the menu under Security. To add another, put a command in `packages/plugin-yubikey/src/commands/` and list it in `packages/plugin-yubikey/src/index.ts`.
+
 ## Hosts (EC2)
 
 `pf host` runs pulpfixer on deployed instances to fix things like pending security patches. Instances never hold a secret: pf reads `NPM_TOKEN` (for updates) and `ANTHROPIC_API_KEY` (for the agent) with the instance IAM role at run time, from SSM Parameter Store or Secrets Manager. It passes each one only into the environment of the process that needs it. Operators reach instances through SSM Run Command, with no SSH, so IAM decides who can invoke what.

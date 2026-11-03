@@ -4,10 +4,11 @@
 
 ## Monorepo
 
-pnpm workspace, three packages (versioned together by `versions.json`, published to cellars):
+pnpm workspace, four packages (versioned together by `versions.json`, published to cellars):
 
 - `packages/kit` (`@pulpfixer/kit`): shared foundation. detect, exec, ui, config, util, context and the `Command` / `Plugin` types. Import it by subpath (`@pulpfixer/kit/ui/text`). Depends on nothing.
 - `packages/plugin-aws` (`@pulpfixer/plugin-aws`): the AWS plugin. Depends only on kit.
+- `packages/plugin-yubikey` (`@pulpfixer/plugin-yubikey`): the YubiKey plugin (`pf otp`, `pf yk`, wrapping `ykman`). Depends only on kit.
 - `packages/core` (`pulpfixer`): the `pf` binary, built-in commands, agent, host mode, skills, install and update. Depends on kit and every plugin.
 
 Dependencies point one way: core -> plugins -> kit. A plugin never imports core. Anything a plugin needs from core moves into kit.
@@ -38,6 +39,7 @@ New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json 
 | `kit/src/detect/` | repo, stack, docs and staging detection, command resolution; `localcli.ts` reads a repo's own `./a` CLI |
 | `kit/src/ui/prompt.ts` | `confirm` (yes/no) and `ask` (single-line text input with default, placeholder and `validate`). Use `ask` for any input field; it returns null without a TTY or on cancel, so give commands flags too |
 | `kit/src/ui/text.ts` | text helpers: colored command samples (`termLine`, `promptLine`), badges, headings, lists, tables. Return strings, take a `Palette`. Use these instead of hand-coloring messages |
+| `plugin-yubikey/src/` | YubiKey plugin (`ykman`): `ykman.ts` argv builders, clipboard and runner, `audit.ts` pure parsers and findings, `commands/otp.ts` (`pf otp`), `commands/yk.ts` (`pf yk`); never reads secrets, ykman owns the password and touch prompts, and nothing here changes the key |
 | `core/src/commands/` | built-in commands |
 | `core/src/agent/` | coding agent: persona, tool registry, MCP server, launchers for claude, codex and cursor |
 | `core/src/host/` | host mode (`pf host`): host config, IMDS identity and secrets via the aws CLI, SSM send-command, OS security patching, host MCP tools, the headless fix agent and its audit log |
@@ -66,6 +68,6 @@ New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json 
 
 When a change is made in a module (package), bump that module's minor version before finishing:
 `pnpm ver bump <module> minor`. This also bumps the stack minor. Use `major` only for breaking changes.
-Never edit versions in manifests by hand. Modules are the packages: `pnpm ver bump packages/core minor`, `pnpm ver bump packages/kit minor`, `pnpm ver bump packages/plugin-aws minor` (several targets may share one command; the stack minor rises once). Bump a package only when its own files changed; a core change that depends on a new kit change bumps both.
+Never edit versions in manifests by hand. Modules are the packages: `pnpm ver bump packages/core minor`, `pnpm ver bump packages/kit minor`, `pnpm ver bump packages/plugin-aws minor`, `pnpm ver bump packages/plugin-yubikey minor` (several targets may share one command; the stack minor rises once). Bump a package only when its own files changed; a core change that depends on a new kit change bumps both.
 
 Publishing: `pnpm release` is always a dry run and publishes every package whose version the registry lacks, in dependency order. `pnpm publish:cellars` publishes without a confirmation prompt. Never publish without the user asking.

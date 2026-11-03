@@ -26,10 +26,19 @@ importers:
       '@pulpfixer/plugin-aws':
         specifier: workspace:*
         version: link:../plugin-aws
+      '@pulpfixer/plugin-yubikey':
+        specifier: workspace:*
+        version: link:../plugin-yubikey
 
   packages/kit: {}
 
   packages/plugin-aws:
+    dependencies:
+      '@pulpfixer/kit':
+        specifier: workspace:*
+        version: link:../kit
+
+  packages/plugin-yubikey:
     dependencies:
       '@pulpfixer/kit':
         specifier: workspace:*

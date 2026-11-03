@@ -1,7 +1,7 @@
 {
   "name": "pulpfixer-monorepo",
   "private": true,
-  "version": "2.5.0",
+  "version": "2.6.0",
   "type": "module",
   "description": "pf: unified developer CLI for any repo, any language (monorepo root)",
   "license": "UNLICENSED",

@@ -32,7 +32,7 @@ const die = (s) => {
 // token saved by `npm login` is shadowed. When NPM_TOKEN is unset, load it from the user .npmrc into this
 // process's environment (child processes inherit it). The value is never printed.
 const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: root, stdio: 'inherit', ...opts });
-const ORDER = ['kit', 'plugin-aws', 'core'];
+const ORDER = ['kit', 'plugin-aws', 'plugin-yubikey', 'core'];
 const capture = (cmd, args) => spawnSync(cmd, args, { cwd: root, encoding: 'utf8' });
 
 function userNpmrcToken() {

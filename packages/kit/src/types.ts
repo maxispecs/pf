@@ -1,6 +1,6 @@
 import type { Context } from './context.js';
 
-export const GROUPS = ['Agent', 'Develop', 'Build & check', 'Docs & deploy', 'AWS', 'Tools', 'Help'] as const;
+export const GROUPS = ['Agent', 'Develop', 'Build & check', 'Docs & deploy', 'AWS', 'Security', 'Tools', 'Help'] as const;
 export type Group = (typeof GROUPS)[number];
 
 export interface Command {

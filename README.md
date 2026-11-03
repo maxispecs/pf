@@ -6,6 +6,7 @@
 |---------|------|------|
 | `packages/kit` | `@pulpfixer/kit` | shared foundation: repo/stack detection, exec, ui, config, `Command`/`Plugin` types |
 | `packages/plugin-aws` | `@pulpfixer/plugin-aws` | AWS plugin (`pf s3`, `pf dl`) |
+| `packages/plugin-yubikey` | `@pulpfixer/plugin-yubikey` | YubiKey plugin (`pf otp`, `pf yk`) |
 | `packages/core` | `pulpfixer` | the `pf` binary: dispatch, built-in commands, agent, host mode, skills |
 
 Root commands (`pnpm ask` lists them): `pnpm dev -- <args>`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm ver`, `pnpm install:local`, `pnpm release`, `pnpm publish:cellars`.
