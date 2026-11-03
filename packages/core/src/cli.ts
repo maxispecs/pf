@@ -94,8 +94,9 @@ export async function main(argv: string[]): Promise<number> {
     return 0;
   }
   if (first === 'menu') return local ? runLocalMenu(local) : runMenu(ctx);
-  // The dev cycle only exists in a checkout (./pf cycle): the installed pf has no such command.
-  if (first === 'cycle' && local) return runDevCycle(local, argv.slice(1));
+  // The dev cycle belongs to the pulpfixer checkout: ./pf runs it for its own root, the global pf
+  // finds the checkout from the current directory (commands/cycle.ts) and refuses elsewhere.
+  if ((first === 'cycle' || first === 'c') && local) return runDevCycle(local, argv.slice(1));
 
   const rest = argv.slice(1);
   const cmd = findCommand(first);

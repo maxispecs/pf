@@ -1,6 +1,6 @@
 import type { Key } from 'node:readline';
 import { listenKeys } from './keys.js';
-import { err, fitLine, out, stripAnsi, type Palette } from './palette.js';
+import { err, fitLine, out, redPf, stripAnsi, type Palette } from './palette.js';
 
 export interface ConfirmOptions {
   /** Flag that answers yes without a terminal, named in the hint when the answer defaults to no. */
@@ -202,9 +202,10 @@ export interface Reporter {
 export function reporter(c: Palette = out()): Reporter {
   const line = (s: string) => process.stdout.write(s + '\n');
   return {
-    ok: (m) => line(`  ${c.green('✔')} ${m}`),
-    warn: (m) => line(`  ${c.yellow('!')} ${m}`),
-    fail: (m) => line(`  ${c.red('✘')} ${m}`),
+    // Messages are plain text here: a standalone `pf` in them is painted red.
+    ok: (m) => line(`  ${c.green('✔')} ${redPf(m, '', c.on)}`),
+    warn: (m) => line(`  ${c.yellow('!')} ${redPf(m, '', c.on)}`),
+    fail: (m) => line(`  ${c.red('✘')} ${redPf(m, '', c.on)}`),
     info: (m) => line(`    ${c.dim(m)}`),
     step: (m) => line(`\n${c.bold(m)}`),
   };

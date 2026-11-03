@@ -119,6 +119,21 @@ async function waitForRegistry(version: string, tries = 15): Promise<boolean> {
   return false;
 }
 
+/**
+ * The pulpfixer checkout that `dir` is in (or below), else null. Lets the global `pf` run the dev cycle
+ * from a checkout without the `./pf` launcher.
+ */
+export function findCheckout(dir: string): string | null {
+  let cur = path.resolve(dir);
+  for (;;) {
+    const core = readJson<{ name?: string }>(path.join(cur, 'packages', 'core', 'package.json'));
+    if (core?.name === PACKAGE_NAME && fs.existsSync(path.join(cur, 'pf')) && fs.existsSync(path.join(cur, 'scripts', 'release.mjs'))) return cur;
+    const parent = path.dirname(cur);
+    if (parent === cur) return null;
+    cur = parent;
+  }
+}
+
 export const CYCLE_USAGE = './pf cycle [--message <msg>] [--yes] [--dry-run]';
 
 /** Run the whole cycle. Returns the exit code. */

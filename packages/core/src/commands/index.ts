@@ -2,6 +2,7 @@ import { aboutCommand } from './about.js';
 import { agentCommand } from './agent.js';
 import { artCommand } from './art.js';
 import { mcpCommand } from './mcp.js';
+import { cycleCommands } from './cycle.js';
 import { deployCommand } from './deploy.js';
 import { docCommand } from './doc.js';
 import { doctorCommand } from './doctor.js';
@@ -40,6 +41,7 @@ export function allCommands(): Command[] {
     setupCommand,
     hostCommand,
     pluginCommand,
+    ...cycleCommands,
     ...SHORTCUTS.flatMap((sc) => shortcutCommands(sc, findCommand)),
     updateCommand,
     uninstallCommand,

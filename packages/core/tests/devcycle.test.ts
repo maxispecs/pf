@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { changesSinceBump, planBumps, publishable, shipsChange, type CyclePackage } from '../src/devcycle.js';
+import { changesSinceBump, findCheckout, planBumps, publishable, shipsChange, type CyclePackage } from '../src/devcycle.js';
 import { localEntries } from '../src/local.js';
 import { json, mkRepo } from './helpers.js';
 
@@ -80,4 +80,15 @@ test('the local menu offers the dev cycle', () => {
   const cycle = localEntries(root).find((e) => e.name === 'cycle');
   assert.ok(cycle);
   assert.equal(cycle.cli, './pf cycle');
+});
+
+test('findCheckout finds the pulpfixer checkout from inside it, and nothing elsewhere', () => {
+  const dir = mkRepo({
+    pf: '#!/bin/sh\n',
+    'scripts/release.mjs': '',
+    'packages/core/package.json': json({ name: 'pulpfixer' }),
+    'packages/kit/src/x.ts': '',
+  });
+  assert.equal(fs.realpathSync(findCheckout(path.join(dir, 'packages', 'kit', 'src'))!), fs.realpathSync(dir));
+  assert.equal(findCheckout(mkRepo({ 'package.json': json({ name: 'other' }) })), null);
 });

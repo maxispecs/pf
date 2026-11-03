@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { wantsLogo } from '../src/cli.js';
 import { LOGO_MIN_COLS, LOGO_MIN_ROWS, logoFits, renderBanner, renderLogo } from '@pulpfixer/kit/ui/banner';
-import { fitLine, palette, stripAnsi, type Palette } from '@pulpfixer/kit/ui/palette';
+import { fitLine, palette, redPf, stripAnsi, type Palette } from '@pulpfixer/kit/ui/palette';
 import { LOGO_ART, LOGO_COLORS } from '@pulpfixer/kit/ui/logo-art';
 import { confirmKey, inputKey, renderConfirm, renderInput, type InputState } from '@pulpfixer/kit/ui/prompt';
 import {
@@ -57,6 +57,23 @@ test('colors turn off with NO_COLOR and stripAnsi removes escapes', () => {
   assert.equal(stripAnsi(on), 'x');
   process.env.NO_COLOR = '1';
   assert.equal(palette(process.stdout).green('x'), 'x');
+  if (saved.n === undefined) delete process.env.NO_COLOR; else process.env.NO_COLOR = saved.n;
+  if (saved.f === undefined) delete process.env.FORCE_COLOR; else process.env.FORCE_COLOR = saved.f;
+});
+
+test('a standalone pf is bold red in every style, paths and files are left alone', () => {
+  const saved = { n: process.env.NO_COLOR, f: process.env.FORCE_COLOR };
+  process.env.FORCE_COLOR = '1';
+  delete process.env.NO_COLOR;
+  const c = palette(process.stdout);
+  const pf = '\x1b[1;31mpf\x1b[0m';
+  assert.equal(c.dim('run pf update'), `\x1b[2mrun ${pf}\x1b[2m update\x1b[0m`);
+  assert.equal(c.bold('pf'), `\x1b[1m${pf}\x1b[1m\x1b[0m`);
+  assert.equal(c.cyan('./pf ~/.pf/skills pf.json @pf-plugins/x pf_deploy'), '\x1b[36m./pf ~/.pf/skills pf.json @pf-plugins/x pf_deploy\x1b[0m');
+  assert.equal(c.bold(c.red('pf')), '\x1b[1m\x1b[31mpf\x1b[0m\x1b[0m');
+  assert.equal(redPf('(pf)', '', true), `(${pf})`);
+  assert.equal(redPf('pf', '', false), 'pf');
+  assert.match(renderBanner({ version: '2.0.0' }, c), /^\x1b\[1m\x1b\[31mpf\x1b\[0m\x1b\[0m /);
   if (saved.n === undefined) delete process.env.NO_COLOR; else process.env.NO_COLOR = saved.n;
   if (saved.f === undefined) delete process.env.FORCE_COLOR; else process.env.FORCE_COLOR = saved.f;
 });

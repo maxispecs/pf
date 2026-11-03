@@ -17,7 +17,7 @@ export interface BannerInfo {
 
 /** The one-line banner every pf invocation prints. Goes to stderr so stdout stays pipeable. */
 export function renderBanner(info: BannerInfo, c = err()): string {
-  const parts = [`${c.boldBrand('pf')} ${c.bold('v' + displayVersion(info.version))}${info.local ? ' ' + c.yellow('(local)') : ''}`];
+  const parts = [`${c.bold(c.red('pf'))} ${c.bold('v' + displayVersion(info.version))}${info.local ? ' ' + c.yellow('(local)') : ''}`];
   if (info.repo) {
     const stacks = info.stacks?.length ? `  ${c.dim(info.stacks.join(', '))}` : '';
     parts.push(`${c.cyan(info.repo)}${stacks}`);

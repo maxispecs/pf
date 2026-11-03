@@ -23,14 +23,35 @@ export interface Palette {
   fg(n: number, s: string): string;
 }
 
+/**
+ * The program name as a standalone word: `pf` in `pf update` or `(pf)`, but not a path or
+ * file (`./pf`, `~/.pf/skills`, `pf.json`), a package (`@pf-plugins`) or an identifier (`pf_x`).
+ * An already painted `pf` is skipped because an escape code's `m` sits right before it.
+ */
+const PF_WORD = /(?<![\w./~@-])pf(?![\w/-]|\.\w)/g;
+const PF_COLOR = '\x1b[1;31m';
+
+/**
+ * Paint every standalone `pf` in `s` bold red, then restore `reopen` (the escape code of the
+ * surrounding style) so the rest of the text keeps its color. Plain text when color is off.
+ */
+export function redPf(s: string, reopen = '', on: boolean = colorEnabled(process.stdout)): string {
+  return on ? String(s).replace(PF_WORD, `${PF_COLOR}pf\x1b[0m${reopen}`) : String(s);
+}
+
 export function palette(stream: NodeJS.WriteStream = process.stdout): Palette {
   const on = colorEnabled(stream);
-  const paint = (code: string) => (s: string) => (on ? `\x1b[${code}m${s}\x1b[0m` : String(s));
+  // Every style paints a standalone `pf` bold red, whatever the surrounding color is.
+  const paint = (code: string, keepPf = false) => (s: string) => {
+    if (!on) return String(s);
+    const open = `\x1b[${code}m`;
+    return `${open}${keepPf ? s : redPf(s, open, true)}\x1b[0m`;
+  };
   return {
     on,
     bold: paint('1'),
     dim: paint('2'),
-    red: paint('31'),
+    red: paint('31', true),
     green: paint('32'),
     yellow: paint('33'),
     blue: paint('34'),
