@@ -11,8 +11,8 @@ export function term(c: Palette = out()) {
   return {
     /** The `$ ` in front of a command. */
     prefix: (s = '$ ') => c.dim(s),
-    /** The program: `pf` is brand orange, anything else is bold. */
-    command: (s: string) => (s === 'pf' ? c.boldBrand(s) : c.bold(s)),
+    /** The program: `pf` is bold red, anything else is bold. */
+    command: (s: string) => (s === 'pf' ? c.bold(c.red(s)) : c.bold(s)),
     /** The subcommand right after the program. */
     sub: (s: string) => c.bold(c.green(s)),
     /** `<required>` and `[optional]` placeholders. */

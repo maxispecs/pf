@@ -1,6 +1,6 @@
 {
   "stack": {
-    "version": "2.6",
+    "version": "2.7",
     "since": "2026-11-03"
   },
   "packages": {
@@ -10,7 +10,7 @@
       "type": "node"
     },
     "packages/kit": {
-      "version": "5.4",
+      "version": "5.5",
       "since": "2026-11-03",
       "type": "node"
     },
