@@ -1,6 +1,7 @@
 import { allCommands, findCommand } from './commands/index.js';
 import { GROUPS } from '@pulpfixer/kit/types';
 import { buildContext, type Context } from '@pulpfixer/kit/context';
+import { runDevCycle } from './devcycle.js';
 import { localRoot, runLocalMenu } from './local.js';
 import { printList, runCustom, runMenu } from './menu.js';
 import { printBanner } from '@pulpfixer/kit/ui/banner';
@@ -93,6 +94,8 @@ export async function main(argv: string[]): Promise<number> {
     return 0;
   }
   if (first === 'menu') return local ? runLocalMenu(local) : runMenu(ctx);
+  // The dev cycle only exists in a checkout (./pf cycle): the installed pf has no such command.
+  if (first === 'cycle' && local) return runDevCycle(local, argv.slice(1));
 
   const rest = argv.slice(1);
   const cmd = findCommand(first);

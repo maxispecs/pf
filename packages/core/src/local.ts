@@ -7,6 +7,7 @@ import { findVersionsRoot, verCommand } from './commands/ver.js';
 import { buildContext, type Context } from '@pulpfixer/kit/context';
 import { detectDocs } from '@pulpfixer/kit/detect/docs';
 import { formatCmd, runCmd } from '@pulpfixer/kit/exec';
+import { runDevCycle } from './devcycle.js';
 import { runMenu } from './menu.js';
 
 /**
@@ -23,6 +24,14 @@ export function localRoot(env: NodeJS.ProcessEnv = process.env): string | null {
 export function localEntries(root: string, ctx: Context = buildContext(root)): Entry[] {
   const docs = detectDocs(ctx);
   return [
+    {
+      name: 'cycle',
+      summary: 'Dev cycle: bump versions, commit, publish to staging, update the global pf',
+      group: 'Global pf',
+      detail: 'bump if changed, commit, pnpm publish:cellars, pf u; asks first',
+      cli: './pf cycle',
+      run: () => runDevCycle(root),
+    },
     {
       name: 'install',
       summary: 'Install pf globally from this checkout',
