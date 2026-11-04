@@ -1,6 +1,7 @@
 import { allCommands, findCommand } from './commands/index.js';
 import { GROUPS } from '@pulpfixer/kit/types';
 import { buildContext, type Context } from '@pulpfixer/kit/context';
+import { SHORTCUTS } from './commands/shortcuts.js';
 import { runDevCycle } from './devcycle.js';
 import { localRoot, runLocalMenu } from './local.js';
 import { printList, runCustom, runMenu } from './menu.js';
@@ -22,13 +23,25 @@ export function helpText(): string {
   lines.push(`${h2('Usage', c)}  ${termLine('pf [command] [args]', c)}`);
   lines.push(c.dim('        pf with no command opens the menu for the current repo (or a fallback menu outside one)'));
   // Commands stay grouped by category, separated by a blank line, without the category names.
-  const cmds = allCommands().filter((cmd) => !cmd.hidden);
+  // Shortcuts get their own section below, not a line each among the commands.
+  const shortNames = new Set(SHORTCUTS.flatMap((s) => s.names));
+  const cmds = allCommands().filter((cmd) => !cmd.hidden && !shortNames.has(cmd.name));
   for (const g of GROUPS) {
     const inGroup = cmds.filter((cmd) => cmd.group === g);
     if (!inGroup.length) continue;
     lines.push('');
     const width = Math.max(...inGroup.map((x) => x.usage.length));
     for (const cmd of inGroup) lines.push(`  ${termLine(cmd.usage, c)}${' '.repeat(width - cmd.usage.length)}  ${cmd.summary}`);
+  }
+  const shorts = SHORTCUTS.flatMap((s) => s.names.map((name) => ({ name, full: `pf ${s.target.join(' ')}` })));
+  if (shorts.length) {
+    lines.push('', h2('Shortcuts', c));
+    const width = Math.max(...shorts.map((s) => `pf ${s.name}`.length));
+    for (const s of shorts) {
+      const short = `pf ${s.name}`;
+      lines.push(`  ${termLine(short, c)}${' '.repeat(width - short.length)}  ${c.dim('=')} ${termLine(s.full, c)}`);
+    }
+    lines.push(c.dim('  Extra args pass through: pf ds --dry-run'));
   }
   lines.push(
     '',
