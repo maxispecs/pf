@@ -51,15 +51,15 @@ test('pf repo --dry-run writes nothing', () => {
   assert.ok(!fs.existsSync(path.join(dir, 'versions.json')));
 });
 
-test('pf r updates an older ver CLI copy and leaves a newer one', () => {
+test('pf rp updates an older ver CLI copy and leaves a newer one', () => {
   const dir = demo();
-  assert.equal(pf(dir, 'r').code, 0);
+  assert.equal(pf(dir, 'rp').code, 0);
   const cli = path.join(dir, 'scripts', 'version.mjs');
   const extra = path.join(dir, 'tools', 'version.mjs');
   fs.writeFileSync(cli, bundledVer.replace(/const CLI_VERSION = \d+;/, 'const CLI_VERSION = 1;'));
   fs.mkdirSync(path.dirname(extra));
   fs.writeFileSync(extra, bundledVer.replace(/const CLI_VERSION = \d+;/, 'const CLI_VERSION = 9999;'));
-  const r = pf(dir, 'r');
+  const r = pf(dir, 'rp');
   assert.equal(r.code, 0, r.out);
   assert.equal(fs.readFileSync(cli, 'utf8'), bundledVer);
   assert.match(r.out, /updated scripts\/version\.mjs \(revision 1 ->/);

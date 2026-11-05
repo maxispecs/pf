@@ -45,7 +45,7 @@ scripts/install.sh --dry-run      # show what would happen
 | `pf plugin [list\|available\|install\|update\|remove]` | Administer plugins from the registry. Without a command it opens an interactive menu. See [Plugins](#plugins) |
 | `pf update` (`pf u`) | Update pf, installed plugins, the `ver` and `pnpm` skills and registry skills, then this repo's copies of their helpers. `--check`, `--yes`, `--dry-run` |
 | `pf init` | Write `pf.json` for this repo from what was detected |
-| `pf repo` (`pf r`) | Hook pf's tools into this repo, or update them: the `/pnpm` root commands (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`) and `/ver` versioning (`versions.json`, `pnpm ver`). Updates every older ver CLI copy, prints what it did. `--dry-run`, `--no-pnpm`, `--no-ver`. Never commits |
+| `pf repo` (`pf rp`) | Hook pf's tools into this repo, or update them: the `/pnpm` root commands (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`) and `/ver` versioning (`versions.json`, `pnpm ver`). Updates every older ver CLI copy, prints what it did. `--dry-run`, `--no-pnpm`, `--no-ver`. Never commits |
 | `pf host ...` | pf on EC2 instances: install, login, update, security patching and the fix agent. See [Hosts](#hosts-ec2) |
 | `pf s3 <file...>`, `pf dl [name]` | AWS plugin: upload to and download from a shared exchange bucket. See [AWS plugin](#aws-plugin) |
 | `pf setup`, `update`, `uninstall`, `doctor` | Machine tooling |
@@ -245,4 +245,4 @@ pnpm publish:cellars        # the real publish (asks you to type the version)
 
 ## Shortcuts
 
-`pf r` is `pf repo`, `pf ds` is `pf deploy staging` and `pf dp` is `pf deploy production` (only a `deploy:production` script or `pf.json` entry; always confirms). `pf ps` is `pf publish staging`: it runs the repo's `publish:cellars` (or `publish:staging`) script, or the `publish:staging` / `publish:cellars` entry in `pf.json`, and always confirms (`--yes` without a TTY, `--dry-run` to preview). Add more in `packages/core/src/commands/shortcuts.ts`.
+`pf r` is `pf dev` (run the repo), `pf rp` is `pf repo`, `pf ds` is `pf deploy staging` and `pf dp` is `pf deploy production` (only a `deploy:production` script or `pf.json` entry; always confirms). `pf ps` is `pf publish staging`: it runs the repo's `publish:cellars` (or `publish:staging`) script, or the `publish:staging` / `publish:cellars` entry in `pf.json`, and always confirms (`--yes` without a TTY, `--dry-run` to preview). Add more in `packages/core/src/commands/shortcuts.ts`.

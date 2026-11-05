@@ -60,6 +60,13 @@ test('pf ds and pf dp preview with --dry-run', () => {
   assert.match(dp.err, /pnpm run deploy:production/);
 });
 
+test('pf r runs the repo dev command', () => {
+  const dir = mkRepo({ '.git/HEAD': '', 'package.json': json({ scripts: { dev: 'x' } }), 'pnpm-lock.yaml': '' });
+  const r = pf(dir, 'r', '--dry-run');
+  assert.equal(r.code, 0);
+  assert.match(r.err, /pnpm run dev/);
+});
+
 test('pf ps previews the repo publish:cellars script with --dry-run', () => {
   const dir = mkRepo({ '.git/HEAD': '', 'package.json': json({ scripts: { 'publish:cellars': 'x' } }), 'pnpm-lock.yaml': '' });
   const ps = pf(dir, 'ps', '--dry-run');
