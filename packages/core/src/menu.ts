@@ -23,7 +23,8 @@ import type { Task } from '@pulpfixer/kit/detect/stacks';
 import { formatCmd, runCmd, shellCmd, withArgs } from '@pulpfixer/kit/exec';
 import { findVersionsRoot } from './commands/ver.js';
 import { lastMenuChoice, rememberMenuChoice } from '@pulpfixer/kit/config';
-import { err, out } from '@pulpfixer/kit/ui/palette';
+import { err, out, type Palette } from '@pulpfixer/kit/ui/palette';
+import { SHORTCUTS } from './commands/shortcuts.js';
 import { pick } from '@pulpfixer/kit/ui/picker';
 import { h2, termLine } from '@pulpfixer/kit/ui/text';
 import { pluginEntries } from './plugins/index.js';
@@ -151,7 +152,37 @@ export function printList(ctx: Context, entries: Entry[] = entriesFor(ctx), head
     }
     w(`  ${termLine(key(e), c)}${' '.repeat(width - key(e).length)}  ${e.detail ? e.summary.padEnd(sw) + c.dim('  ' + e.detail) : e.summary}`);
   }
+  if (!heading) {
+    const shorts = shortcutList();
+    const sWidth = Math.max(...shorts.map((s) => `pf ${s.name}`.length));
+    w(`\n${h2('Shortcuts', c)}`);
+    for (const s of shorts) {
+      const short = `pf ${s.name}`;
+      w(`  ${termLine(short, c)}${' '.repeat(sWidth - short.length)}  ${c.dim('=')} ${termLine(s.full, c)}`);
+    }
+  }
   w(`\n${termLine('pf help', c)} ${c.dim('shows every command and option.')}`);
+}
+
+/** Every short name with the full command it stands for. */
+function shortcutList(): { name: string; full: string }[] {
+  return SHORTCUTS.flatMap((s) => s.names.map((name) => ({ name, full: `pf ${s.target.join(' ')}` })));
+}
+
+/** Shortcuts as dim lines wrapped to `cols`, for under the interactive menu. */
+export function shortcutTrailer(cols: number, c: Palette = out()): string[] {
+  const items = shortcutList().map((s) => ({ text: `${s.name} = ${s.full.replace(/^pf /, '')}` }));
+  const lines: string[] = [];
+  let line = '  shortcuts:';
+  for (const it of items) {
+    const next = `${line}${line.endsWith(':') ? ' ' : ' · '}${it.text}`;
+    if (next.length > cols - 2 && !line.endsWith(':')) {
+      lines.push(line);
+      line = `             ${it.text}`;
+    } else line = next;
+  }
+  lines.push(line);
+  return ['', ...lines.map((l) => c.dim(l))];
 }
 
 /** Interactive menu. Without a terminal it prints the static list instead. */
@@ -178,7 +209,10 @@ export async function runMenu(
       ...(e.detail ? { detail: e.detail } : {}),
     })),
     // The main menu keeps its grouping but not the group names; custom menus (the ./pf launcher) keep them.
-    { ...(last ? { initial: last } : {}), ...(custom ? {} : { groupNames: false }) },
+    {
+      ...(last ? { initial: last } : {}),
+      ...(custom ? {} : { groupNames: false, trailer: shortcutTrailer(process.stdout.columns || 80) }),
+    },
   );
   if (!chosen) return 0;
   rememberMenuChoice(historyKey, chosen.name);

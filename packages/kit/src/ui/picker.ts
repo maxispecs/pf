@@ -18,6 +18,8 @@ export interface PickOptions<T> {
   /** Type to filter (turns off the j/k/q/digit shortcuts). Defaults to on for long lists. */
   search?: boolean;
   footer?: string;
+  /** Extra lines drawn under the list (and the detail line), above the key hints. Already styled. */
+  trailer?: string[];
   /** Single-select: value to start on. */
   initial?: T;
   /** Multi-select: values that start checked. */
@@ -233,6 +235,7 @@ export function chosenValues<T>(st: PickerState, cfg: PickerConfig<T>): PickItem
 export interface PickerView<T> extends PickerConfig<T> {
   title: string;
   footer?: string;
+  trailer?: string[];
   groupNames?: boolean;
 }
 
@@ -242,7 +245,8 @@ export function renderPicker<T>(v: PickerView<T>, st: PickerState, cols: number,
   const cursor = Math.min(st.cursor, Math.max(0, list.length - 1));
   const rows = buildRows(list, v.groupNames ?? true);
   const hasDetail = v.items.some((i) => i.detail);
-  const maxRows = Math.max(5, termRows - (hasDetail ? 8 : 7));
+  const trailer = v.trailer ?? [];
+  const maxRows = Math.max(5, termRows - (hasDetail ? 8 : 7) - trailer.length);
   const selRow = rows.findIndex((r) => 'item' in r && r.index === cursor);
   let start = 0;
   if (rows.length > maxRows) {
@@ -276,6 +280,8 @@ export function renderPicker<T>(v: PickerView<T>, st: PickerState, cols: number,
   if (start + maxRows < rows.length) lines.push(c.dim('  ↓ more'));
   if (hasDetail) lines.push(list[cursor]?.detail ? `  ${c.dim('›')} ${c.dim(list[cursor]!.detail!)}` : '');
 
+  lines.push(...trailer);
+
   let keys: string;
   if (v.multi) {
     keys = v.search
@@ -305,6 +311,7 @@ function session<T>(title: string, items: PickItem<T>[], multi: boolean, opts: P
       search: opts.search ?? items.length > SEARCH_AFTER,
       page: Math.max(1, rowsNow() - 10),
       ...(opts.footer ? { footer: opts.footer } : {}),
+      ...(opts.trailer?.length ? { trailer: opts.trailer } : {}),
       ...(opts.groupNames === false ? { groupNames: false } : {}),
     };
     const st = initialState(items, opts);

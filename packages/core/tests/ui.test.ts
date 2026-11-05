@@ -311,6 +311,15 @@ test('renderPicker: shows numbers, checkboxes, disabled reasons and the detail l
   assert.ok(multi.some((l) => l.includes('○ doc')));
 });
 
+test('renderPicker: a trailer sits under the list, above the key hints, and the list shrinks to fit', () => {
+  const list = items(40);
+  const trailer = ['', '  shortcuts: ds = deploy staging'];
+  const lines = renderPicker({ ...cfg(list, { search: true }), title: 'Go', trailer }, initialState(list), 80, 20, off);
+  assert.ok(lines.length <= 20, `${lines.length} lines for a 20-row terminal`);
+  const at = lines.findIndex((l) => l.includes('shortcuts: ds'));
+  assert.ok(at > 0 && at === lines.length - 2, 'trailer is the last block before the key hints');
+});
+
 // ---- confirm ----
 
 test('confirm keys: y/n answer at once, enter keeps the default, arrows toggle, escape says no', () => {
