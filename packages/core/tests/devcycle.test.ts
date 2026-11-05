@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { changesSinceBump, findCheckout, planBumps, publishable, shipsChange, type CyclePackage } from '../src/devcycle.js';
+import { changesSinceBump, findCheckout, planBumps, publishable, shipsChange, suggestCommitMessage, type CyclePackage } from '../src/devcycle.js';
 import { localEntries } from '../src/local.js';
 import { json, mkRepo } from './helpers.js';
 
@@ -73,6 +73,21 @@ test('changesSinceBump sees edits after the commit that changed the version', ()
   fs.writeFileSync(path.join(root, 'packages/kit/package.json'), json({ name: 'k', version: '1.1.0' }));
   git('commit', '-q', '-am', 'bump');
   assert.deepEqual(changesSinceBump(root, 'packages/kit'), []);
+});
+
+test('suggestCommitMessage names the packages and files touched', () => {
+  const lines = [
+    ' M versions.json',
+    ' M packages/core/package.json',
+    ' M packages/core/src/devcycle.ts',
+    ' M packages/core/src/commands/cycle.ts',
+    '?? packages/kit/src/ui/text.ts',
+  ];
+  assert.equal(suggestCommitMessage(lines, '2.9'), 'v2.9: update core (devcycle, cycle), kit (text)');
+  assert.equal(suggestCommitMessage(['?? packages/kit/src/new.ts'], null), 'add kit (new)');
+  assert.equal(suggestCommitMessage([' M versions.json', ' M packages/kit/package.json'], '2.9'), 'v2.9');
+  assert.equal(suggestCommitMessage([' M scripts/build.mjs'], '2.9'), 'v2.9: update scripts (build)');
+  assert.equal(suggestCommitMessage([' M a.ts', ' M b.ts', ' M c.ts', ' M d.ts'], null), 'update root (a, b, c, +1)');
 });
 
 test('the local menu offers the dev cycle', () => {

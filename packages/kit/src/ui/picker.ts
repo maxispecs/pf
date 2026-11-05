@@ -136,14 +136,8 @@ export function handleKey<T>(st: PickerState, str: string | undefined, key: Key,
   const plain = !key.ctrl && !key.meta;
 
   if (key.ctrl && name === 'c') return 'cancel';
-  if (name === 'escape') {
-    if (cfg.search && st.query) {
-      st.query = '';
-      st.cursor = settle(cfg.items, 0);
-      return 'render';
-    }
-    return 'cancel';
-  }
+  // A single esc leaves at once, even with a filter typed.
+  if (name === 'escape') return 'cancel';
   if (name === 'return' || name === 'enter') {
     if (cfg.multi) return 'submit';
     const it = list[st.cursor];

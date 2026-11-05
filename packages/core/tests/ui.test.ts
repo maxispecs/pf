@@ -216,7 +216,7 @@ test('single pick: initial value sets the cursor; a disabled initial moves to an
   assert.equal(initialState(list, { initial: 0 }).cursor, 1);
 });
 
-test('search mode: typing filters, j/k/q/digits type, escape clears then cancels', () => {
+test('search mode: typing filters, j/k/q/digits type, escape and ctrl-c cancel', () => {
   const list = [
     { value: 0, label: 'alpha' },
     { value: 1, label: 'beta' },
@@ -236,9 +236,8 @@ test('search mode: typing filters, j/k/q/digits type, escape clears then cancels
   assert.equal(st.query, 'bq1');
   assert.equal(filterItems(list, st.query).length, 0);
   assert.equal(handleKey(st, undefined, key('return'), c), 'ignore', 'nothing to select');
-  assert.equal(handleKey(st, undefined, key('escape'), c), 'render');
-  assert.equal(st.query, '');
-  assert.equal(handleKey(st, undefined, key('escape'), c), 'cancel');
+  assert.equal(handleKey(st, undefined, key('escape'), c), 'cancel', 'one esc leaves even with a filter');
+  assert.equal(handleKey(st, '\x03', key('c', { ctrl: true }), c), 'cancel');
 });
 
 test('multi pick: space toggles, a toggles all, i inverts, digits toggle, enter returns checked items in order', () => {

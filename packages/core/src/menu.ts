@@ -154,19 +154,16 @@ export function printList(ctx: Context, entries: Entry[] = entriesFor(ctx), head
   }
   if (!heading) {
     const shorts = shortcutList();
-    const sWidth = Math.max(...shorts.map((s) => `pf ${s.name}`.length));
+    const sWidth = Math.max(...shorts.map((s) => s.name.length));
     w(`\n${h2('Shortcuts', c)}`);
-    for (const s of shorts) {
-      const short = `pf ${s.name}`;
-      w(`  ${termLine(short, c)}${' '.repeat(sWidth - short.length)}  ${c.dim('=')} ${termLine(s.full, c)}`);
-    }
+    for (const s of shorts) w(`  ${c.cyan(s.name)}${' '.repeat(sWidth - s.name.length)} ${c.dim('=')} ${s.full}`);
   }
   w(`\n${termLine('pf help', c)} ${c.dim('shows every command and option.')}`);
 }
 
 /** Every short name with the full command it stands for. */
 function shortcutList(): { name: string; full: string }[] {
-  return SHORTCUTS.flatMap((s) => s.names.map((name) => ({ name, full: `pf ${s.target.join(' ')}` })));
+  return SHORTCUTS.flatMap((s) => s.names.map((name) => ({ name, full: s.target.join(' ') })));
 }
 
 /** Shortcuts as a list, one per line, for under the interactive menu. */
@@ -176,7 +173,7 @@ export function shortcutTrailer(c: Palette = out()): string[] {
   return [
     '',
     `  ${c.dim(c.bold('Shortcuts'))}`,
-    ...shorts.map((s) => c.dim(`  pf ${s.name.padEnd(width)}  = ${s.full}`)),
+    ...shorts.map((s) => c.dim(`  ${s.name.padEnd(width)} = ${s.full}`)),
   ];
 }
 

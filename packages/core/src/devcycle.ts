@@ -107,6 +107,36 @@ function stackVersion(root: string): string | null {
   return readJson<{ stack?: { version?: string } }>(root, 'versions.json')?.stack?.version ?? null;
 }
 
+/**
+ * A commit message drafted from `git status --short` lines, e.g. `v2.9: update core (devcycle, cycle), kit (text)`.
+ * Names the packages and files touched (version bookkeeping files are skipped); the user can edit it in the prompt.
+ */
+export function suggestCommitMessage(statusLines: string[], stack: string | null): string {
+  const entries = statusLines
+    .map((l) => ({ code: l.slice(0, 2).trim(), file: (l.slice(3).split(' -> ').pop() ?? '').trim().replace(/^"|"$/g, '') }))
+    .filter((e) => e.file);
+  const bookkeeping = (f: string) => f === 'versions.json' || /^packages\/[^/]+\/package\.json$/.test(f) || f === 'pnpm-lock.yaml';
+  const real = entries.filter((e) => !bookkeeping(e.file));
+  const prefix = stack ? `v${stack}` : '';
+  if (!real.length) return prefix;
+
+  const groups = new Map<string, Set<string>>();
+  for (const { file } of real) {
+    const parts = file.split('/');
+    const area = parts[0] === 'packages' && parts.length > 2 ? parts[1]! : parts.length > 1 ? parts[0]! : 'root';
+    const base = (parts.at(-1) ?? file).replace(/\.(test\.)?[cm]?[jt]sx?$|\.[a-z]+$/i, '');
+    (groups.get(area) ?? groups.set(area, new Set()).get(area)!).add(base);
+  }
+  const areas = [...groups].map(([area, names]) => {
+    const list = [...names];
+    const shown = list.slice(0, 3).join(', ');
+    return `${area} (${shown}${list.length > 3 ? `, +${list.length - 3}` : ''})`;
+  });
+  const shownAreas = areas.slice(0, 3).join(', ') + (areas.length > 3 ? `, +${areas.length - 3} more` : '');
+  const verb = real.every((e) => e.code === '??' || e.code === 'A') ? 'add' : real.every((e) => e.code === 'D') ? 'remove' : 'update';
+  return `${prefix ? `${prefix}: ` : ''}${verb} ${shownAreas}`;
+}
+
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** Wait until the registry serves `version` of pf, so `pf u` does not run against a stale answer. */
@@ -200,7 +230,7 @@ export async function runDevCycle(root: string, args: string[] = []): Promise<nu
     r.step('Commit');
     for (const l of pending.slice(0, 15)) r.info(l);
     if (pending.length > 15) r.info(`... and ${pending.length - 15} more`);
-    const suggested = bumps.length && stackVersion(root) ? `v${stackVersion(root)}` : '';
+    const suggested = suggestCommitMessage(pending, bumps.length ? stackVersion(root) : null);
     let msg = message ?? (await ask('Commit message (empty skips the commit)', { initial: suggested, placeholder: 'what changed' }));
     if (msg === null && !message) {
       if (process.stdin.isTTY) {
