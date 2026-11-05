@@ -1,0 +1,165 @@
+---
+title: Writing a plugin
+---
+
+# Writing a plugin
+
+A registry plugin is a package named `@pf-plugins/<name>` whose entry point default-exports a `Plugin`. Depend on `@pulpfixer/kit` for the types and helpers, and publish it to cellars. `pf plugin install <name>` does the rest.
+
+```ts
+import type { Plugin } from '@pulpfixer/kit/plugin';
+
+const plugin: Plugin = {
+  name: 'hello',
+  summary: 'A small example',
+  commands: [
+    {
+      name: 'hello',
+      summary: 'Say hello',
+      group: 'Tools',
+      usage: 'pf hello',
+      async run(ctx, args) {
+        process.stdout.write('hello\n');
+        return 0;
+      },
+    },
+  ],
+};
+export default plugin;
+```
+
+A `Plugin` has `name`, `summary` and `commands`, plus optional `entries(ctx)` (menu entries), `tools(ctx)` (agent tools served by `pf mcp`) and `api` (the plugin interface revision the plugin was written for, default 1). A command's `run` returns the exit code.
+
+A built-in plugin lives in `packages/plugin-<name>` instead, and also needs to be added to the build, the release order, the `core` dependencies and `packages/core/src/plugins/index.ts`. See [Development](/development).
+
+## Agent tools
+
+Any plugin can serve tools the coding agent can call. This complete example adds a team-notes tool the agent can read freely, and an append that needs your approval:
+
+```ts
+// @pf-plugins/notes: src/index.ts
+import fs from 'node:fs';
+import path from 'node:path';
+import { objectSchema, type Tool, type ToolResult } from '@pulpfixer/kit/agent-tool';
+import type { Context } from '@pulpfixer/kit/context';
+import type { Plugin } from '@pulpfixer/kit/plugin';
+
+const fail = (text: string): ToolResult => ({ ok: false, text });
+const notesFile = (ctx: Context) => path.join(ctx.repo?.root ?? ctx.workdir, 'NOTES.md');
+
+const readNotes: Tool = {
+  name: 'pf_notes_read',
+  description: "Read this repo's NOTES.md (team notes: known issues, runbooks).",
+  inputSchema: objectSchema(),
+  readOnly: true,
+  async run(ctx) {
+    const file = notesFile(ctx);
+    if (!fs.existsSync(file)) return fail('This repo has no NOTES.md.');
+    return { ok: true, text: fs.readFileSync(file, 'utf8') };
+  },
+};
+
+const appendNote: Tool = {
+  name: 'pf_notes_append',
+  description: 'Append a note to NOTES.md. pf shows the note to the user, and nothing is written unless they approve.',
+  inputSchema: objectSchema({ text: { type: 'string', description: 'The note, in Markdown' } }, ['text']),
+  readOnly: false,
+  asksUser: true,
+  async run(ctx, input, session) {
+    const text = typeof input.text === 'string' ? input.text.trim() : '';
+    if (!text) return fail('text is required');
+    if (!session) return fail('pf can only ask the user inside an MCP session.');
+
+    if (session.elicit) {
+      const answer = await session.elicit(`The agent wants to add this note to NOTES.md:\n\n${text}`, {
+        type: 'object',
+        properties: { approve: { type: 'boolean', title: 'Add the note', default: false } },
+        required: ['approve'],
+      });
+      const approved = answer.action === 'accept' && answer.content?.approve === true;
+      session.audit({ event: 'notes-append', approved });
+      if (!approved) return fail('The user did not approve the note.');
+    } else if (!session.trustClientPrompt) {
+      return fail('pf could not ask the user (this agent CLI shows no elicitation dialogs).');
+    }
+
+    fs.appendFileSync(notesFile(ctx), `\n${text}\n`);
+    return { ok: true, text: 'Note added.' };
+  },
+};
+
+const notesPlugin: Plugin = {
+  name: 'notes',
+  summary: 'Team notes for the agent',
+  commands: [],
+  tools: () => [readNotes, appendNote],
+};
+export default notesPlugin;
+```
+
+### The tool contract
+
+```ts
+// @pulpfixer/kit/agent-tool
+export interface Tool {
+  name: string;                               // pf_<area>_<verb>; Claude shows mcp__pulpfixer__<name>
+  description: string;                        // what the model reads to decide when to call it
+  inputSchema: Record<string, unknown>;       // JSON Schema; objectSchema(props, required) refuses extra keys
+  readOnly: boolean;                          // changes nothing: Claude may run it unasked
+  asksUser?: boolean;                         // asks you itself through elicitation: Claude may run it unasked
+  run(ctx: Context, input: Record<string, unknown>, session?: ToolSession): Promise<ToolResult>;
+}
+
+export interface ToolSession {
+  id: string;                                 // this agent session (one pf mcp process)
+  elicit?(message: string, requestedSchema: Record<string, unknown>): Promise<ElicitResult>;  // missing when the client cannot show a dialog
+  trustClientPrompt: boolean;                 // without elicit: may the CLI's own prompt stand in for your approval?
+  audit(event: Record<string, unknown>): void;
+}
+```
+
+A tool returns `{ ok, text }`. `ok: false` reaches the model as an MCP error result, and the text should say what to do next. A thrown error becomes `pf <tool> failed: <message>`.
+
+### Rules for plugin tools
+
+- **Names:** prefix them `pf_<plugin>_`. A tool that reuses a built-in name is dropped, and the built-in wins.
+- **Approval:** treat an approval as something only `session.elicit` gives you. Never let the model approve itself through an argument such as `confirm: true`. Check `approved` from the answer, not just `action === 'accept'`: the user can accept the form with the box unticked.
+- **Without a dialog:** go ahead only if `session.trustClientPrompt` is true. Otherwise refuse with a message the model can pass on.
+- **Logging:** call `session.audit()` for decisions and for anything that leaves the machine.
+- **No shell:** never run a shell line built from model input. Build an argv array, and check every value (see `paramArgv`).
+- **Secrets:** never return them. Redact output that can contain them.
+- **`tools(ctx)`:** keep it cheap and side-effect free. It runs at every `pf mcp` start and every `pf agent` launch, and a throw only drops the plugin's tools.
+
+A built-in plugin lists its tools the same way: `packages/plugin-aws/src/index.ts` has `tools: () => AWS_AGENT_TOOLS`.
+
+### Testing a tool
+
+Run the tool directly with a fake session. Here `appendNote` is the tool from the example above and `repoDir` is a temp directory with a `.git/HEAD`. The AWS tests put a fake `aws` script on `PATH` in the same way:
+
+```ts
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import type { ElicitResult, ToolSession } from '@pulpfixer/kit/agent-tool';
+import { buildContext } from '@pulpfixer/kit/context';
+
+function session(answer: ElicitResult | null, trustClientPrompt = false): ToolSession {
+  return {
+    id: 'test',
+    trustClientPrompt,
+    ...(answer ? { elicit: async () => answer } : {}),
+    audit: () => undefined,
+  };
+}
+
+test('the note is written only after approval', async () => {
+  const ctx = buildContext(repoDir);
+  const declined = await appendNote.run(ctx, { text: 'x' }, session({ action: 'decline' }));
+  assert.equal(declined.ok, false);
+  const refused = await appendNote.run(ctx, { text: 'x' }, session(null));
+  assert.match(refused.text, /could not ask the user/);
+  const ok = await appendNote.run(ctx, { text: 'x' }, session({ action: 'accept', content: { approve: true } }));
+  assert.equal(ok.ok, true);
+});
+```
+
+To test over the protocol, drive `serve()` with in-memory streams: send `initialize` with `capabilities.elicitation`, call the tool, answer the `elicitation/create` request, and read the result. See `mcp serve: a grant request asks the user through elicitation and is audited` in `packages/core/tests/agent.test.ts`.

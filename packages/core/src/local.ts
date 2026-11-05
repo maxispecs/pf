@@ -53,7 +53,7 @@ export function localEntries(root: string, ctx: Context = buildContext(root)): E
       summary: 'Run the docs site locally',
       group: 'This repo',
       detail: docs[0] ? formatCmd(docs[0].cmd, ctx.workdir) : 'no docs site in this repo yet',
-      cli: 'pf doc',
+      cli: 'pf docs',
       run: () => runDoc(ctx, { pick: true }),
     },
     {

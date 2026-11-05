@@ -1,0 +1,48 @@
+---
+title: Terminal output
+---
+
+# Terminal output
+
+## Banner on stderr
+
+Every invocation prints a banner with the version to **stderr**:
+
+```text
+pf v4.39  ·  my-service  Node (pnpm)
+```
+
+stdout stays clean, so `pf list`, `pf dl --list` and other output can be piped. There is no output path that skips the banner.
+
+## Colors
+
+Colors follow the usual environment variables:
+
+| Variable | Effect |
+|----------|--------|
+| `NO_COLOR` | Turn colors off |
+| `FORCE_COLOR` | Turn colors on, even without a terminal |
+
+## Without a terminal
+
+Anything with a terminal-only mode (the menu, pickers and prompts) falls back to static output when there is no TTY. Prompts return nothing on cancel, so commands that ask also have flags (`--yes`, `--dry-run`, `--bucket`, ...) for scripts and CI.
+
+## Pictures
+
+pf prints small pictures to stderr for some commands: an octopus mascot for `pf repo`, `pf update` and `pf agent`, and a confused figure on an unknown command or an uncaught error. They appear only on a color terminal that is wide and tall enough, never into pipes or logs.
+
+| Variable | Effect |
+|----------|--------|
+| `PF_NO_MASCOT=1` (or `PF_NO_TRAVOLTA=1`) | Turn every picture off |
+
+`pf art` lists the pictures and which commands show them, and `pf art show <name>` previews one. You can map a command to a picture, or to `none`, in `art.json`. Your own pictures go in `~/.pf/art/`, as plain text files with color escapes (`.ansi`).
+
+## Other environment variables
+
+| Variable | Effect |
+|----------|--------|
+| `PF_NO_UPDATE_CHECK=1` | Skip the update check |
+| `PF_NO_PLUGINS=1` | Do not load registry plugins (to debug) |
+| `PF_AGENT` | Default agent CLI: `claude`, `codex` or `cursor` |
+| `PF_PROFILE` | The [profile](/agent/profiles) for this run |
+| `PF_HOME` | Where pf keeps its state (default `~/.pf`) |

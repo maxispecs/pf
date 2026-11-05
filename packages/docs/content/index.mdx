@@ -1,0 +1,46 @@
+---
+title: Overview
+---
+
+# pf (pulpfixer)
+
+`pf` is one command line for every repo, in any language. Run `pf` in a repo to get its menu, and use the same short commands everywhere: `pf dev`, `pf build`, `pf test`, `pf docs`, `pf ver`, `pf deploy staging`. pf works out what each one means in the repo you are in.
+
+```bash
+pf              # menu for this repo
+pf dev          # run the app locally (any language)
+pf docs         # run the repo's docs site
+pf ver          # versions and bumps
+pf agent        # a coding agent with pf's tools
+```
+
+Every invocation prints a banner with its version (`pf v4.39`) on **stderr**, so stdout stays pipeable.
+
+## Features
+
+| Feature | What it gives you | Read more |
+|---------|-------------------|-----------|
+| Unified commands | `dev`, `build`, `test`, `lint`, `install` resolved per repo, from `pf.json`, the repo's own scripts, or a stack default | [Commands](/commands) |
+| Many stacks | Node, Python, Go, Rust, Java, .NET, Ruby, PHP, Elixir, Swift, Docker Compose, and a repo's own `./a` CLI | [Stacks](/concepts/stacks) |
+| Docs | `pf docs` starts whatever docs site the repo has (Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo) | [Run and build](/commands/run-and-build) |
+| Versioning | Major.minor versions per module and for the stack, with ready-to-run bump commands | [pf ver](/commands/ver) |
+| Deploys | Auto-detected staging deploys, and a production deploy that only runs what the repo defines and always asks | [Deploy and publish](/commands/deploy) |
+| Skills | Agent skills found in your skill folders or installed from the registry | [Skills](/concepts/skills) |
+| Agent | Claude Code, Codex or Cursor with pf's tools, and scoped, read-only, approved AWS access | [Agent](/agent) |
+| Plugins | Built-in AWS and YubiKey plugins, plus registry plugins you install | [Plugins](/plugins) |
+| Host mode | pf on EC2 instances: security patching and a fix agent with no shell | [Host mode](/host) |
+
+## Principles
+
+- **No third-party runtime dependencies.** Colors, the picker and argument parsing are hand-written.
+- **Dry runs.** Commands that run something support `--dry-run`.
+- **Safe by default.** Production is never guessed, and always asks. The agent and MCP tools deploy to staging only.
+- **No secrets in pf.** pf never reads, prints or writes a registry token. The agent never receives AWS credentials.
+- **Works without a terminal.** Menus and prompts fall back to static output without a TTY, and colors follow `NO_COLOR` and `FORCE_COLOR`.
+
+## Where to start
+
+- New here? Follow [Getting started](/getting-started).
+- Looking for a command? See [Commands](/commands), or run `pf list`.
+- Using the coding agent? Read the [Agent guide](/agent).
+- Working on pf itself? See [Development](/development).

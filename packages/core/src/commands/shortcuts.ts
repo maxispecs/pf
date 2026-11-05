@@ -12,6 +12,7 @@ export interface Shortcut {
 
 export const SHORTCUTS: Shortcut[] = [
   { names: ['a'], target: ['agent'], summary: 'Open the coding agent (pf agent)', group: 'Agent' },
+  { names: ['docs'], target: ['doc'], summary: 'Run the docs site locally (pf doc)', group: 'Docs & deploy' },
   { names: ['ds'], target: ['deploy', 'staging'], summary: 'Deploy to staging (pf deploy staging)', group: 'Docs & deploy' },
   { names: ['dp'], target: ['deploy', 'production'], summary: 'Deploy to production (pf deploy production)', group: 'Docs & deploy' },
   { names: ['ps'], target: ['publish', 'staging'], summary: 'Publish to the staging registry, cellars (pf publish staging)', group: 'Docs & deploy' },

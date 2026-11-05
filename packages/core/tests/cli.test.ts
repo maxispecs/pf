@@ -72,7 +72,7 @@ test('with PF_LOCAL set (./pf), the menu is the local checkout menu', () => {
   assert.match(r.stdout, /Global pf/);
   assert.match(r.stdout, /pnpm install:local\s+Install pf globally from this checkout/);
   assert.match(r.stdout, /pf update\s+Update the global pf/);
-  assert.match(r.stdout, /pf doc\s+Run the docs site locally/);
+  assert.match(r.stdout, /pf docs\s+Run the docs site locally/);
   assert.match(r.stdout, /pf ver\s+List versions/);
   assert.doesNotMatch(r.stdout, /pf dev/);
 });

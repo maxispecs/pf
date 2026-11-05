@@ -1,0 +1,43 @@
+---
+title: Tools and repo setup
+---
+
+# Tools and repo setup
+
+## pf tools
+
+Some repos have their own developer CLI: an executable `a` at the root, a `cli/run` entry and `cli/commands/**/*.sh` scripts whose headers carry `# desc:` and `# usage:` lines. pf reads it.
+
+```bash
+pf tools                 # list the repo's tools
+pf tools seed            # run one
+pf tools seed --reset    # extra arguments go to the tool
+pf tools --dry-run
+```
+
+A command named like a task (`dev`, `build`, `test`, `lint`, `install` or `setup`) becomes that task's repo script, so `pf dev` runs it. `deploy:staging` and `deploy:production` become deploy targets (`-y` is added when its usage mentions it, since pf already confirmed). Everything else is reached with `pf tools`.
+
+## pf init
+
+```bash
+pf init            # write pf.json from what was detected
+pf init --dry-run  # preview
+pf init --ver      # also set up versioning
+```
+
+See [pf.json](/concepts/pf-json) for the format.
+
+## pf repo
+
+`pf repo` (short: `pf rp`) hooks pf's helpers into a repo and wires its `package.json`:
+
+- the `/pnpm` root commands: `pnpm ask` (every root script, grouped), `pnpm doc` (the docs site) and `pnpm deploy:staging`, adding the last two only where a docs site or a staging target exists;
+- `/ver` versioning: `versions.json` and `pnpm ver`.
+
+```bash
+pf repo --dry-run
+pf repo --no-pnpm     # versioning only
+pf repo --no-ver      # pnpm commands only
+```
+
+It updates every older copy of the ver CLI, prints what it did and never commits. Run it again after `pf update`.

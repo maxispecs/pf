@@ -1,0 +1,66 @@
+---
+title: Getting started
+---
+
+# Getting started
+
+## Install
+
+From the cellars registry (needs `NPM_TOKEN`; the token comes from the frontend team):
+
+```bash
+npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/
+pf setup
+```
+
+`pf setup` sets the machine up: the registry, shell completions and cleanup of the legacy `pulpfixer` 1.x package (its data in `~/.pulpfixer` is left alone).
+
+On a machine that has nothing yet, use the installer from a checkout of the repo:
+
+```bash
+scripts/install.sh                # latest published version
+scripts/install.sh --from-source  # build this checkout, pack its packages and install them globally
+scripts/install.sh --plugin jira  # also install a registry plugin (repeatable)
+scripts/install.sh --dry-run      # show what would happen
+```
+
+One global install brings everything: the `pulpfixer` package depends on `@pulpfixer/kit` and the built-in plugins.
+
+## First run
+
+```bash
+cd ~/code/my-service
+pf              # the menu for this repo
+pf list         # the same list, static (for scripts and agents)
+pf doctor       # check the machine and repo
+```
+
+Inside a repo the menu shows what pf found: the resolved `dev`, `build`, `test` and `lint` commands, the docs site, deploy targets, the repo's own tools, and the agent. Outside a repo you get a fallback menu (run a skill, about, doctor).
+
+Try a command without running it:
+
+```bash
+pf dev --dry-run
+pf docs --dry-run
+```
+
+## Keep pf current
+
+```bash
+pf update --check    # is there a newer version?
+pf update            # pf, installed plugins, the ver and pnpm skills and registry skills
+pf uninstall         # remove pf from this machine
+```
+
+`pf update` also refreshes a repo's copies of the `ver` and `pnpm` helpers when you run it inside one. See [Skills](/concepts/skills#stack-skills-ver-pnpm).
+
+## Set up a repo
+
+Most repos need nothing. To give pf a few hints, or to add your own commands, write a `pf.json`:
+
+```bash
+pf init            # writes pf.json from what was detected (--dry-run to preview)
+pf repo            # hooks pf's pnpm commands and versioning into the repo
+```
+
+See [pf.json](/concepts/pf-json) and [Tools and repo setup](/commands/tools-and-repo).

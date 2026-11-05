@@ -1,0 +1,46 @@
+---
+title: YubiKey plugin
+---
+
+# YubiKey plugin
+
+The built-in `yubikey` plugin wraps [`ykman`](https://docs.yubico.com/software/yubikey/tools/ykman/). It must be on PATH (`brew install ykman`).
+
+pf never sees a secret: ykman asks for the OATH password and for a touch itself, and the code is calculated on the key. Nothing here changes the key.
+
+## One-time codes: pf otp
+
+```bash
+pf otp                      # pick an account (type to filter), then touch the key if it asks: the code prints on stdout
+pf otp github               # straight to one account (a unique part of its name); several matches are listed
+pf otp github --copy        # also put the code on the clipboard (pbcopy, wl-copy, xclip, xsel or clip)
+pf otp --list               # account names, no codes (also what you get when piped with no account)
+pf otp --all                # ykman's table of every code (touch accounts show [Requires Touch])
+pf otp -d 11447176 github   # with several keys plugged in; --hidden includes hidden accounts
+```
+
+## Key information and audit: pf yk
+
+```bash
+pf yk                       # in a terminal: pick audit, status, list, oath, fido, creds, piv or pgp
+pf yk audit                 # read-only security check, with the command that fixes each finding
+pf yk audit --strict        # exit 1 when there is a warning
+pf yk status | list | oath | fido | creds | piv | pgp    # the matching ykman info view
+```
+
+## What the audit flags
+
+The audit reads `ykman info` and each enabled application's info, and flags:
+
+- firmware before 5.7 (EUCLEAK, YSA-2024-03)
+- OATH accounts without a password
+- no FIDO2 PIN, and PINs with attempts used up
+- a TDES PIV management key on firmware that defaults to AES
+- OpenPGP without KDF, or with the signature PIN cached
+- Yubico OTP left enabled
+
+Commands support `--dry-run` and `--device <serial>`, and both appear in the menu under Security.
+
+## Adding a command
+
+Put a command in `packages/plugin-yubikey/src/commands/` and list it in `packages/plugin-yubikey/src/index.ts`.

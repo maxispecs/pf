@@ -1,0 +1,31 @@
+---
+title: Command resolution
+---
+
+# Command resolution
+
+For `dev`, `build`, `test`, `lint` and `install`, pf picks the command in this order:
+
+1. **`pf.json`** `commands.<name>`: an explicit override always wins.
+2. **A script or target the repo already has**: `package.json` scripts, `composer.json` scripts, Makefile and justfile targets, and the repo's own `./a` tools.
+3. **A stack default**: what is normal for the detected language and tools. See [Stacks](/concepts/stacks).
+
+```bash
+pf dev --dry-run     # shows the command and where it came from
+pf dev --pick        # when several candidates exist, choose one
+```
+
+The same order applies to docs (`pf docs`) and to deploy targets (`pf deploy staging`), with their own script names and detectors. Production is the exception: it is never guessed.
+
+## Monorepos
+
+When you run pf in a subdirectory, commands resolve against that directory's stack and scripts first. Run it at the repo root for the root's commands.
+
+## Where the code lives
+
+| What | Path |
+|------|------|
+| Repo, stack, docs and staging detection | `packages/kit/src/detect/` |
+| Stack defaults | `packages/kit/src/detect/stacks.ts` |
+| Local `./a` CLI | `packages/kit/src/detect/localcli.ts` |
+| Command resolution | `packages/kit/src/detect/resolve.ts` |

@@ -1,0 +1,46 @@
+---
+title: Versioning and release
+---
+
+import { Callout } from 'nextra/components'
+
+# Versioning and release
+
+## Versioning
+
+Every package and the whole stack have a `major.minor` version, kept in `versions.json`.
+
+When you change a package, bump its **minor** version before you finish:
+
+```bash
+pnpm ver bump packages/core minor
+pnpm ver bump packages/kit packages/core minor   # several targets; the stack minor rises once
+```
+
+- Use **major** only for breaking changes.
+- Never edit versions in manifests by hand.
+- Bump a package only when its own files changed. A core change that depends on a new kit change bumps both.
+- After adding or removing a package, run `pnpm ver init` (`--prune` for removals).
+
+The packages that get versions are `packages/core`, `packages/kit`, `packages/plugin-aws`, `packages/plugin-yubikey` and `packages/docs`.
+
+## Release
+
+```bash
+pnpm release         # typecheck, test, build, npm publish --dry-run for every unpublished package
+pnpm publish:cellars # the real publish
+```
+
+`pnpm release` is always a dry run. It publishes nothing, and it lists every package whose version the registry lacks, in dependency order (kit, plugins, core). `pnpm publish:cellars` publishes without a confirmation prompt. A published version can never be reused, so bump first.
+
+Core pins kit and the built-in plugins to exact versions, and users only update `pulpfixer`, so the release script refuses to publish a dependency without a new core.
+
+`packages/docs` is private and is never published.
+
+<Callout type="warning">
+Never publish unless you were asked to.
+</Callout>
+
+## The dev cycle
+
+`./pf cycle [--message m] [--yes] [--dry-run]` in the checkout bumps changed packages (core goes along), commits, runs `pnpm run publish:cellars`, then `pf u --yes` so the global pf updates itself.

@@ -1,0 +1,109 @@
+---
+title: Profiles
+---
+
+# Profiles
+
+A profile ties a project to an AWS account and limits what the agent may be granted there. There are two layers:
+
+| Layer | File | Holds | Trusted to |
+|-------|------|-------|------------|
+| User | `~/.pf/config.json` | AWS profile name, pinned account, region, agent limits | widen and narrow |
+| Repo | `pf.json` (committed) | which profile the repo uses, optional tighter limits | narrow only |
+
+A cloned repo is not trusted, so its `pf.json` can never allow more than your user profile does.
+
+## User profiles
+
+```bash
+pf profile add acme --aws-profile acme-readonly --account 123456789012 --region eu-west-1 --scopes identity,ec2,ecs,logs
+pf profile add side --aws-profile sp-ro --region us-east-1      # no --scopes: everything except logs
+pf profile add acme --max-ttl 30                                 # edit one field; others are kept
+pf profile add acme --region ""                                  # clear a field
+pf profile add                                                   # in a terminal: a wizard
+```
+
+The resulting `~/.pf/config.json`:
+
+```json
+{
+  "profiles": {
+    "acme": {
+      "aws": { "profile": "acme-readonly", "account": "123456789012", "region": "eu-west-1" },
+      "agent": { "aws": { "scopes": ["identity", "ec2", "ecs", "logs"], "maxTtlMinutes": 30 } }
+    },
+    "side": {
+      "aws": { "profile": "sp-ro", "region": "us-east-1" }
+    }
+  },
+  "defaultProfile": "acme"
+}
+```
+
+| Field | Meaning | Default |
+|-------|---------|---------|
+| `aws.profile` | profile name in `~/.aws/config` (required) | none |
+| `aws.account` | 12-digit account the credentials must resolve to | not pinned (pf warns) |
+| `aws.region` | region for calls | from the AWS profile |
+| `agent.aws.scopes` | scopes the agent may be granted | all except `logs` |
+| `agent.aws.regions` | regions the agent may read | `aws.region`, else any |
+| `agent.aws.maxTtlMinutes` | longest grant | 60 (hard cap 480) |
+
+Pin the account. pf then runs `sts get-caller-identity` before the first read of every grant, and refuses everything if the credentials point somewhere else (a stale SSO session, a mixed-up profile).
+
+## Repo profile
+
+```json
+{
+  "name": "acme-api",
+  "profile": "acme",
+  "agent": { "aws": { "scopes": ["identity", "ecs", "logs"], "regions": ["eu-west-1"], "maxTtlMinutes": 20 } },
+  "commands": {}
+}
+```
+
+`agent.aws` is optional. Each list is intersected with the user's limits, and the shorter time wins.
+
+## Which profile applies
+
+The first of:
+
+1. `pf agent --profile <name>`, or the name given to `pf profile show <name>` or `pf profile check <name>`
+2. `PF_PROFILE`
+3. `"profile"` in the repo's `pf.json`
+4. `"defaultProfile"` (`pf profile use <name>`)
+
+## Commands
+
+```bash
+pf profile                 # list (also in the pf menu)
+pf profile show [name]     # the effective profile here, after pf.json narrowing
+pf profile use <name>      # make it the default
+pf profile check [name]    # sts get-caller-identity vs the pinned account (--dry-run prints the command)
+pf profile remove <name>
+```
+
+```text
+$ pf profile show side
+  profile       side (from flag)
+  aws profile   sp-ro
+  account       not pinned
+  region        us-east-1
+  agent limits  scopes identity, ec2, ecs, rds, elb, cloudwatch, ssm-metadata, s3-metadata; regions us-east-1; at most 60 min
+```
+
+## Example: several projects, one machine
+
+```bash
+pf profile add acme    --aws-profile acme-readonly  --account 111111111111 --region eu-west-1 --scopes identity,ecs,logs
+pf profile add acme-dw --aws-profile acme-data-ro   --account 222222222222 --region eu-central-1 --scopes identity,rds,cloudwatch
+pf profile add side    --aws-profile sp-ro          --account 333333333333 --region us-east-1
+```
+
+```text
+~/code/acme-api/pf.json        { "profile": "acme" }
+~/code/acme-warehouse/pf.json  { "profile": "acme-dw" }
+~/code/side-project/pf.json    { "profile": "side", "agent": { "aws": { "scopes": ["identity", "ec2"] } } }
+```
+
+Each repo's agent sessions then use their own account and limits, with no switching. `pf agent --profile acme-dw` overrides one session.

@@ -1,0 +1,89 @@
+---
+title: MCP server
+---
+
+# Using the pf tools from other MCP clients
+
+`pf mcp` is a plain stdio MCP server, so any MCP client can use pf's tools.
+
+```bash
+pf mcp [--cwd <repo>] [--profile <name>] [--require-elicitation]
+```
+
+| Flag | Meaning |
+|------|---------|
+| `--cwd` | the repo the tools work in (placeholders like `${workspaceFolder}` that were not expanded are ignored) |
+| `--profile` | the pf profile for this server (the same as `PF_PROFILE`) |
+| `--require-elicitation` | refuse approvals the client cannot show as a dialog. Set it whenever the client runs `pf_aws_request_access` without asking |
+| `--host [--apply]` | serve the host tools instead (see [Host mode](/host)); write tools are refused without `--apply` |
+
+Project `.mcp.json` for Claude Code, or `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "pulpfixer": { "command": "pf", "args": ["mcp", "--cwd", "/Users/me/code/acme-api", "--require-elicitation"] }
+  }
+}
+```
+
+Headless Claude Code, with only pf's AWS tools (useful in scripts; approvals are cancelled without a UI, so grant-needing reads fail):
+
+```bash
+claude -p "Call pf_aws_profile and summarize the limits." \
+  --mcp-config ./pf-mcp.json --strict-mcp-config --tools "" \
+  --allowedTools mcp__pulpfixer__pf_aws_profile
+```
+
+## The elicitation exchange
+
+Requests from pf have ids like `pf-1`:
+
+```json
+→ {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{"elicitation":{}}}}
+← {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{},"prompts":{}},"serverInfo":{"name":"pulpfixer","version":"4.38.0"},"instructions":"..."}}
+→ {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"pf_aws_request_access","arguments":{"scopes":["ec2"],"reason":"disk full on web-1"}}}
+← {"jsonrpc":"2.0","id":"pf-1","method":"elicitation/create","params":{"message":"The agent asks pulpfixer for read-only AWS access.\n...","requestedSchema":{"type":"object","properties":{"approve":{"type":"boolean","title":"Grant this access","default":false}},"required":["approve"]}}}
+→ {"jsonrpc":"2.0","id":"pf-1","result":{"action":"accept","content":{"approve":true}}}
+← {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"Granted. ..."}],"isError":false}}
+```
+
+pf accepts form elicitation as `elicitation: {}` (2025-06-18) or `elicitation: { "form": {} }` (later revisions). A client that offers only `url` mode counts as unable to show the dialog.
+
+## How the server serves a session
+
+- `serve()` reads one JSON-RPC message per line. A message with a `method` goes to `handle()`. A message with only an `id` and a `result` or `error` answers one of pf's own requests (`pf-1`, `pf-2`, ...) and resolves the matching promise.
+- `initialize` stores the client's capabilities on the session. A tool gets `elicit` only when they include form elicitation.
+- `tools/call` runs the tool with its session and logs `{ event: "tool", tool, args, ok }`. Tool calls run concurrently, so a tool waiting on your answer does not block others.
+- The audit file opens lazily on the first event, and when stdin closes, pending requests are rejected.
+- `--require-elicitation` makes the session refuse approvals that would rest on the client's own prompt.
+
+## How Claude's allowlist is built
+
+```ts
+// packages/core/src/agent/adapters.ts
+function claudeAllowedTools(tools: Tool[]): string[] {
+  return tools.filter((t) => t.readOnly || t.asksUser).map((t) => `mcp__${SERVER_NAME}__${t.name}`);
+}
+```
+
+A tool may only be `asksUser` if it gets your approval from `session.elicit` before it changes anything. Because Claude runs those tools unasked, its server always starts with `--require-elicitation`.
+
+## Where things live
+
+| Path | What |
+|------|------|
+| `packages/kit/src/agent-tool.ts` | `Tool`, `ToolResult`, `ToolSession`, `ElicitResult`, `objectSchema()` |
+| `packages/kit/src/plugin.ts` | `Plugin.tools(ctx)`: plugins contribute tools |
+| `packages/kit/src/config.ts` | `ProfileConfig`, `AgentAwsScope`, parsing of `profiles` and pf.json `profile` / `agent.aws` |
+| `packages/kit/src/profiles.ts` | `resolveProfile`, `narrowLimits`, `saveProfile`, `removeProfile`, `setDefaultProfile` |
+| `packages/core/src/agent/launch.ts` | `startAgent`: picks the CLI, builds the persona, writes launch files, spawns |
+| `packages/core/src/agent/adapters.ts` | `buildLaunch` per CLI, `mcpServerArgv`, Claude's allowlist |
+| `packages/core/src/agent/persona.ts` | the system prompt and its rules |
+| `packages/core/src/agent/mcp.ts` | the MCP server: `handle`, `serve`, sessions, elicitation, audit |
+| `packages/core/src/agent/tools.ts` | the built-in repo tools (`TOOLS`) |
+| `packages/core/src/plugins/index.ts` | `agentTools(ctx)`: built-in tools, then plugin tools that do not reuse a name |
+| `packages/core/src/audit.ts` | `openAudit`, shared with host mode |
+| `packages/plugin-aws/src/access.ts` | scopes, `DENIED`, `checkOperation`, `limitsFor`, `paramArgv`, `redactJson`, `redactText` |
+| `packages/plugin-aws/src/grants.ts` | the grant store |
+| `packages/plugin-aws/src/agent-tools.ts` | the four `pf_aws_*` tools |

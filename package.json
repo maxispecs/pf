@@ -1,7 +1,7 @@
 {
   "name": "pulpfixer-monorepo",
   "private": true,
-  "version": "2.19.0",
+  "version": "2.21.0",
   "type": "module",
   "description": "pf: unified developer CLI for any repo, any language (monorepo root)",
   "license": "UNLICENSED",
@@ -15,6 +15,8 @@
     "typecheck": "tsc -p tsconfig.check.json",
     "test": "node scripts/test.mjs",
     "pf": "node packages/core/dist/bin/pf.js",
+    "docs:dev": "pnpm --filter @pulpfixer/docs dev",
+    "docs:build": "pnpm --filter @pulpfixer/docs build",
     "install:local": "bash packages/core/scripts/install.sh --from-source",
     "release": "node scripts/release.mjs",
     "publish:cellars": "node scripts/release.mjs --publish",
@@ -27,6 +29,10 @@
     "Develop": {
       "dev": "Run pf from source (pnpm dev -- <args>)",
       "pf": "Run the built pf from dist"
+    },
+    "Docs": {
+      "docs:dev": "Run the Nextra docs site locally on port 4400 (same as pf docs)",
+      "docs:build": "Build the docs site and its search index"
     },
     "Build & check": {
       "build": "Compile every package to its dist",

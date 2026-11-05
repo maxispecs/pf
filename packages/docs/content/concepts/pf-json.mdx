@@ -1,0 +1,40 @@
+---
+title: pf.json
+---
+
+# pf.json
+
+`pf.json` sits at the root of a repo. It overrides detection, adds commands to the menu, and names the repo's [profile](/agent/profiles). `pf init` writes a starting file from what pf detected.
+
+```json
+{
+  "name": "my-service",
+  "commands": {
+    "dev": { "run": "uv run fastapi dev", "description": "Run the API", "group": "Develop" },
+    "seed": { "run": "./scripts/seed.sh", "description": "Load sample data", "group": "Tools", "cwd": "." }
+  }
+}
+```
+
+## Commands
+
+| Field | Meaning |
+|-------|---------|
+| `run` | The shell line to run |
+| `description` | Shown in the menu and by `pf list` |
+| `group` | The menu heading |
+| `cwd` | Directory to run in, relative to the repo root |
+
+Built-in names (`dev`, `build`, `test`, `lint`, `install`) override detection. `deploy:staging`, `deploy:production`, `publish:staging` and `doc` override those commands. Any other name shows up in the menu and runs with `pf <name>`, for example `pf seed`.
+
+## Profile and agent limits
+
+```json
+{ "profile": "acme", "agent": { "aws": { "scopes": ["identity", "ecs"] } } }
+```
+
+`profile` names one of your user profiles. `agent.aws` may only **narrow** what that profile allows, never widen it, because a cloned repo is not trusted. See [Profiles](/agent/profiles).
+
+## Production
+
+A `deploy:production` entry is one of the three ways a repo can define production (with a script or the repo's own CLI). pf never guesses it. See [Deploy and publish](/commands/deploy).

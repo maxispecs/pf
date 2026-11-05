@@ -1,0 +1,54 @@
+---
+title: Stacks
+---
+
+# Stacks
+
+pf detects the stacks in a repo and supplies defaults for the commands the repo does not define itself.
+
+| Stack | Package managers and tools |
+|-------|----------------------------|
+| Node | pnpm, npm, yarn, bun |
+| Python | uv, poetry, pipenv, pip |
+| Go | `go` |
+| Rust | `cargo` |
+| Java | Maven, Gradle |
+| .NET | `dotnet` |
+| Ruby | Ruby and Bundler |
+| PHP | Composer, Laravel, CakePHP |
+| Elixir | `mix` |
+| Swift | SwiftPM |
+| Docker Compose | `docker compose` |
+
+Run `pf` or `pf doctor` to see what was detected in the current repo.
+
+## PHP
+
+For a repo with `composer.json`, `dev`, `build`, `test` and `lint` come from composer scripts:
+
+| Task | Script names pf looks for |
+|------|---------------------------|
+| `dev` | `dev`, `serve`, `start` |
+| `test` | `test`, `tests`, `phpunit` |
+| `lint` | `lint`, `cs-check`, `cs`, `phpcs`, `stan`, `phpstan`, `analyse` |
+
+Without such a script, pf uses framework and tool defaults:
+
+- Laravel: `artisan`
+- CakePHP: `bin/cake server`
+- Otherwise the PHP built-in server on `public` or `webroot`
+- Tests and lint: Pest, PHPUnit, Pint, PHP CS Fixer, PHP_CodeSniffer and PHPStan from `vendor/bin`
+
+`pf deploy staging` and `pf deploy production` also run a composer script named like the Node ones (`deploy:staging`, `deploy:production`).
+
+## A repo's own CLI
+
+Some repos have a local developer CLI: an executable `a` at the root, `cli/run`, and `cli/commands/**/*.sh` scripts that carry `# desc:` and `# usage:` headers. pf reads it:
+
+- a command named like a task (`dev`, `build`, `test`, `lint`, `install` or `setup`) is that task's repo script;
+- `deploy:staging` and `deploy:production` are deploy targets;
+- everything else is listed and run with [`pf tools`](/commands/tools-and-repo).
+
+## Adding a stack
+
+New stacks go in `packages/kit/src/detect/stacks.ts`, with a test in `packages/kit/tests/`.

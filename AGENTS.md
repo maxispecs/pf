@@ -4,12 +4,14 @@
 
 ## Monorepo
 
-pnpm workspace, four packages (versioned together by `versions.json`, published to cellars):
+pnpm workspace, four published packages (versioned together by `versions.json`, published to cellars) and one private docs site:
 
 - `packages/kit` (`@pulpfixer/kit`): shared foundation. detect, exec, ui, config, util, context and the `Command` / `Plugin` types. Import it by subpath (`@pulpfixer/kit/ui/text`). Depends on nothing.
 - `packages/plugin-aws` (`@pulpfixer/plugin-aws`): the AWS plugin. Depends only on kit.
 - `packages/plugin-yubikey` (`@pulpfixer/plugin-yubikey`): the YubiKey plugin (`pf otp`, `pf yk`, wrapping `ykman`). Depends only on kit.
 - `packages/core` (`pulpfixer`): the `pf` binary, built-in commands, agent, host mode, skills, install and update. Depends on kit and every plugin.
+
+- `packages/docs` (`@pulpfixer/docs`): the documentation site (Nextra on Next.js, port 4400). Private, never published, not part of `scripts/build.mjs`, `scripts/release.mjs` or the core dependencies. `pf docs` (a shortcut for `pf doc`) or `pnpm docs:dev` runs it, `pnpm docs:build` builds it. Pages are MDX in `packages/docs/content/` with a `_meta.ts` per folder. **When you change a command, plugin, the agent or host mode, update the matching page.** `core/docs/agent.md` and the agent pages under `content/agent/` and `content/plugins/writing-a-plugin.mdx` cover the same material, so change both.
 
 Dependencies point one way: core -> plugins -> kit. A plugin never imports core. Anything a plugin needs from core moves into kit.
 Each package exports `source` / `types` / `default` conditions: dev, tests and typecheck run with `--conditions=source` (straight from `src/`), builds and installs use `dist/`. Root `scripts/` hold the cross-package commands (build, test, release, ver, logo, ask).
@@ -24,7 +26,7 @@ New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json 
 - Never read, print or write a registry token. Only check that an auth line exists. `.npmrc` uses `${NPM_TOKEN}`. The one exception is host mode, which reads secrets with the instance role into a child process's env only, never to disk or output.
 - Host mode (`pf host fix`) gives the agent no shell or file tools. Anything that changes the host is a pf host tool, and the MCP server refuses it without `--apply`.
 - Commands that run something support `--dry-run`. `pf deploy staging` auto-detects its target. `pf deploy production` runs only a `deploy:production` script or `pf.json` entry the repo defines (never guessed from platform configs), always asks for confirmation, and needs `--yes` without a TTY. The agent and MCP tools deploy to staging only.
-- Shortcuts: a short name for a full command (`pf r` = `pf dev`, `pf a` = `pf agent`, `pf rp` = `pf repo`, `pf ds` = `pf deploy staging`, `pf dp` = `pf deploy production`, `pf ps` = `pf publish staging`, which runs a repo's `publish:cellars` script and always confirms) is one entry in `SHORTCUTS` in `packages/core/src/commands/shortcuts.ts`. Extra args pass through to the target.
+- Shortcuts: a short name for a full command (`pf r` = `pf dev`, `pf a` = `pf agent`, `pf docs` = `pf doc`, `pf rp` = `pf repo`, `pf ds` = `pf deploy staging`, `pf dp` = `pf deploy production`, `pf ps` = `pf publish staging`, which runs a repo's `publish:cellars` script and always confirms) is one entry in `SHORTCUTS` in `packages/core/src/commands/shortcuts.ts`. Extra args pass through to the target.
 - New command: add `packages/core/src/commands/<name>.ts`, register it in `packages/core/src/commands/index.ts`, show it in `packages/core/src/menu.ts` if it belongs in the menu, add a test.
 - Command resolution order is `pf.json` override, then scripts/targets the repo defines, then stack defaults (`packages/kit/src/detect/`). New stacks go in `packages/kit/src/detect/stacks.ts` with a test in `packages/kit/tests/`.
 - PHP (`composer.json`): `dev`/`build`/`test`/`lint` come from composer scripts (`dev serve start`, `test tests phpunit`, `lint cs-check cs phpcs stan phpstan analyse`), else framework and tool defaults (Laravel `artisan`, CakePHP `bin/cake server`, built-in server on `public`/`webroot`; Pest, PHPUnit, Pint, PHP CS Fixer, PHP_CodeSniffer, PHPStan from `vendor/bin`). `pf deploy staging|production` also run a composer script named like the node ones (`deploy:staging`, ...).
@@ -47,6 +49,7 @@ New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json 
 | `kit/src/plugin.ts`, `plugin-settings.ts`, `core/src/plugins/index.ts` | plugin API, saved plugin settings, and the registry of built-in plugins |
 | `plugin-aws/src/` | AWS plugin (exchange bucket: `pf s3`, `pf dl`); add AWS shortcuts under `commands/`. Agent AWS access: `access.ts` (scopes -> allowed operations, `DENIED`, param checks, redaction; a new read operation is one line there), `grants.ts` (session grants in `~/.pf/agent/grants.json`), `agent-tools.ts` (`pf_aws_*`), `commands/aws.ts` (`pf aws grants|revoke`). Never add an operation that returns secrets, file contents or user data |
 | `kit/src/profiles.ts`, `core/src/commands/profile.ts` | project profiles: `~/.pf/config.json` `profiles` (AWS profile, pinned account, agent caps) and `pf.json` `profile` / `agent.aws` (may only narrow); resolution `--profile`, `PF_PROFILE`, `pf.json`, `defaultProfile` |
+| `packages/docs/` | Nextra docs site (`content/**/*.mdx`, `_meta.ts` per folder, `app/` for the layout); `pf docs` runs it |
 | `core/docs/agent.md` | the agent guide (usage, profiles, AWS access, plugin tools, security model); update it with any change to agent tools, profiles or the MCP server |
 | `kit/src/agent-tool.ts`, `core/src/agent/mcp.ts` | agent tool types (plugins add tools with `Plugin.tools`) and the MCP server; a tool with `asksUser` asks through MCP elicitation (`ToolSession.elicit`), so Claude may run it unasked (`pf mcp --require-elicitation` refuses approvals without a dialog). Sessions log to `~/.pf/agent/audit/` |
 | `core/src/skills/` | skill discovery and runner (direct scripts, else an agent CLI) |
@@ -72,6 +75,6 @@ New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json 
 
 When a change is made in a module (package), bump that module's minor version before finishing:
 `pnpm ver bump <module> minor`. This also bumps the stack minor. Use `major` only for breaking changes.
-Never edit versions in manifests by hand. Modules are the packages: `pnpm ver bump packages/core minor`, `pnpm ver bump packages/kit minor`, `pnpm ver bump packages/plugin-aws minor`, `pnpm ver bump packages/plugin-yubikey minor` (several targets may share one command; the stack minor rises once). Bump a package only when its own files changed; a core change that depends on a new kit change bumps both.
+Never edit versions in manifests by hand. Modules are the packages: `pnpm ver bump packages/core minor`, `pnpm ver bump packages/kit minor`, `pnpm ver bump packages/plugin-aws minor`, `pnpm ver bump packages/plugin-yubikey minor`, `pnpm ver bump packages/docs minor` (several targets may share one command; the stack minor rises once). Bump a package only when its own files changed; a core change that depends on a new kit change bumps both.
 
 Publishing: `pnpm release` is always a dry run and publishes every package whose version the registry lacks, in dependency order. `pnpm publish:cellars` publishes without a confirmation prompt. Never publish without the user asking.

@@ -41,7 +41,7 @@ scripts/install.sh --dry-run      # show what would happen
 | `pf list` | The same list, static (for scripts and agents) |
 | `pf dev`, `build`, `test`, `lint`, `install` | Resolved per repo, see below. `--dry-run` prints, `--pick` chooses when several exist, `-- <args>` passes args on |
 | `pf ver [list\|bump\|init\|sync]` | Major.minor versioning with the bundled `/ver` CLI |
-| `pf doc` | Run the docs site (Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo) |
+| `pf doc` (`pf docs`) | Run the docs site (Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo) |
 | `pf deploy staging` | Deploy to staging. `--dry-run`, `--yes`. Never production |
 | `pf skill [name]` | Pick and run an agent skill. `available`, `install`, `update`, `remove` manage skills from the registry |
 | `pf plugin [list\|available\|install\|update\|remove]` | Administer plugins from the registry. Without a command it opens an interactive menu. See [Plugins](#plugins) |
@@ -269,4 +269,4 @@ pnpm publish:cellars        # the real publish (asks you to type the version)
 
 ## Shortcuts
 
-`pf r` is `pf dev` (run the repo), `pf rp` is `pf repo`, `pf ds` is `pf deploy staging` and `pf dp` is `pf deploy production` (only a `deploy:production` script or `pf.json` entry; always confirms). `pf ps` is `pf publish staging`: it runs the repo's `publish:cellars` (or `publish:staging`) script, or the `publish:staging` / `publish:cellars` entry in `pf.json`, and always confirms (`--yes` without a TTY, `--dry-run` to preview). Add more in `packages/core/src/commands/shortcuts.ts`.
+`pf docs` is `pf doc` (run the repo's docs site; `--dry-run` previews, `--pick` chooses between several), `pf r` is `pf dev` (run the repo), `pf rp` is `pf repo`, `pf ds` is `pf deploy staging` and `pf dp` is `pf deploy production` (only a `deploy:production` script or `pf.json` entry; always confirms). `pf ps` is `pf publish staging`: it runs the repo's `publish:cellars` (or `publish:staging`) script, or the `publish:staging` / `publish:cellars` entry in `pf.json`, and always confirms (`--yes` without a TTY, `--dry-run` to preview). Add more in `packages/core/src/commands/shortcuts.ts`.

@@ -1,0 +1,51 @@
+---
+title: Deploy and publish
+---
+
+import { Callout } from 'nextra/components'
+
+# Deploy and publish
+
+## Staging
+
+```bash
+pf deploy staging            # detect the target and run it
+pf deploy staging --dry-run  # show the steps only
+pf ds                        # same as pf deploy staging
+```
+
+pf finds the staging target by itself, in this order:
+
+1. A `deploy:staging` entry in `pf.json`
+2. A `deploy:staging` script in a `package.json` or `composer.json`, or the repo's own `./a deploy:staging` tool
+3. A GitHub workflow with `stag` in its file name and a `workflow_dispatch` trigger, run with `gh workflow run`
+4. Platform configs: Firebase, Cloudflare Workers (`wrangler`, with a staging env), Fly.io (`fly.staging.toml`), Serverless, SST, Netlify and Vercel (a preview)
+
+Steps print before they run. Anything pf skips is listed with the reason.
+
+## Production
+
+```bash
+pf deploy production
+pf dp
+```
+
+Production is never guessed from platform configs. pf runs it only when the repo defines it:
+
+- a `deploy:production` script (`package.json` or `composer.json`),
+- a `deploy:production` entry in `pf.json`, or
+- the repo's own `./a deploy:production` tool.
+
+It always asks for confirmation. Without a terminal it refuses unless you pass `--yes`. `--dry-run` previews it.
+
+<Callout type="warning">
+The coding agent and the MCP tools deploy to staging only. Production is never targeted by an agent.
+</Callout>
+
+## Publish to the registry
+
+```bash
+pf publish staging           # same as pf ps
+```
+
+Runs the repo's `publish:cellars` script (or `publish:staging`), or the matching `pf.json` entry, and always confirms (`--yes` without a terminal, `--dry-run` to preview). A repo with neither fails with exit code 1.

@@ -1,0 +1,30 @@
+---
+title: Shortcuts
+---
+
+# Shortcuts
+
+A shortcut is a short name for a full command. Extra arguments pass through to the target, so `pf ds --dry-run` is `pf deploy staging --dry-run`.
+
+| Shortcut | Same as | Notes |
+|----------|---------|-------|
+| `pf a` | `pf agent` | Open the coding agent |
+| `pf docs` | `pf doc` | Run the repo's docs site |
+| `pf ds` | `pf deploy staging` | Auto-detects its target |
+| `pf dp` | `pf deploy production` | Only a repo-defined production script; always confirms |
+| `pf ps` | `pf publish staging` | Runs `publish:cellars`; always confirms |
+| `pf r` | `pf dev` | Run the repo |
+| `pf rp` | `pf repo` | Hook pf's tools into this repo |
+| `pf u` | `pf update` | Update pf, plugins and skills |
+| `pf v` | `pf ver` | List versions and bump them |
+| `pf up` | `pf s3` | Upload to the exchange bucket |
+
+## Adding one
+
+A shortcut is one entry in `SHORTCUTS` in `packages/core/src/commands/shortcuts.ts`:
+
+```ts
+{ names: ['docs'], target: ['doc'], summary: 'Run the docs site locally (pf doc)', group: 'Docs & deploy' },
+```
+
+`names` can hold several short names for the same target, and `target` can have fixed arguments, such as `['deploy', 'staging']`. Add a test in `packages/core/tests/shortcuts.test.ts`.

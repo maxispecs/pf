@@ -1,0 +1,35 @@
+---
+title: Plugins
+---
+
+# Plugins
+
+A plugin adds commands (and menu entries) to pf. Some ship inside pf; the rest come from the cellars registry as `@pf-plugins/<name>` (or `@pf-plugins-<name>/<name>`) and are remembered per user.
+
+| Plugin | Package | What it adds |
+|--------|---------|--------------|
+| `aws` (built in) | `@pulpfixer/plugin-aws` | `pf s3`, `pf dl`, `pf aws`, and the agent's `pf_aws_*` tools. See [AWS plugin](/plugins/aws) |
+| `yubikey` (built in) | `@pulpfixer/plugin-yubikey` | `pf otp`, `pf yk`. See [YubiKey plugin](/plugins/yubikey) |
+| registry plugins | `@pf-plugins/<name>` | whatever the plugin defines |
+
+## Managing registry plugins
+
+```bash
+pf plugin                          # interactive: list, install, update, remove
+pf plugin list                     # built-in and installed plugins; a plugin that fails to load is named with the reason
+pf plugin available                # what the registry has, and what is installed
+pf plugin install jira [x@1.2]     # latest (or that version) into ~/.pf/plugins
+pf plugin update [name...]         # bring installed plugins to the latest (--check only reports)
+pf plugin remove jira
+```
+
+Installed plugins live in an npm prefix at `~/.pf/plugins`. Its `package.json` `dependencies` are the list pf remembers, so a plugin stays installed across `pf update`, which updates them along with pf and the registry skills.
+
+## Safety
+
+- Only the `@pf-plugins` scope installs, because a plugin runs inside pf with your rights.
+- A plugin can add commands, but never replaces a built-in one. Plugin commands are appended after every built-in and de-duplicated.
+- A plugin that throws on load is skipped, with a note in `pf plugin list`. A failing plugin never stops pf.
+- `PF_NO_PLUGINS=1` skips loading registry plugins, to debug.
+
+To write your own, see [Writing a plugin](/plugins/writing-a-plugin).

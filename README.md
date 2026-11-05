@@ -1,6 +1,6 @@
 # pulpfixer monorepo
 
-`pf` is a developer CLI for any repo, in any language. This repo is a pnpm workspace; the user-facing docs live in [packages/core/README.md](packages/core/README.md). The agent (tools, project profiles, scoped AWS access, writing agent tools in a plugin) is documented in [packages/core/docs/agent.md](packages/core/docs/agent.md).
+`pf` is a developer CLI for any repo, in any language. This repo is a pnpm workspace; the docs site is [packages/docs](packages/docs) (Nextra, run it with `pf docs` or `pnpm docs:dev`), and the user-facing reference is also in [packages/core/README.md](packages/core/README.md). The agent (tools, project profiles, scoped AWS access, writing agent tools in a plugin) is documented in [packages/core/docs/agent.md](packages/core/docs/agent.md).
 
 | Package | Name | What |
 |---------|------|------|
@@ -8,5 +8,6 @@
 | `packages/plugin-aws` | `@pulpfixer/plugin-aws` | AWS plugin (`pf s3`, `pf dl`, `pf aws`, the agent's `pf_aws_*` tools) |
 | `packages/plugin-yubikey` | `@pulpfixer/plugin-yubikey` | YubiKey plugin (`pf otp`, `pf yk`) |
 | `packages/core` | `pulpfixer` | the `pf` binary: dispatch, built-in commands, agent, host mode, skills |
+| `packages/docs` | `@pulpfixer/docs` | the documentation site (Nextra); private, never published |
 
-Root commands (`pnpm ask` lists them): `pnpm dev -- <args>`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm ver`, `pnpm install:local`, `pnpm release`, `pnpm publish:cellars`.
+Root commands (`pnpm ask` lists them): `pnpm dev -- <args>`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm ver`, `pnpm docs:dev`, `pnpm docs:build`, `pnpm install:local`, `pnpm release`, `pnpm publish:cellars`.

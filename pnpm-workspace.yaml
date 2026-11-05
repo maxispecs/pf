@@ -3,3 +3,8 @@ packages:
 
 allowBuilds:
   esbuild: true
+
+# nextra-theme-docs 4.6 (packages/docs) breaks with zod 4.2+: its Layout schema makes the
+# `children` key required, so every page fails with "expected nonoptional, received undefined".
+overrides:
+  zod: 4.1.13

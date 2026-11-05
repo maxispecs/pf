@@ -1,0 +1,69 @@
+---
+title: Host mode
+---
+
+# Host mode (EC2)
+
+`pf host` runs pulpfixer on deployed instances to fix things like pending security patches. Instances never hold a secret: pf reads `NPM_TOKEN` (for updates) and `ANTHROPIC_API_KEY` (for the agent) with the instance IAM role at run time, from SSM Parameter Store or Secrets Manager. It passes each one only into the environment of the process that needs it, never to disk or output.
+
+Operators reach instances through SSM Run Command, with no SSH, so IAM decides who can invoke what.
+
+## Install on instances
+
+From your machine (needs the aws CLI and `ssm:SendCommand`):
+
+```bash
+pf host install --tag Env=staging --service nginx.service --timer
+pf host install --instances i-0abc123,i-0def456 --secrets secretsmanager --prefix /pulpfixer
+```
+
+This sends `scripts/install.sh --host` through `AWS-RunShellScript`. On each instance it installs Node if missing, reads the registry token with the instance role, installs pf and Claude Code, writes `/etc/pulpfixer/host.json` (secret *names* only), and runs `pf host login`. In user data, or on a box you are already on, run `sudo bash install.sh --host [options]` instead.
+
+## Commands on the instance
+
+| Command | What it does |
+|---------|--------------|
+| `pf host init` | Write `/etc/pulpfixer/host.json` and `/etc/pulpfixer/npmrc` (the auth line reads `${NPM_TOKEN}`). `--secrets ssm\|secretsmanager`, `--prefix`, `--region`, `--service <unit>` (restart allowlist), `--budget <usd>`, `--timer` (daily `pf host update`) |
+| `pf host login` | Check the instance identity (IMDSv2), the IAM role, that every secret is readable (values are discarded), and the agent CLI |
+| `pf host status` | Instance, versions, pending security updates, reboot pending, recent agent runs |
+| `pf host update --yes` | Install the pinned pf version (`version` in host.json, default `latest`), update registry skills and Claude Code |
+| `pf host patch [--apply]` | List OS security updates (dnf, yum or apt). `--apply` installs them. Never reboots |
+| `pf host fix [--apply] <task>` | Run the agent on this host |
+
+## The fix agent
+
+`pf host fix "patch the openssl advisory and restart nginx"` runs headless Claude Code with:
+
+- **No shell and no file tools** (`--tools ""`). It can only use the pf host tools: status, security updates, package versions, unit status and logs, `pf_host_patch` and `pf_host_restart`.
+- **Plan-only by default.** Without `--apply`, the agent may only call the read-only tools, and the `pf mcp --host` server also refuses the two write tools. The run ends with a report of what it would do.
+- **Allowlisted restarts.** `pf_host_restart` only restarts units named with `pf host init --service`.
+- **A spending cap.** `maxBudgetUsd` in host.json, default 5.
+- **An audit log.** Every run writes a log to `/var/log/pulpfixer/` (root only): a header with time, instance, user, mode and task, then the full transcript and the exit code.
+
+## From your machine
+
+```bash
+pf host send --tag Env=staging status
+pf host send --tag Env=staging patch                  # list security updates on every instance
+pf host send --instances i-0abc123 fix "why is nginx failing?"
+pf host send --instances i-0abc123 fix --apply "install the pending security updates"
+```
+
+`send` runs only `status`, `login`, `update`, `patch` or `fix`, and quotes the arguments for the remote shell. It prints the SSM command id and the `aws ssm` commands to read each instance's output. `--aws-region` picks the region, and `--dry-run` prints the `aws ssm send-command` call.
+
+## IAM
+
+The instance role needs read access to the secrets, plus SSM for Run Command:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": "ssm:GetParameter", "Resource": "arn:aws:ssm:*:*:parameter/pulpfixer/*" },
+    { "Effect": "Allow", "Action": "kms:Decrypt", "Resource": "<kms key arn of the parameters>" },
+    { "Effect": "Allow", "Action": "secretsmanager:GetSecretValue", "Resource": "arn:aws:secretsmanager:*:*:secret:pulpfixer/*" }
+  ]
+}
+```
+
+Also attach `AmazonSSMManagedInstanceCore`. On the operator side, scope `ssm:SendCommand` on `AWS-RunShellScript` by instance tag, so only the right people can run `--apply` on production-tagged hosts.

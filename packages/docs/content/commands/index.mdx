@@ -1,0 +1,44 @@
+---
+title: All commands
+---
+
+# Commands
+
+Run `pf list` for the list that applies in the current directory, and `pf help` for options.
+
+| Command | What it does |
+|---------|--------------|
+| `pf` | Menu: this repo's commands, or the fallback menu outside a repo. Includes the agent |
+| `pf list` | The same list, static (for scripts and agents) |
+| `pf dev`, `build`, `test`, `lint`, `install` | Resolved per repo. `--dry-run` prints, `--pick` chooses when several exist, `-- <args>` passes args on. See [Run, build and docs](/commands/run-and-build) |
+| `pf doc` (`pf docs`) | Run the docs site (Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo) |
+| `pf ver [list\|bump\|init\|sync]` | Major.minor versioning with the bundled `/ver` CLI. See [Versioning](/commands/ver) |
+| `pf deploy staging` | Deploy to staging. `--dry-run`, `--yes`. See [Deploy and publish](/commands/deploy) |
+| `pf deploy production` | Only a `deploy:production` script or `pf.json` entry; always confirms |
+| `pf publish staging` | Run the repo's `publish:cellars` script; always confirms |
+| `pf tools [name] [args]` | List and run the repo's own `./a` tools. See [Tools and repo setup](/commands/tools-and-repo) |
+| `pf init` | Write `pf.json` for this repo from what was detected |
+| `pf repo` | Hook pf's tools into this repo, or update them |
+| `pf agent [prompt]` | Open the coding agent (Claude Code, Codex or Cursor). See [Agent](/agent) |
+| `pf profile [...]` | Project profiles: which AWS account a repo uses and what the agent may read there |
+| `pf aws [grants\|revoke]` | AWS access the agent was granted: list it, end it |
+| `pf mcp` | Serve pf's tools to any MCP client over stdio |
+| `pf skill [name]` | Pick and run an agent skill. `available`, `install`, `update`, `remove` manage registry skills |
+| `pf plugin [...]` | Administer plugins from the registry. See [Plugins](/plugins) |
+| `pf s3 <file...>`, `pf dl [name]` | AWS plugin: upload to and download from a shared exchange bucket |
+| `pf otp`, `pf yk` | YubiKey plugin: OATH codes and a security audit |
+| `pf host ...` | pf on EC2 instances. See [Host mode](/host) |
+| `pf art [list\|show <name>]` | List the pictures pf prints and which commands show them |
+| `pf setup`, `update`, `uninstall`, `doctor` | Machine tooling |
+| `pf about`, `pf help`, `pf --version` | Info |
+
+Commands that run something support `--dry-run`. Short names such as `pf r` and `pf ds` are listed under [Shortcuts](/commands/shortcuts).
+
+## Machine tooling
+
+| Command | Notes |
+|---------|-------|
+| `pf setup` | Registry, completions and legacy cleanup. `--dry-run`, `--yes`, `--no-completions` |
+| `pf update` (`pf u`) | Update pf, installed plugins, the `ver` and `pnpm` skills and registry skills, then this repo's copies of their helpers. `--check`, `--yes`, `--dry-run` |
+| `pf uninstall` | Remove pf. `--purge`, `--no-package`, `--no-shell`, `--yes`, `--dry-run` |
+| `pf doctor` | Check this machine and repo for problems. `--offline` |

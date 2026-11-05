@@ -1,0 +1,35 @@
+---
+title: Security and troubleshooting
+---
+
+# Security model
+
+- **No credentials for the agent.** pf passes only `--profile <name>` to the aws CLI. The credentials stay with the AWS CLI and SSO, and pf never reads, prints or stores them.
+- **Approval outside the model.** A grant needs your answer in a dialog. No tool argument can approve one.
+- **Two layers of limits.** Your profile caps what can be asked for, and a repo can only narrow it. Inside a grant, every call is checked for operation, scope, region, parameters and account.
+- **Fail closed.** No grant, no read. A wrong account means nothing is read. With no dialog and a client that runs the tool unasked, the grant is refused.
+- **Short-lived.** Grants last minutes, end with the session, and can be revoked from another terminal.
+- **Traceable.** Every request, decision, call and refusal is logged per session in `~/.pf/agent/audit/`.
+- **Defense in depth.** Point each profile at a read-only IAM role (`ViewOnlyAccess`, or tighter), so AWS refuses writes even if pf had a bug.
+- **Staging only.** The agent and MCP tools deploy to staging only. A staging deploy returns a plan until the call passes `confirm`, and the agent CLI asks first.
+
+Limits to keep in mind:
+
+- Read-only metadata can still be sensitive: resource names, IPs, tags, and log lines with the `logs` scope.
+- Redaction catches common patterns only.
+- A repo's `pf.json` chooses which of your profiles applies. The dialog always names the profile, its source and the account, so read it before approving.
+
+# Troubleshooting
+
+| Symptom | Cause and fix |
+|---------|---------------|
+| `No pf profile applies here` | Add one (`pf profile add`) and name it in `pf.json`, or set a default with `pf profile use` |
+| `The profile "x" ... is not configured` | `pf.json` names a profile this machine does not have: `pf profile add x ...` |
+| `has no AWS profile` | `pf profile add x --aws-profile <name>` |
+| The dialog never shows; the grant says `could not ask the user` | the agent CLI lacks MCP elicitation, or this is `claude -p`. Update the CLI, or run the agent interactively |
+| `This is not the pinned account` | the AWS profile resolves to another account, often after an SSO login to another account. Check with `pf profile check`, fix `~/.aws/config` or log in again |
+| `aws ... failed: ... ExpiredToken` or `SSO session expired` | `aws sso login --profile <aws-profile>` |
+| `aws CLI not found on PATH` | install the aws CLI v2 |
+| Output cut | narrow the call with `query`, `filters`, `max-items` or a shorter time range |
+| The agent keeps the old profile | the server reads `~/.pf/config.json` when it starts, so restart the agent after editing profiles |
+| Check what the agent did | list `~/.pf/agent/audit/` newest first, then read the latest log |

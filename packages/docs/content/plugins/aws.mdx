@@ -1,0 +1,40 @@
+---
+title: AWS plugin
+---
+
+# AWS plugin
+
+The built-in `aws` plugin wraps the aws CLI (it must be on PATH). It starts with a shared **exchange bucket** for passing files between people, and it provides the agent's read-only AWS tools.
+
+## Exchange bucket
+
+```bash
+pf s3 --setup              # wizard: asks for bucket, profile, folder and region (prefilled with what is saved)
+pf s3 --setup --bucket my-exchange [--profile exchange] [--prefix shared] [--region eu-west-1]   # no questions
+pf s3 report.pdf            # upload to s3://my-exchange/shared/report.pdf (profile "exchange")
+pf s3 a.zip b.zip           # several files; --as <name> renames a single one
+pf dl                       # pick a file (newest first, arrows + enter) and download it to the current dir
+pf dl report.pdf            # download by name (exact, case-insensitive, or a unique part of the name)
+pf dl --list                # print the listing (also what you get when piped); -o <dir>, --force
+```
+
+`pf up` is a shortcut for `pf s3`.
+
+Settings live in `plugins.aws.exchange` of `~/.pf/config.json`. These variables override them:
+
+| Variable | Setting |
+|----------|---------|
+| `PF_EXCHANGE_BUCKET` | bucket |
+| `PF_EXCHANGE_PROFILE` | AWS profile (default `exchange`) |
+| `PF_EXCHANGE_PREFIX` | folder inside the bucket |
+| `PF_EXCHANGE_REGION` | region |
+
+pf never reads credentials: the aws CLI resolves them from the profile. All commands support `--dry-run`, and `pf dl` is also in the menu.
+
+## Agent access
+
+`pf aws grants` lists the AWS access the agent was granted, and `pf aws revoke` ends it. The rules for scopes, redaction and approval are in [AWS access for the agent](/agent/aws-access).
+
+## Adding an AWS shortcut
+
+Put a command in `packages/plugin-aws/src/commands/` and list it in `packages/plugin-aws/src/index.ts`. Never add an operation that returns secrets, file contents or user data.

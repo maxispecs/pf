@@ -45,6 +45,9 @@ test('docs: root script, docs package, framework, static generators', () => {
   const pkg = detectDocs(buildContext(mkRepo({ '.git/HEAD': '', 'package.json': '{}', 'apps/docs/package.json': json({ dependencies: { nextra: '4' }, scripts: { dev: 'next dev' } }) })));
   assert.equal(pkg[0]!.source, 'apps/docs (nextra)');
   assert.ok(pkg[0]!.cmd.cwd!.endsWith('apps/docs'));
+  const mono = detectDocs(buildContext(mkRepo({ '.git/HEAD': '', 'package.json': '{}', 'packages/docs/package.json': json({ dependencies: { nextra: '4' }, scripts: { dev: 'next dev --port 4400' } }) })));
+  assert.equal(mono[0]!.source, 'packages/docs (nextra)');
+  assert.ok(mono[0]!.cmd.cwd!.endsWith('packages/docs'));
   assert.deepEqual(lines(detectDocs(buildContext(mkRepo({ '.git/HEAD': '', 'mkdocs.yml': 'site_name: x\n' })))), ['mkdocs serve']);
   assert.deepEqual(lines(detectDocs(buildContext(mkRepo({ '.git/HEAD': '', 'docs/.vitepress/config.ts': '' })))), ['npx vitepress dev docs']);
   assert.deepEqual(lines(detectDocs(buildContext(mkRepo({ '.git/HEAD': '', 'book.toml': '' })))), ['mdbook serve']);

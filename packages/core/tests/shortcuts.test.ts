@@ -67,6 +67,16 @@ test('pf r runs the repo dev command', () => {
   assert.match(r.err, /pnpm run dev/);
 });
 
+test('pf docs is pf doc: it previews the docs site start with --dry-run', () => {
+  const dir = mkRepo({ '.git/HEAD': '', 'package.json': json({ scripts: { 'docs:dev': 'x' } }), 'pnpm-lock.yaml': '' });
+  const docs = pf(dir, 'docs', '--dry-run');
+  assert.equal(docs.code, 0);
+  assert.match(docs.err, /pnpm run docs:dev/);
+  assert.equal(pf(dir, 'doc', '--dry-run').code, 0);
+  const none = mkRepo({ '.git/HEAD': '', 'package.json': json({ scripts: {} }) });
+  assert.equal(pf(none, 'docs', '--dry-run').code, 1);
+});
+
 test('pf ps previews the repo publish:cellars script with --dry-run', () => {
   const dir = mkRepo({ '.git/HEAD': '', 'package.json': json({ scripts: { 'publish:cellars': 'x' } }), 'pnpm-lock.yaml': '' });
   const ps = pf(dir, 'ps', '--dry-run');

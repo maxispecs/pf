@@ -1,0 +1,56 @@
+---
+title: Skills
+---
+
+# Skills
+
+A skill is a folder with a `SKILL.md` that teaches an agent a task. `pf skill` lists them, and runs one.
+
+```bash
+pf skill                  # pick and run a skill
+pf skill ver              # run one by name
+pf skill --list           # list them
+pf skill ver --dry-run
+```
+
+## Where skills are found
+
+In this order. A skill in an earlier directory wins over a later one with the same name.
+
+1. `~/.cursor/skills`
+2. `~/.cursor/skills-cursor`
+3. `~/.agents/skills`
+4. `~/.claude/skills`
+5. the repo's `.cursor/skills`, `.agents/skills` and `.claude/skills`
+6. pf's own folder, `~/.pf/skills`
+7. the skills bundled with pf
+
+Skills in `~/.pf/skills` and the bundled ones run through `pf agent`, which reads them with the `pf_skill` tool, so they work with any agent CLI. `ver` and `pnpm` run their scripts directly. Others run through the agent CLI.
+
+## Skills from the registry
+
+The skills repo publishes each skill to cellars as `@pf-skills/<name>`, or `@pf-skills-<name>/<name>` when it has its own package.
+
+```bash
+pf skill available                  # registry skills, their versions and where they are installed
+pf skill install ver bp             # latest version into pf's own folder, ~/.pf/skills
+pf skill install --all --to claude  # every skill, into ~/.claude/skills instead
+pf skill update [name...]           # bring registry installs to the latest (--check only reports)
+pf skill remove ver                 # delete a registry install
+```
+
+`--to` takes `pf` (the default), `cursor`, `claude`, `agents` or `all` (comma-separated). Use an agent folder when that agent should see the skill outside `pf agent`.
+
+An install keeps the package's `package.json` in the skill folder, which marks it as a registry install. pf never replaces a symlink (a skills repo checkout) or a folder it did not install unless you pass `--force`. `pf update` also updates every registry install.
+
+A skill named `available`, `install`, `update`, `remove` or `run` runs as `pf skill run <name>`.
+
+## Stack skills (ver, pnpm)
+
+The `ver` and `pnpm` skills change often and pf runs their helper files itself (`pf ver`, `pf repo`, the agent's version tools). So `pf update`:
+
+- installs them into `~/.pf/skills` when missing, and updates them there (a symlinked checkout or a hand-made folder is left alone);
+- uses the newest of that copy and the one bundled in the pf package, which stays as the offline fallback;
+- inside a repo, refreshes the repo's own copies: `scripts/version.mjs` (when its revision is older; a newer one is kept) and `scripts/tasks.mjs` (only a copy that is already the pnpm helper).
+
+It never installs a helper into a repo (that is `pf repo`), never commits, and `--check` and `--dry-run` only report.

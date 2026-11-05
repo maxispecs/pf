@@ -1,0 +1,39 @@
+---
+title: Conventions
+---
+
+# Conventions
+
+## Code
+
+- TypeScript, ESM, strict. Node 18 or later.
+- **No third-party runtime dependencies** in the shipped packages. Colors, the picker and argument parsing are hand-written. Dev dependencies only (`typescript`, `tsx`, `@types/node`). The packages depend on each other through `workspace:*`.
+- Import kit by subpath, for example `@pulpfixer/kit/ui/text`.
+
+## Output
+
+- Every invocation prints a banner with the version to **stderr**, so stdout stays pipeable. Do not add output paths that skip it.
+- Colors follow `NO_COLOR` and `FORCE_COLOR`. Anything with a terminal-only mode (the menu, prompts) must fall back to static output without a TTY.
+- Use the helpers in `packages/kit/src/ui/text.ts` (`termLine`, `promptLine`, badges, headings, lists, tables) instead of hand-coloring messages.
+- Use `ask` from `packages/kit/src/ui/prompt.ts` for any input field. It returns null without a TTY or on cancel, so give commands flags too.
+
+## Safety
+
+- Never read, print or write a registry token. Only check that an auth line exists. `.npmrc` uses `${NPM_TOKEN}`. The one exception is host mode, which reads secrets with the instance role into a child process's environment only.
+- Host mode (`pf host fix`) gives the agent no shell or file tools. Anything that changes the host is a pf host tool, and the MCP server refuses it without `--apply`.
+- Commands that run something support `--dry-run`.
+- `pf deploy staging` auto-detects its target. `pf deploy production` runs only a `deploy:production` script or `pf.json` entry that the repo defines (never guessed from platform configs), always asks for confirmation, and needs `--yes` without a TTY. The agent and MCP tools deploy to staging only.
+- Never add an AWS operation that returns secrets, file contents or user data.
+
+## Command resolution
+
+The order is `pf.json` override, then scripts and targets the repo defines, then stack defaults. See [Command resolution](/concepts/command-resolution).
+
+## Tests
+
+```bash
+pnpm test          # every package's tests (node:test, run through tsx)
+pnpm typecheck
+```
+
+Add a test with each new command, stack or shortcut. Tests that run pf use a temporary `PF_HOME` and set `PF_NO_UPDATE_CHECK=1`.
