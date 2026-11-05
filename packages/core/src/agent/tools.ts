@@ -7,34 +7,17 @@ import { detectStaging } from '@pulpfixer/kit/detect/deploy';
 import { candidates } from '@pulpfixer/kit/detect/resolve';
 import { TASKS, type Task } from '@pulpfixer/kit/detect/stacks';
 import { captureAsync, formatCmd, withArgs, type Cmd } from '@pulpfixer/kit/exec';
+import { objectSchema, type Tool, type ToolResult } from '@pulpfixer/kit/agent-tool';
 import { discoverSkills, type Skill } from '../skills/discover.js';
 
-export interface ToolResult {
-  ok: boolean;
-  text: string;
-}
-
-export interface Tool {
-  name: string;
-  description: string;
-  /** JSON Schema of the arguments. */
-  inputSchema: Record<string, unknown>;
-  /** Changes nothing, so agent CLIs may run it without asking. */
-  readOnly: boolean;
-  run(ctx: Context, input: Record<string, unknown>): Promise<ToolResult>;
-}
+export type { Tool, ToolResult, ToolSession } from '@pulpfixer/kit/agent-tool';
 
 /** Tasks the agent can run. `dev` keeps running, so it is listed but never run. */
 export const RUNNABLE_TASKS: Task[] = ['build', 'test', 'lint', 'install'];
 
 const STEP_TIMEOUT = 30 * 60_000;
 
-const obj = (properties: Record<string, unknown> = {}, required: string[] = []) => ({
-  type: 'object',
-  properties,
-  ...(required.length ? { required } : {}),
-  additionalProperties: false,
-});
+const obj = objectSchema;
 
 const fail = (text: string): ToolResult => ({ ok: false, text });
 

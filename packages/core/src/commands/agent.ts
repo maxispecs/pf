@@ -10,14 +10,15 @@ export const agentCommand: Command = {
   name: 'agent',
   summary: 'Open the coding agent (Claude Code, Codex or Cursor)',
   group: 'Agent',
-  usage: 'pf agent [prompt...] [--agent claude|codex|cursor] [--dry-run]',
+  usage: 'pf agent [prompt...] [--agent claude|codex|cursor] [--profile <name>] [--dry-run]',
   async run(ctx, args) {
     const [before, after] = splitDashes([...args]);
     const dryRun = takeFlag(before, '--dry-run', '-n');
     if (before[0] === 'use') return useAgent(before.slice(1), dryRun);
     const agent = takeOption(before, '--agent');
+    const profile = takeOption(before, '--profile');
     const prompt = [...before, ...after].join(' ').trim();
-    return startAgent(ctx, { prompt, ...(agent !== undefined ? { agent } : {}), dryRun });
+    return startAgent(ctx, { prompt, ...(agent !== undefined ? { agent } : {}), ...(profile ? { profile } : {}), dryRun });
   },
 };
 

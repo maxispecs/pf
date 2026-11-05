@@ -1,11 +1,11 @@
 # pulpfixer monorepo
 
-`pf` is a developer CLI for any repo, in any language. This repo is a pnpm workspace; the user-facing docs live in [packages/core/README.md](packages/core/README.md).
+`pf` is a developer CLI for any repo, in any language. This repo is a pnpm workspace; the user-facing docs live in [packages/core/README.md](packages/core/README.md). The agent (tools, project profiles, scoped AWS access, writing agent tools in a plugin) is documented in [packages/core/docs/agent.md](packages/core/docs/agent.md).
 
 | Package | Name | What |
 |---------|------|------|
 | `packages/kit` | `@pulpfixer/kit` | shared foundation: repo/stack detection, exec, ui, config, `Command`/`Plugin` types |
-| `packages/plugin-aws` | `@pulpfixer/plugin-aws` | AWS plugin (`pf s3`, `pf dl`) |
+| `packages/plugin-aws` | `@pulpfixer/plugin-aws` | AWS plugin (`pf s3`, `pf dl`, `pf aws`, the agent's `pf_aws_*` tools) |
 | `packages/plugin-yubikey` | `@pulpfixer/plugin-yubikey` | YubiKey plugin (`pf otp`, `pf yk`) |
 | `packages/core` | `pulpfixer` | the `pf` binary: dispatch, built-in commands, agent, host mode, skills |
 

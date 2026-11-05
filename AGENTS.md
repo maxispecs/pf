@@ -45,7 +45,10 @@ New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json 
 | `core/src/agent/` | coding agent: persona, tool registry, MCP server, launchers for claude, codex and cursor |
 | `core/src/host/` | host mode (`pf host`): host config, IMDS identity and secrets via the aws CLI, SSM send-command, OS security patching, host MCP tools, the headless fix agent and its audit log |
 | `kit/src/plugin.ts`, `plugin-settings.ts`, `core/src/plugins/index.ts` | plugin API, saved plugin settings, and the registry of built-in plugins |
-| `plugin-aws/src/` | AWS plugin (exchange bucket: `pf s3`, `pf dl`); add AWS shortcuts under `commands/` |
+| `plugin-aws/src/` | AWS plugin (exchange bucket: `pf s3`, `pf dl`); add AWS shortcuts under `commands/`. Agent AWS access: `access.ts` (scopes -> allowed operations, `DENIED`, param checks, redaction; a new read operation is one line there), `grants.ts` (session grants in `~/.pf/agent/grants.json`), `agent-tools.ts` (`pf_aws_*`), `commands/aws.ts` (`pf aws grants|revoke`). Never add an operation that returns secrets, file contents or user data |
+| `kit/src/profiles.ts`, `core/src/commands/profile.ts` | project profiles: `~/.pf/config.json` `profiles` (AWS profile, pinned account, agent caps) and `pf.json` `profile` / `agent.aws` (may only narrow); resolution `--profile`, `PF_PROFILE`, `pf.json`, `defaultProfile` |
+| `core/docs/agent.md` | the agent guide (usage, profiles, AWS access, plugin tools, security model); update it with any change to agent tools, profiles or the MCP server |
+| `kit/src/agent-tool.ts`, `core/src/agent/mcp.ts` | agent tool types (plugins add tools with `Plugin.tools`) and the MCP server; a tool with `asksUser` asks through MCP elicitation (`ToolSession.elicit`), so Claude may run it unasked (`pf mcp --require-elicitation` refuses approvals without a dialog). Sessions log to `~/.pf/agent/audit/` |
 | `core/src/skills/` | skill discovery and runner (direct scripts, else an agent CLI) |
 | `core/assets/skills/` | skills that ship with pf (a same-named user or repo skill wins) |
 | `core/src/install/`, `core/src/update/` | machine setup helpers, update check |

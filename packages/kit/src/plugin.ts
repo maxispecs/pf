@@ -1,3 +1,4 @@
+import type { Tool } from './agent-tool.js';
 import type { Command, Entry } from './types.js';
 import type { Context } from './context.js';
 
@@ -18,4 +19,6 @@ export interface Plugin {
   commands: Command[];
   /** Entries this plugin adds to the `pf` menu and `pf list`. */
   entries?(ctx: Context): Entry[];
+  /** Tools this plugin serves to agent CLIs through `pf mcp`. A built-in tool of the same name wins. */
+  tools?(ctx: Context): Tool[];
 }

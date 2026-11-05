@@ -33,6 +33,7 @@ export function validatePlugin(value: unknown): Plugin | string {
   for (const c of p.commands) {
     if (!c || typeof c.name !== 'string' || typeof c.run !== 'function') return 'a command is missing its name or run()';
   }
+  if (p.tools !== undefined && typeof p.tools !== 'function') return 'tools must be a function returning the tool list';
   if (p.api !== undefined && (typeof p.api !== 'number' || p.api > PLUGIN_API)) return `it needs plugin API ${String(p.api)}, this pf has ${PLUGIN_API}: run pf update`;
   return p as Plugin;
 }

@@ -4,7 +4,10 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { buildLaunch, withPulpfixerServer } from '../src/agent/adapters.js';
 import { agentInfo, resolveAgent, saveAgent, type AgentId } from '../src/agent/agents.js';
-import { handle } from '../src/agent/mcp.js';
+import { PassThrough } from 'node:stream';
+import readline from 'node:readline';
+import { canElicitForm, handle, serve } from '../src/agent/mcp.js';
+import { agentTools } from '../src/plugins/index.js';
 import { buildPersona } from '../src/agent/persona.js';
 import { buildContext } from '@pulpfixer/kit/context';
 import { userConfigPath } from '@pulpfixer/kit/config';
@@ -80,6 +83,113 @@ test('launch argv: claude gets a system prompt, codex and cursor get the persona
   assert.equal(cursorArgv.at(-1), 'PERSONA');
 });
 
+test('launch: claude may run read-only and self-asking tools unasked, and its server requires elicitation', () => {
+  const ctx = buildContext(mkRepo({ '.git/HEAD': '' }));
+  const launch = buildLaunch(claude, { persona: 'P', prompt: '', cwd: '/repo', tools: agentTools(ctx), profile: 'acme', mcpConfigPath: '/tmp/pf-mcp.json' });
+  for (const name of ['pf_aws_profile', 'pf_aws_request_access', 'pf_aws_whoami', 'pf_aws_describe', 'pf_commands']) {
+    assert.ok(launch.argv.includes(`mcp__pulpfixer__${name}`), name);
+  }
+  assert.ok(!launch.argv.includes('mcp__pulpfixer__pf_run'));
+  const args = (JSON.parse(launch.files[0]!.contents) as { mcpServers: { pulpfixer: { args: string[] } } }).mcpServers.pulpfixer.args;
+  assert.ok(args.includes('--require-elicitation'));
+  assert.deepEqual(args.slice(args.indexOf('--profile'), args.indexOf('--profile') + 2), ['--profile', 'acme']);
+  const codexArgv = buildLaunch(codex, { persona: 'P', prompt: '', cwd: '/repo' }).argv.join(' ');
+  assert.doesNotMatch(codexArgv, /require-elicitation/, 'other CLIs keep their own tool prompt as the approval');
+});
+
+test('elicitation capability: empty object or form mode', () => {
+  assert.equal(canElicitForm({ elicitation: {} }), true);
+  assert.equal(canElicitForm({ elicitation: { form: {}, url: {} } }), true);
+  assert.equal(canElicitForm({ elicitation: { url: {} } }), false);
+  assert.equal(canElicitForm({ roots: {} }), false);
+});
+
+/** Drive `serve` over in-memory stdio: send messages, wait for matching ones. */
+function mcpPipe() {
+  const input = new PassThrough();
+  const output = new PassThrough();
+  const seen: Record<string, unknown>[] = [];
+  const waiters: { match: (m: Record<string, unknown>) => boolean; resolve: (m: Record<string, unknown>) => void }[] = [];
+  readline.createInterface({ input: output }).on('line', (line) => {
+    const msg = JSON.parse(line) as Record<string, unknown>;
+    const i = waiters.findIndex((w) => w.match(msg));
+    if (i >= 0) waiters.splice(i, 1)[0]!.resolve(msg);
+    else seen.push(msg);
+  });
+  return {
+    input,
+    output,
+    send: (m: Record<string, unknown>) => input.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\n'),
+    next: (match: (m: Record<string, unknown>) => boolean) =>
+      new Promise<Record<string, unknown>>((resolve) => {
+        const i = seen.findIndex(match);
+        if (i >= 0) resolve(seen.splice(i, 1)[0]!);
+        else waiters.push({ match, resolve });
+      }),
+  };
+}
+
+test('mcp serve: a grant request asks the user through elicitation and is audited', async () => {
+  const prev = { home: process.env.PF_HOME, profile: process.env.PF_PROFILE };
+  const home = mkRepo({ 'config.json': json({ profiles: { acme: { aws: { profile: 'acme-ro', region: 'eu-west-1' } } } }) });
+  process.env.PF_HOME = home;
+  delete process.env.PF_PROFILE;
+  try {
+    const ctx = buildContext(mkRepo({ '.git/HEAD': '', 'pf.json': json({ profile: 'acme' }) }));
+    const auditDir = path.join(home, 'audit');
+    const pipe = mcpPipe();
+    const done = serve(ctx, pipe.input, pipe.output, agentTools(ctx), { requireElicitation: true, auditDir });
+
+    pipe.send({ id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: { elicitation: {} } } });
+    await pipe.next((m) => m.id === 1);
+    pipe.send({ id: 2, method: 'tools/call', params: { name: 'pf_aws_request_access', arguments: { scopes: ['ec2'], reason: 'disk full on web-1' } } });
+    const ask = await pipe.next((m) => m.method === 'elicitation/create');
+    const params = ask.params as { message: string; requestedSchema: { properties: Record<string, unknown> } };
+    assert.match(params.message, /Reason: disk full on web-1/);
+    assert.ok(params.requestedSchema.properties.approve);
+    pipe.send({ id: ask.id, result: { action: 'accept', content: { approve: true } } });
+    const granted = (await pipe.next((m) => m.id === 2)).result as { isError: boolean; content: { text: string }[] };
+    assert.equal(granted.isError, false, granted.content[0]!.text);
+    assert.match(granted.content[0]!.text, /Granted/);
+
+    pipe.send({ id: 3, method: 'tools/call', params: { name: 'pf_aws_request_access', arguments: { scopes: ['ec2'], reason: 'again' } } });
+    const again = await pipe.next((m) => m.method === 'elicitation/create');
+    pipe.send({ id: again.id, result: { action: 'decline' } });
+    const declined = (await pipe.next((m) => m.id === 3)).result as { isError: boolean };
+    assert.equal(declined.isError, true);
+
+    pipe.input.end();
+    assert.equal(await done, 0);
+    const [file] = fs.readdirSync(auditDir);
+    const log = fs.readFileSync(path.join(auditDir, file!), 'utf8');
+    assert.match(log, /"kind":"agent"/);
+    assert.match(log, /"event":"aws-request"/);
+    assert.match(log, /"approved":true/);
+    assert.match(log, /"approved":false/);
+  } finally {
+    for (const [k, v] of [['PF_HOME', prev.home], ['PF_PROFILE', prev.profile]] as const) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+});
+
+test('mcp: without an elicitation-capable client a required approval is refused', async () => {
+  const prev = process.env.PF_HOME;
+  process.env.PF_HOME = mkRepo({ 'config.json': json({ profiles: { acme: { aws: { profile: 'acme-ro' } } }, defaultProfile: 'acme' }) });
+  try {
+    const ctx = buildContext(mkRepo({ '.git/HEAD': '' }));
+    const r = await handle(ctx, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'pf_aws_request_access', arguments: { scopes: ['ec2'], reason: 'r' } } }, agentTools(ctx));
+    assert.ok(r && 'result' in r);
+    const body = r.result as { isError: boolean; content: { text: string }[] };
+    assert.equal(body.isError, true);
+    assert.match(body.content[0]!.text, /could not ask the user/);
+  } finally {
+    if (prev === undefined) delete process.env.PF_HOME;
+    else process.env.PF_HOME = prev;
+  }
+});
+
 test('cursor mcp config keeps the other servers', () => {
   const merged = withPulpfixerServer({ mcpServers: { docs: { command: 'docs' } }, extra: true }, ['node', 'pf.js', 'mcp']);
   const servers = merged.mcpServers as Record<string, { command: string }>;
@@ -102,6 +212,8 @@ test('the persona names the resolved commands and the safety rules', () => {
   assert.match(persona, /Never edit versions in manifests/);
   assert.match(persona, /fix-failing/);
   assert.match(persona, /pf_skill/);
+  assert.match(persona, /pf_aws_request_access/);
+  assert.match(persona, /never the aws CLI in a shell/);
 });
 
 test('mcp: initialize, tools/list, an unknown tool, and a deploy that only plans', async () => {

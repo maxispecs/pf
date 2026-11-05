@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { which } from '@pulpfixer/kit/util';
 
 /** Which AWS account and region to talk to. */
@@ -31,7 +31,57 @@ export function listArgv(bucket: string, prefix: string, t: AwsTarget): string[]
   ];
 }
 
+/** `aws sts get-caller-identity` as JSON. */
+export function whoamiArgv(t: AwsTarget): string[] {
+  return ['aws', 'sts', 'get-caller-identity', '--output', 'json', ...awsGlobalArgs(t)];
+}
+
+/** One read call: `aws <service> <operation> <params> --output json --profile p --region r`. */
+export function callArgv(service: string, operation: string, params: string[], t: AwsTarget): string[] {
+  return ['aws', service, operation, ...params, '--output', 'json', ...awsGlobalArgs(t)];
+}
+
 export const hasAws = (): boolean => which('aws') !== null;
+
+export interface AwsJsonResult {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+  /** stdout went past the limit and was cut. */
+  truncated: boolean;
+  timedOut: boolean;
+}
+
+/** Run an aws command without blocking (the MCP server keeps answering), stdout and stderr apart. Never prompts. */
+export function awsRun(argv: string[], opts: { timeout?: number; maxBytes?: number } = {}): Promise<AwsJsonResult> {
+  const max = opts.maxBytes ?? 4 * 1024 * 1024;
+  return new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let truncated = false;
+    let timedOut = false;
+    const child = spawn(argv[0]!, argv.slice(1), { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, AWS_PAGER: '' } });
+    child.stdout.on('data', (c: Buffer) => {
+      if (stdout.length < max) stdout += c.toString('utf8');
+      else truncated = true;
+    });
+    child.stderr.on('data', (c: Buffer) => {
+      if (stderr.length < 20_000) stderr += c.toString('utf8');
+    });
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+    }, opts.timeout ?? 60_000);
+    child.on('error', (e: NodeJS.ErrnoException) => {
+      clearTimeout(timer);
+      resolve({ ok: false, stdout, stderr: e.code === 'ENOENT' ? 'aws CLI not found on PATH' : e.message, truncated, timedOut });
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve({ ok: code === 0 && !timedOut, stdout, stderr: stderr.trim(), truncated, timedOut });
+    });
+  });
+}
 
 export type AwsResult = { ok: true; stdout: string } | { ok: false; error: string };
 

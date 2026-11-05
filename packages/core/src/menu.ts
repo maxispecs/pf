@@ -13,6 +13,7 @@ import { localCliFor, toolsCommand } from './commands/tools.js';
 import { GROUPS, type Entry } from '@pulpfixer/kit/types';
 import { updateCommand } from './commands/update.js';
 import { pluginCommand } from './commands/plugin.js';
+import { profileCommand } from './commands/profile.js';
 import { repoCommand } from './commands/repo.js';
 import { verCommand } from './commands/ver.js';
 import type { Context } from '@pulpfixer/kit/context';
@@ -29,6 +30,7 @@ import { pick } from '@pulpfixer/kit/ui/picker';
 import { h2, termLine } from '@pulpfixer/kit/ui/text';
 import { pluginEntries } from './plugins/index.js';
 import { interactive } from '@pulpfixer/kit/util';
+import { resolveProfile } from '@pulpfixer/kit/profiles';
 
 const BUILTIN_NAMES = new Set(['dev', 'build', 'test', 'lint', 'install', 'doc', 'docs', 'deploy:staging']);
 
@@ -42,6 +44,12 @@ function agentEntry(ctx: Context): Entry {
     detail: ready ? `${choice.agent!.label}${choice.source === 'detected' ? ' (auto)' : ''}` : 'not set up',
     run: () => agentCommand.run(ctx, []),
   };
+}
+
+function profileDetail(ctx: Context): string {
+  const p = resolveProfile(ctx);
+  if (!p) return Object.keys(ctx.user.profiles ?? {}).length ? 'none here' : 'not set up';
+  return p.config ? `${p.name} (${p.source})` : `${p.name} (not configured)`;
 }
 
 /** Run a custom command from pf.json. */
@@ -116,6 +124,7 @@ export function entriesFor(ctx: Context): Entry[] {
     entries.push(tool(skillCommand, 'Tools'));
     entries.push(tool(pluginCommand, 'Tools'));
     entries.push(tool(repoCommand, 'Tools'));
+    entries.push(tool(profileCommand, 'Tools', profileDetail(ctx)));
     if (!ctx.repo.hasConfig) entries.push(tool(initCommand, 'Tools'));
     entries.push(tool(doctorCommand, 'Tools'));
     entries.push(tool(updateCommand, 'Tools'));
@@ -124,6 +133,7 @@ export function entriesFor(ctx: Context): Entry[] {
     entries.push(agentEntry(ctx));
     entries.push({ ...tool(skillCommand, 'Tools'), name: 'skill', summary: 'Run a skill' });
     entries.push(tool(pluginCommand, 'Tools'));
+    entries.push(tool(profileCommand, 'Tools', profileDetail(ctx)));
     entries.push(tool(doctorCommand, 'Tools'));
     entries.push(tool(setupCommand, 'Tools'));
     entries.push(tool(updateCommand, 'Tools'));

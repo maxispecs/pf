@@ -13,11 +13,14 @@ import { buildLaunch, cursorMcpPath, cursorMcpRegistered, writeCursorMcp } from 
 import { agentInfo, installedAgents, resolveAgent, saveAgent, type AgentChoice, type AgentInfo } from './agents.js';
 import { buildPersona } from './persona.js';
 import { loadAgentSkills } from './tools.js';
+import { agentTools } from '../plugins/index.js';
 
 export interface StartOptions {
   prompt?: string;
   /** `--agent` value. */
   agent?: string;
+  /** `--profile` value: the pf profile the agent's tools use. */
+  profile?: string;
   dryRun?: boolean;
 }
 
@@ -91,6 +94,10 @@ async function ensureCursorMcp(dryRun: boolean): Promise<void> {
 /** Launch the chosen agent CLI with the pf persona, tools and skills. */
 export async function startAgent(ctx: Context, opts: StartOptions = {}): Promise<number> {
   const c = err();
+  if (opts.profile && !ctx.user.profiles?.[opts.profile]) {
+    process.stderr.write(`${badgeLabel('error', c)} no profile named "${opts.profile}". Add it with ${termLine(`pf profile add ${opts.profile}`, c)} or list them with ${termLine('pf profile', c)}.\n`);
+    return 2;
+  }
   const choice = await resolveForLaunch(ctx, opts);
   if (!choice) return 130;
   if (!choice.agent || choice.unknown || choice.missing) {
@@ -102,7 +109,13 @@ export async function startAgent(ctx: Context, opts: StartOptions = {}): Promise
   }
   if (choice.agent.id === 'cursor') await ensureCursorMcp(Boolean(opts.dryRun));
   const persona = buildPersona(ctx, loadAgentSkills(ctx));
-  const launch = buildLaunch(choice.agent, { persona, prompt: opts.prompt ?? '', cwd: ctx.workdir });
+  const launch = buildLaunch(choice.agent, {
+    persona,
+    prompt: opts.prompt ?? '',
+    cwd: ctx.workdir,
+    tools: agentTools(ctx),
+    ...(opts.profile ? { profile: opts.profile } : {}),
+  });
   if (opts.dryRun) process.stderr.write(`${c.bold('persona')}\n${persona}\n`);
   else if (!writeLaunchFiles(launch.files)) return 1;
   return runCmd({ argv: launch.argv, cwd: ctx.workdir }, { dryRun: opts.dryRun, base: ctx.workdir });

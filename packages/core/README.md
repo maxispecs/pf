@@ -35,7 +35,9 @@ scripts/install.sh --dry-run      # show what would happen
 | Command | What it does |
 |---------|--------------|
 | `pf` | Menu: this repo's commands, or the fallback menu outside a repo. Includes the agent |
-| `pf agent [prompt]` | Open the coding agent (Claude Code, Codex or Cursor) with pf's tools and skills. `--agent`, `--dry-run`. `pf agent use [id]` sets the default |
+| `pf agent [prompt]` | Open the coding agent (Claude Code, Codex or Cursor) with pf's tools and skills. `--agent`, `--profile`, `--dry-run`. `pf agent use [id]` sets the default |
+| `pf profile [list\|show\|use\|add\|remove\|check]` | Project profiles: which AWS account a repo uses and what the agent may read there. See [Profiles](#profiles-and-aws-access-for-the-agent) |
+| `pf aws [grants\|revoke]` | AWS access the agent was granted: list it, end it |
 | `pf list` | The same list, static (for scripts and agents) |
 | `pf dev`, `build`, `test`, `lint`, `install` | Resolved per repo, see below. `--dry-run` prints, `--pick` chooses when several exist, `-- <args>` passes args on |
 | `pf ver [list\|bump\|init\|sync]` | Major.minor versioning with the bundled `/ver` CLI |
@@ -97,9 +99,31 @@ The `ver` and `pnpm` skills change often and pf runs their helper files itself (
 
 ### Agent
 
+The full guide, with examples of usage and of writing agent tools, is [docs/agent.md](docs/agent.md).
+
 `pf agent` (also the Agent entry in the `pf` menu) starts Claude Code, Codex or Cursor with a system prompt built from this repo, the pf tools (`pf mcp`) and the skills above. The agent CLI is chosen with `--agent`, `PF_AGENT`, or `"agent"` in `~/.pf/config.json` (`claude`, `codex` or `cursor`; `claude-code` and `cursor-agent` are accepted too). Otherwise the first installed CLI is used, and a terminal asks the first time more than one is installed. `pf agent use cursor` also registers the pf MCP server in `~/.cursor/mcp.json`.
 
 The tools can list and run this repo's commands, bump versions and deploy to staging. A staging deploy returns the plan until the call passes `confirm`, and the agent CLI asks before running it. Production is never targeted.
+
+### Profiles and AWS access for the agent
+
+A profile names the AWS account a project uses and caps what the agent may read there. Profiles live in `~/.pf/config.json` (nothing secret, only names):
+
+```bash
+pf profile add acme --aws-profile acme-readonly --account 123456789012 --region eu-west-1 --scopes identity,ec2,ecs,logs
+pf profile use acme        # default everywhere, or name it per repo in pf.json
+pf profile check           # sts get-caller-identity, compared with the pinned account
+```
+
+A repo picks its profile in `pf.json` and may narrow it, never widen it (a cloned repo is not trusted):
+
+```json
+{ "profile": "acme", "agent": { "aws": { "scopes": ["identity", "ecs"] } } }
+```
+
+The profile is the first of `--profile`, `PF_PROFILE`, `pf.json` `profile` and the default. Without `--scopes` a profile allows every scope except `logs` (log text can hold secrets), for at most 60 minutes per grant (`--max-ttl`, up to 480).
+
+The agent never gets credentials. It calls `pf_aws_profile`, then `pf_aws_request_access` with scopes and a reason, and pf asks you in a dialog inside the agent CLI (MCP elicitation) showing the profile, account, scopes, regions and time. After you approve, `pf_aws_whoami` and `pf_aws_describe` run read-only calls (`describe-*`, `list-*` and a few `get-*` per scope; never secret values, file contents or user data) with the profile, after checking the pinned account. Secret-looking values are redacted. A grant belongs to one agent session and ends when it expires, when the session ends, or with `pf aws revoke`. `pf aws grants` lists them, and every request, decision and call is logged in `~/.pf/agent/audit/`. Claude Code runs these tools unasked because pf asks you itself. If a CLI cannot show the dialog, Claude sessions refuse the grant, and Codex and Cursor fall back to their own tool prompt. Use a read-only IAM role (`ViewOnlyAccess`) for the AWS profile as well: pf's scopes are a second layer.
 
 ## Plugins
 
@@ -116,7 +140,7 @@ pf plugin remove jira
 
 Installed plugins live in an npm prefix at `~/.pf/plugins`; its `package.json` `dependencies` are the list pf remembers, so a plugin stays installed across `pf update`, which updates them along with pf and the registry skills. Only the `@pf-plugins` scope installs, because a plugin runs inside pf with your rights. A plugin can add commands but never replaces a built-in one, and one that throws on load is skipped with a note in `pf plugin list`. `PF_NO_PLUGINS=1` skips loading them (to debug).
 
-**Writing a plugin:** a package named `@pf-plugins/<name>` whose entry point default-exports a `Plugin` (`@pulpfixer/kit/plugin`: `name`, `summary`, `commands`, optional `entries(ctx)` and `api`). Depend on `@pulpfixer/kit` for the types and helpers. Publish it to cellars; `pf plugin install <name>` does the rest.
+**Writing a plugin:** a package named `@pf-plugins/<name>` whose entry point default-exports a `Plugin` (`@pulpfixer/kit/plugin`: `name`, `summary`, `commands`, optional `entries(ctx)`, `tools(ctx)` (agent tools served by `pf mcp`, `@pulpfixer/kit/agent-tool`) and `api`). Depend on `@pulpfixer/kit` for the types and helpers. Publish it to cellars; `pf plugin install <name>` does the rest.
 
 ## AWS plugin
 

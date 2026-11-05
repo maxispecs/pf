@@ -89,18 +89,7 @@ export function newAuditHeader(opts: { task: string; apply: boolean; identity: I
   };
 }
 
-/** Open the run's log in the audit dir (root-only). Null when it cannot be written. */
-export function openAudit(dir: string, header: AuditHeader): { file: string; fd: number } | null {
-  try {
-    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-    const file = path.join(dir, `${header.startedAt.replace(/[:.]/g, '-')}-${header.id}.log`);
-    const fd = fs.openSync(file, 'a', 0o600);
-    fs.writeSync(fd, JSON.stringify(header) + '\n');
-    return { file, fd };
-  } catch {
-    return null;
-  }
-}
+export { openAudit } from '../audit.js';
 
 /** Run the agent, copying its output to the terminal and the audit log. Resolves with the exit code. */
 export function runAudited(argv: string[], env: NodeJS.ProcessEnv, audit: { fd: number } | null): Promise<number> {

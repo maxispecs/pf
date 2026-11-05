@@ -18,6 +18,7 @@ export function buildPersona(ctx: Context, skills: Skill[] = loadAgentSkills(ctx
     '- After changing a module, bump its version with pf_bump (minor for a normal change, major only for a breaking change). Bumping a module also bumps the stack minor. Never edit versions in manifests by hand.',
     '- Deploys go to staging only, never production. pf_deploy_staging without confirm returns the plan. Show that plan to the user and pass confirm: true only after they agree.',
     '- Never read, print or write a registry token or other secret. An .npmrc auth line uses ${NPM_TOKEN}; leave it alone.',
+    '- For AWS troubleshooting use the pf_aws_* tools, never the aws CLI in a shell and never ask for credentials. Call pf_aws_profile first, then pf_aws_request_access with the fewest scopes the task needs and a clear reason; the user approves it in a dialog. Then read with pf_aws_whoami and pf_aws_describe. If the user declines, do not ask again unless they tell you to.',
     '- When a task matches a skill below, call pf_skill with its name and follow the instructions it returns.',
     '',
     'Skills:',

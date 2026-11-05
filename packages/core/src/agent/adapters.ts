@@ -5,7 +5,7 @@ import { pfHome } from '@pulpfixer/kit/constants';
 import { readJson } from '@pulpfixer/kit/util';
 import type { AgentInfo } from './agents.js';
 import { SERVER_NAME } from './mcp.js';
-import { TOOLS } from './tools.js';
+import { TOOLS, type Tool } from './tools.js';
 
 export interface LaunchFile {
   path: string;
@@ -27,12 +27,25 @@ export interface LaunchInput {
   serverArgv?: string[];
   /** Claude reads the MCP server from here. */
   mcpConfigPath?: string;
+  /** Tools the server will serve, to pick the ones Claude may run unasked. Defaults to the built-in tools. */
+  tools?: Tool[];
+  /** pf profile the server uses (`pf agent --profile`). */
+  profile?: string;
+}
+
+export interface McpServerOptions {
+  /** pf profile for this session. */
+  profile?: string;
+  /** Refuse approvals the client cannot show as an elicitation (set when approval tools run unasked). */
+  requireElicitation?: boolean;
 }
 
 /** argv that serves pf tools: this executable, plus `mcp`, plus the repo when one is known. */
-export function mcpServerArgv(cwd?: string): string[] {
+export function mcpServerArgv(cwd?: string, opts: McpServerOptions = {}): string[] {
   const argv = [process.execPath, ...process.execArgv, process.argv[1] ?? '', 'mcp'];
   if (cwd) argv.push('--cwd', cwd);
+  if (opts.profile) argv.push('--profile', opts.profile);
+  if (opts.requireElicitation) argv.push('--require-elicitation');
   return argv;
 }
 
@@ -45,9 +58,13 @@ function mcpJson(serverArgv: string[]): string {
   return JSON.stringify({ mcpServers: { [SERVER_NAME]: { command, args } } }, null, 2) + '\n';
 }
 
-/** Read-only pf tools an agent CLI may run without asking. Writes and deploys stay behind its own prompt. */
-function claudeAllowedTools(): string[] {
-  return TOOLS.filter((t) => t.readOnly).map((t) => `mcp__${SERVER_NAME}__${t.name}`);
+/**
+ * pf tools Claude may run without asking: read-only ones, and the ones that ask the user themselves
+ * through an elicitation (the server is started with --require-elicitation, so they never fall back
+ * to an approval Claude did not show). Writes and deploys stay behind Claude's own prompt.
+ */
+function claudeAllowedTools(tools: Tool[]): string[] {
+  return tools.filter((t) => t.readOnly || t.asksUser).map((t) => `mcp__${SERVER_NAME}__${t.name}`);
 }
 
 /**
@@ -59,7 +76,8 @@ function claudeAllowedTools(): string[] {
  * and the MCP server is registered separately in ~/.cursor/mcp.json.
  */
 export function buildLaunch(agent: AgentInfo, input: LaunchInput): Launch {
-  const serverArgv = input.serverArgv ?? mcpServerArgv(input.cwd);
+  const profile = input.profile ? { profile: input.profile } : {};
+  const serverArgv = input.serverArgv ?? mcpServerArgv(input.cwd, { ...profile, requireElicitation: agent.id === 'claude' });
   const prompt = input.prompt.trim();
   if (agent.id === 'claude') {
     const configPath = input.mcpConfigPath ?? claudeMcpConfigPath();
@@ -69,7 +87,7 @@ export function buildLaunch(agent: AgentInfo, input: LaunchInput): Launch {
       configPath,
       '--append-system-prompt',
       input.persona,
-      ...claudeAllowedTools().flatMap((t) => ['--allowedTools', t]),
+      ...claudeAllowedTools(input.tools ?? TOOLS).flatMap((t) => ['--allowedTools', t]),
     ];
     if (prompt) argv.push(prompt);
     return { argv, files: [{ path: configPath, contents: mcpJson(serverArgv) }] };
