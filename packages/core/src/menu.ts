@@ -169,20 +169,15 @@ function shortcutList(): { name: string; full: string }[] {
   return SHORTCUTS.flatMap((s) => s.names.map((name) => ({ name, full: `pf ${s.target.join(' ')}` })));
 }
 
-/** Shortcuts as dim lines wrapped to `cols`, for under the interactive menu. */
-export function shortcutTrailer(cols: number, c: Palette = out()): string[] {
-  const items = shortcutList().map((s) => ({ text: `${s.name} = ${s.full.replace(/^pf /, '')}` }));
-  const lines: string[] = [];
-  let line = '  shortcuts:';
-  for (const it of items) {
-    const next = `${line}${line.endsWith(':') ? ' ' : ' · '}${it.text}`;
-    if (next.length > cols - 2 && !line.endsWith(':')) {
-      lines.push(line);
-      line = `             ${it.text}`;
-    } else line = next;
-  }
-  lines.push(line);
-  return ['', ...lines.map((l) => c.dim(l))];
+/** Shortcuts as a list, one per line, for under the interactive menu. */
+export function shortcutTrailer(c: Palette = out()): string[] {
+  const shorts = shortcutList();
+  const width = Math.max(...shorts.map((s) => s.name.length));
+  return [
+    '',
+    `  ${c.dim(c.bold('Shortcuts'))}`,
+    ...shorts.map((s) => c.dim(`  pf ${s.name.padEnd(width)}  = ${s.full}`)),
+  ];
 }
 
 /** Interactive menu. Without a terminal it prints the static list instead. */
@@ -211,7 +206,7 @@ export async function runMenu(
     // The main menu keeps its grouping but not the group names; custom menus (the ./pf launcher) keep them.
     {
       ...(last ? { initial: last } : {}),
-      ...(custom ? {} : { groupNames: false, trailer: shortcutTrailer(process.stdout.columns || 80) }),
+      ...(custom ? {} : { groupNames: false, trailer: shortcutTrailer() }),
     },
   );
   if (!chosen) return 0;
