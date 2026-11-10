@@ -4,12 +4,13 @@ title: Shortcuts
 
 # Shortcuts
 
-A shortcut is a short name for a full command. Extra arguments pass through to the target, so `pf ds --dry-run` is `pf deploy staging --dry-run`.
+A shortcut is a short name for a full command. Extra arguments pass through to the target, so `pf ds --dry-run` is `pf deploy staging --dry-run`. That includes a commit message for the deploy shortcuts: `pf d "fix login"`.
 
 | Shortcut | Same as | Notes |
 |----------|---------|-------|
 | `pf a` | `pf agent` | Open the coding agent |
 | `pf docs` | `pf doc` | Run the repo's docs site |
+| `pf d` | `pf deploy` | Staging if configured, else production, else the repo's own deploy |
 | `pf ds` | `pf deploy staging` | Auto-detects its target |
 | `pf dp` | `pf deploy production` | Only a repo-defined production script; always confirms |
 | `pf ps` | `pf publish staging` | Runs `publish:cellars`; always confirms |

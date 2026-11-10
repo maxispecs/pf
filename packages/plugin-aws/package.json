@@ -1,6 +1,6 @@
 {
   "name": "@pulpfixer/plugin-aws",
-  "version": "4.2.0",
+  "version": "5.0.0",
   "description": "pf AWS plugin: exchange bucket (pf s3, pf dl)",
   "license": "UNLICENSED",
   "type": "module",

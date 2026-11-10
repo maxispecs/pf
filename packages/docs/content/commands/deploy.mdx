@@ -6,6 +6,38 @@ import { Callout } from 'nextra/components'
 
 # Deploy and publish
 
+## pf deploy (pf d)
+
+```bash
+pf deploy                    # staging if configured, else production, else the repo's own deploy
+pf d                         # same thing
+pf d "fix login"             # with a commit message, when the repo's deploy commits
+pf d --dry-run               # show the steps only
+```
+
+With no environment, pf picks the first target the repo has:
+
+1. **Staging**, when pf finds one (see below).
+2. **Production**, when that is the only target.
+3. **A bare `deploy`**: a `deploy` entry in `pf.json`, a `deploy` script in `package.json` or `composer.json`, or the repo's own `./a deploy`. A bare deploy does not name an environment, so pf treats it like production: it always asks first and needs `--yes` without a terminal. pf never guesses it from platform configs.
+
+pf says which one it picked. `pf deploy staging` and `pf deploy production` (or `pf ds`, `pf dp`) pick one yourself. The coding agent and the MCP tools never run a bare deploy.
+
+### A commit message
+
+`pf d "fix login"`, `pf ds fix login` and `pf dp "release 3.4"` pass the text to a deploy command that makes a commit. `-m "text"` is the explicit form. Words after `staging` or `production` are the message, and a mistyped flag such as `--dryrun` is an error, not a message.
+
+pf cannot tell whether an arbitrary command commits, so only a target that says it takes a message gets one:
+
+- a `pf.json` command with `"message": true`, for example `{ "run": "./tl d", "message": true }`;
+- a repo CLI command (`./a deploy`) whose `# usage:` header mentions `message`.
+
+The message goes on as one quoted argument (`./tl d 'fix login'`), on the last step of the plan. A target that takes none prints a warning and runs without it.
+
+### Repos with their own helper script
+
+Older repos deploy with a hand-written helper such as `./tl d` or `./al d`. Run `pf rp` (or `pf rp --deploy`) once: the coding agent reads the repo's docs and helper, asks which environment it is, and writes the `pf.json` entry. See [Tools and repo setup](/commands/tools-and-repo).
+
 ## Staging
 
 ```bash
