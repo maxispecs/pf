@@ -5,6 +5,7 @@ import { detectDeploy, detectProduction, detectStaging } from '@pulpfixer/kit/de
 import { findDeployHelpers, type DeployHelper } from '@pulpfixer/kit/detect/helpers';
 import { capture, formatCmd, runCmd } from '@pulpfixer/kit/exec';
 import { err } from '@pulpfixer/kit/ui/palette';
+import { pick } from '@pulpfixer/kit/ui/picker';
 import { confirm } from '@pulpfixer/kit/ui/prompt';
 import { badgeLabel, h2, termLine, ul } from '@pulpfixer/kit/ui/text';
 import { exists, interactive, readText, takeFlag } from '@pulpfixer/kit/util';
@@ -181,12 +182,24 @@ async function setupVer(root: string, dryRun: boolean, done: string[]): Promise<
   return 0;
 }
 
+export type DeployKey = 'deploy' | 'deploy:staging' | 'deploy:production';
+
 /** What the agent is asked first. The skill carries the method; the ranked helpers are only hints. */
-export function deploySetupPrompt(helpers: DeployHelper[]): string {
+export function deploySetupPrompt(helpers: DeployHelper[], key: DeployKey = 'deploy'): string {
   const hints = helpers.length
     ? `pf found these scripts at the repo root, best guess first: ${helpers.map((h) => `${h.file} (${h.reasons.join(', ')})`).join('; ')}. Check them yourself.`
     : 'pf found no helper script at the repo root; look in the docs, a Makefile, a justfile or cli/.';
-  return `Set up pf deploy for this repo: call pf_skill with name "deploy-setup" and follow it. ${hints} Do not run the deploy.`;
+  return `Set up pf deploy for this repo: call pf_skill with name "deploy-setup" and follow it. ${hints} The user chose the pf.json key "${key}". Use that key and do not ask. This session exits when you finish. Write pf.json only, then stop. pf will preview the deploy after you exit. Do not run the deploy.`;
+}
+
+/** The environment question, asked here so the agent can run once and exit. No terminal means the plain `deploy` key. */
+async function chooseDeployKey(): Promise<DeployKey | null> {
+  if (!interactive()) return 'deploy';
+  return pick<DeployKey>('Which pf.json key should this deploy use?', [
+    { value: 'deploy', label: 'deploy', hint: 'just deploy, pf asks first' },
+    { value: 'deploy:staging', label: 'deploy:staging', hint: 'staging' },
+    { value: 'deploy:production', label: 'deploy:production', hint: 'production, pf asks first' },
+  ]);
 }
 
 interface DeployStep {
@@ -275,11 +288,16 @@ export const repoCommand: Command = {
 
     if (deploy?.agent) {
       process.stderr.write(`\n${h2('Deploy setup (agent)', c)}\n`);
-      const code = await startAgent(ctx, { prompt: deploySetupPrompt(deploy.helpers) });
+      const key = await chooseDeployKey();
+      if (!key) return 130;
+      if (!interactive()) process.stderr.write(`${c.dim('no terminal, using the deploy key')}\n`);
+      const code = await startAgent(ctx, { prompt: deploySetupPrompt(deploy.helpers, key), once: true });
       if (code !== 0) return code;
-      // The agent may have written pf.json: show what pf d resolves to now (a preview, nothing runs).
+      // The agent was told to exit when the file was written. Show what pf d resolves to now.
       process.stderr.write(`\n${c.dim('pf d now:')}\n`);
-      return runDeployAuto(buildContext(ctx.cwd), { dryRun: true });
+      const check = await runDeployAuto(buildContext(ctx.cwd), { dryRun: true });
+      if (check === 0) process.stderr.write(`${badgeLabel('success', c)} wired. pf d will ask before it runs; nothing was deployed.\n`);
+      return check;
     }
     return 0;
   },

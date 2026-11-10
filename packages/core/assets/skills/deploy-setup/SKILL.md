@@ -31,7 +31,9 @@ Describe it in one line for the `description`: what it changes and where it ends
 
 ## 4. Ask which environment it is
 
-Ask the user once: staging, production, or "just deploy". A command the repo does not tie to an environment goes under the plain name.
+If the prompt already names the pf.json key (`deploy`, `deploy:staging` or `deploy:production`), use that key and do not ask. `pf rp` asks before it starts you, then exits when you finish.
+
+Otherwise ask the user once: staging, production, or "just deploy". A command the repo does not tie to an environment goes under the plain name.
 
 | Answer | `pf.json` key | What `pf` does |
 |---|---|---|
@@ -64,7 +66,7 @@ Add the entry under `commands`, keeping everything already in the file (create t
 
 ## 6. Check
 
-Run `pf deploy --dry-run` (it only prints) and show the user the line it printed. Tell them how to use it:
+Do not run the deploy. When the prompt says pf will preview it, stop after writing `pf.json`: pf runs the preview once you exit. Otherwise run `pf deploy --dry-run` (it only prints) and show the user the line it printed. Tell them how to use it:
 
 - `pf d` runs it after asking.
 - `pf d "fix login"` passes a commit message when `"message": true` is set.

@@ -145,7 +145,7 @@ pf agent "find errors in /ecs/api logs from the last hour"        # logs scope (
 
 ### Deploy setup (`pf rp --deploy`)
 
-For a repo that deploys through its own helper script (`./tl d`, `./al d`) `pf repo` starts the agent with the bundled `deploy-setup` skill (`packages/core/assets/skills/deploy-setup/SKILL.md`). The prompt lists the helpers pf found at the repo root, ranked (`GWLOCAL` helpers first, server-only ones such as `a.sh` last) as hints only. The agent reads the repo's deploy notes and the helper, picks the dev-machine command, asks which environment it is (default: the plain `deploy` key), and writes the `pf.json` entry, with `"message": true` when the command commits and takes a commit message. It never runs the deploy; it finishes with `pf deploy --dry-run`.
+For a repo that deploys through its own helper script (`./tl d`, `./al d`) `pf repo` asks which `pf.json` key to write (`deploy`, `deploy:staging` or `deploy:production`; no terminal means `deploy`), then starts the agent with the bundled `deploy-setup` skill (`packages/core/assets/skills/deploy-setup/SKILL.md`). Claude and Cursor are started in print mode, so the process exits when the task is done and pf continues. The prompt lists the helpers pf found at the repo root, ranked (`GWLOCAL` helpers first, server-only ones such as `a.sh` last) as hints only. The agent reads the repo's deploy notes and the helper, picks the dev-machine command, and writes that key, with `"message": true` when the command commits and takes a commit message. It never runs the deploy. pf then previews `pf d`.
 
 ## Troubleshoot mode (`pf t`)
 

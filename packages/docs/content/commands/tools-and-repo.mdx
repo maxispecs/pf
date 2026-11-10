@@ -47,13 +47,12 @@ It updates every older copy of the ver CLI, prints what it did and never commits
 
 ### Deploy setup
 
-Some repos deploy through their own helper, not a script pf can read: triton's `./tl d`, arbiter's `./al d`. Those scripts have no `# usage:` headers, so pf cannot parse them. When `pf d` resolves to nothing, `pf rp` looks for helpers at the repo root (an executable script with a `"$1" = "d"` or `"deploy"` branch, ranked with the local `GWLOCAL` ones first and server-only ones such as arbiter's `a.sh` last) and offers to start the coding agent with the bundled `deploy-setup` skill. The agent:
+Some repos deploy through their own helper, not a script pf can read: triton's `./tl d`, arbiter's `./al d`. Those scripts have no `# usage:` headers, so pf cannot parse them. When `pf d` resolves to nothing, `pf rp` looks for helpers at the repo root (an executable script with a `"$1" = "d"` or `"deploy"` branch, ranked with the local `GWLOCAL` ones first and server-only ones such as arbiter's `a.sh` last) and offers to start the coding agent with the bundled `deploy-setup` skill. pf asks which key to write, then starts Claude (or Cursor) in print mode so it exits when it is done and pf can show the result. The agent:
 
 1. reads the repo's own deploy notes (`AGENTS.md`, README, docs) and the helper;
 2. picks the dev-machine command and never a server-only one;
-3. asks whether it is staging, production or just a deploy (default: `deploy`);
-4. writes the `pf.json` entry, with `"message": true` when the command commits and takes a commit message;
-5. never runs the deploy, and finishes with `pf deploy --dry-run`.
+3. writes the key you picked (`deploy`, `deploy:staging` or `deploy:production`; no terminal means `deploy`), with `"message": true` when the command commits and takes a commit message;
+4. never runs the deploy. It exits, and pf previews `pf d`.
 
 ```json
 { "commands": { "deploy": { "run": "./al d", "message": true, "description": "Bump version, compile prefect.yaml, commit, push" } } }

@@ -22,6 +22,8 @@ export interface StartOptions {
   /** `--profile` value: the pf profile the agent's tools use. */
   profile?: string;
   dryRun?: boolean;
+  /** Run the task and exit (`claude -p`), so this function returns when the task is done. */
+  once?: boolean;
   /** `pf t`: the deployment summary for the persona. Starts the agent in troubleshooting mode. */
   troubleshoot?: { deployment: string[] };
 }
@@ -117,6 +119,7 @@ export async function startAgent(ctx: Context, opts: StartOptions = {}): Promise
     cwd: ctx.workdir,
     tools: agentTools(ctx),
     ...(opts.profile ? { profile: opts.profile } : {}),
+    ...(opts.once ? { once: true } : {}),
   });
   if (opts.dryRun) process.stderr.write(`${c.bold('persona')}\n${persona}\n`);
   else if (!writeLaunchFiles(launch.files)) return 1;

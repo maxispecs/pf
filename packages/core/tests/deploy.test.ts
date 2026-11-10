@@ -140,5 +140,7 @@ test('the deploy-setup skill ships with pf, and the setup prompt names the ranke
   const prompt = deploySetupPrompt([{ file: 'al', local: true, serverOnly: false, branch: true, score: 14, reasons: ['marked local (GWLOCAL)'] }]);
   assert.match(prompt, /pf_skill with name "deploy-setup"/);
   assert.match(prompt, /al \(marked local/);
+  assert.match(prompt, /key "deploy"/);
+  assert.match(deploySetupPrompt([], 'deploy:staging'), /key "deploy:staging"/);
   assert.match(deploySetupPrompt([]), /no helper script/);
 });

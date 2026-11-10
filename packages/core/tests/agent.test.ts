@@ -74,6 +74,13 @@ test('launch argv: claude gets a system prompt, codex and cursor get the persona
   assert.ok(claudeLaunch.argv.includes('mcp__pulpfixer__pf_commands'));
   assert.ok(!claudeLaunch.argv.includes('mcp__pulpfixer__pf_deploy_staging'));
   assert.equal(claudeLaunch.argv.at(-1), 'fix the build');
+  assert.ok(!claudeLaunch.argv.includes('-p'));
+  const once = buildLaunch(claude, { ...input, once: true });
+  assert.deepEqual(once.argv.slice(1, 4), ['-p', '--permission-mode', 'acceptEdits']);
+  assert.ok(once.argv.indexOf('--permission-mode') < once.argv.indexOf('--allowedTools'));
+  assert.ok(once.argv.lastIndexOf('--allowedTools') < once.argv.indexOf('--append-system-prompt'));
+  assert.equal(once.argv.at(-1), 'fix the build');
+  assert.equal(buildLaunch(cursor, { ...input, once: true }).argv[1], '-p');
   const mcp = JSON.parse(claudeLaunch.files[0]!.contents) as { mcpServers: { pulpfixer: { command: string; args: string[] } } };
   assert.equal(mcp.mcpServers.pulpfixer.command, 'node');
   assert.deepEqual(mcp.mcpServers.pulpfixer.args, ['pf.js', 'mcp', '--cwd', '/repo']);

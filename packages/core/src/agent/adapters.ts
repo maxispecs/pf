@@ -31,6 +31,11 @@ export interface LaunchInput {
   tools?: Tool[];
   /** pf profile the server uses (`pf agent --profile`). */
   profile?: string;
+  /**
+   * Run the task and exit, so the caller continues. Claude and Cursor use print mode (`-p`).
+   * An empty prompt still starts an interactive session.
+   */
+  once?: boolean;
 }
 
 export interface McpServerOptions {
@@ -85,8 +90,12 @@ export function buildLaunch(agent: AgentInfo, input: LaunchInput): Launch {
     // consumes every following argument until the next flag. The task has to come after a
     // single-value option (`--append-system-prompt`), or Claude treats it as another tool name
     // and opens an interactive session with no prompt.
+    // `-p` prints the reply and exits. `--permission-mode acceptEdits` lets the write through:
+    // print mode has no permission dialog. Both are single-value or boolean, so they stay ahead of
+    // the variadic flags and do not swallow the task.
     const argv = [
       agent.bin,
+      ...(input.once && prompt ? ['-p', '--permission-mode', 'acceptEdits'] : []),
       '--mcp-config',
       configPath,
       ...claudeAllowedTools(input.tools ?? TOOLS).flatMap((t) => ['--allowedTools', t]),
@@ -108,7 +117,7 @@ export function buildLaunch(agent: AgentInfo, input: LaunchInput): Launch {
     ];
     return { argv, files: [] };
   }
-  const argv = [agent.bin, '--workspace', input.cwd];
+  const argv = [agent.bin, ...(input.once && prompt ? ['-p'] : []), '--workspace', input.cwd];
   const text = prompt ? `${input.persona}\n\n${prompt}` : input.persona;
   argv.push(text);
   return { argv, files: [] };
