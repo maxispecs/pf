@@ -81,13 +81,17 @@ export function buildLaunch(agent: AgentInfo, input: LaunchInput): Launch {
   const prompt = input.prompt.trim();
   if (agent.id === 'claude') {
     const configPath = input.mcpConfigPath ?? claudeMcpConfigPath();
+    // `--mcp-config` and `--allowedTools` are variadic (`<configs...>`, `<tools...>`): each one
+    // consumes every following argument until the next flag. The task has to come after a
+    // single-value option (`--append-system-prompt`), or Claude treats it as another tool name
+    // and opens an interactive session with no prompt.
     const argv = [
       agent.bin,
       '--mcp-config',
       configPath,
+      ...claudeAllowedTools(input.tools ?? TOOLS).flatMap((t) => ['--allowedTools', t]),
       '--append-system-prompt',
       input.persona,
-      ...claudeAllowedTools(input.tools ?? TOOLS).flatMap((t) => ['--allowedTools', t]),
     ];
     if (prompt) argv.push(prompt);
     return { argv, files: [{ path: configPath, contents: mcpJson(serverArgv) }] };

@@ -62,6 +62,7 @@ export function buildHostLaunch(input: HostLaunchInput): { argv: string[]; mcpJs
     '--max-budget-usd', String(input.config.maxBudgetUsd),
     '--no-session-persistence',
     ...(input.config.model ? ['--model', input.config.model] : []),
+    // `--allowedTools` is variadic, so the task stays after those single-value options.
     input.task,
   ];
   return { argv, mcpJson: JSON.stringify({ mcpServers: { [SERVER_NAME]: { command, args } } }, null, 2) + '\n' };

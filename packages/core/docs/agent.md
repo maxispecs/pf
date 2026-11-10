@@ -93,7 +93,7 @@ What pf passes to each CLI:
 `pf agent --profile acme --dry-run` with Claude shows the allowlist:
 
 ```text
-would run claude --mcp-config ~/.pf/agent/mcp.json --append-system-prompt '...'
+would run claude --mcp-config ~/.pf/agent/mcp.json
   --allowedTools mcp__pulpfixer__pf_commands
   --allowedTools mcp__pulpfixer__pf_versions
   --allowedTools mcp__pulpfixer__pf_skills
@@ -105,7 +105,11 @@ would run claude --mcp-config ~/.pf/agent/mcp.json --append-system-prompt '...'
   --allowedTools mcp__pulpfixer__pf_aws_context
   --allowedTools mcp__pulpfixer__pf_aws_link_profile
   --allowedTools mcp__pulpfixer__pf_aws_act
+  --append-system-prompt '...'
+  'the task'
 ```
+
+Claude's `--allowedTools` and `--mcp-config` take every following argument, so the task comes after `--append-system-prompt` (one value). A task placed after the last `--allowedTools` is read as a tool name and the session opens with no prompt.
 
 `pf_run`, `pf_bump` and `pf_deploy_staging` are not on the list, so Claude asks you before each call.
 
@@ -690,6 +694,8 @@ function claudeAllowedTools(tools: Tool[]): string[] {
   return tools.filter((t) => t.readOnly || t.asksUser).map((t) => `mcp__${SERVER_NAME}__${t.name}`);
 }
 // buildLaunch for claude: mcpServerArgv(cwd, { profile, requireElicitation: true })
+// argv order: --mcp-config, --allowedTools..., --append-system-prompt, then the task.
+// The first two flags are variadic, so the task has to follow the single-value system prompt.
 ```
 
 A tool may only be `asksUser` if it gets your approval from `session.elicit` before it changes anything. Because Claude runs those tools unasked, its server always starts with `--require-elicitation`.

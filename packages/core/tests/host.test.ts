@@ -106,6 +106,8 @@ test('host launch: no built-in tools, only the pf server, writes only with --app
   assert.equal(at(plan.argv, '--permission-mode'), 'dontAsk');
   assert.equal(at(plan.argv, '--max-budget-usd'), '5');
   assert.equal(plan.argv.at(-1), 'patch openssl');
+  assert.ok(plan.argv.indexOf('--allowedTools') < plan.argv.indexOf('--append-system-prompt'));
+  assert.ok(plan.argv.indexOf('--append-system-prompt') < plan.argv.length - 1);
   assert.doesNotMatch(at(plan.argv, '--allowedTools')!, /pf_host_patch|pf_host_restart/);
   assert.match(at(plan.argv, '--allowedTools')!, /mcp__pulpfixer__pf_host_status/);
   const apply = buildHostLaunch({ ...base, apply: true, serverArgv: ['node', 'pf.js', 'mcp', '--host', '--apply'] });

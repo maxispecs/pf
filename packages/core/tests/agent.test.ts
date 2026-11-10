@@ -64,7 +64,12 @@ test('saveAgent merges into the user config', () => {
 test('launch argv: claude gets a system prompt, codex and cursor get the persona in front of the task', () => {
   const input = { persona: 'PERSONA', prompt: 'fix the build', cwd: '/repo', serverArgv, mcpConfigPath: '/tmp/pf-mcp.json' };
   const claudeLaunch = buildLaunch(claude, input);
-  assert.deepEqual(claudeLaunch.argv.slice(0, 5), ['claude', '--mcp-config', '/tmp/pf-mcp.json', '--append-system-prompt', 'PERSONA']);
+  assert.deepEqual(claudeLaunch.argv.slice(0, 3), ['claude', '--mcp-config', '/tmp/pf-mcp.json']);
+  const systemAt = claudeLaunch.argv.indexOf('--append-system-prompt');
+  assert.equal(claudeLaunch.argv[systemAt + 1], 'PERSONA');
+  // Claude's --allowedTools consumes every argument until the next flag, so the task must follow
+  // the single-value --append-system-prompt or the session opens with no prompt.
+  assert.ok(claudeLaunch.argv.lastIndexOf('--allowedTools') < systemAt);
   assert.ok(claudeLaunch.argv.includes('--allowedTools'));
   assert.ok(claudeLaunch.argv.includes('mcp__pulpfixer__pf_commands'));
   assert.ok(!claudeLaunch.argv.includes('mcp__pulpfixer__pf_deploy_staging'));

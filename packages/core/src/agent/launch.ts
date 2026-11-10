@@ -120,7 +120,10 @@ export async function startAgent(ctx: Context, opts: StartOptions = {}): Promise
   });
   if (opts.dryRun) process.stderr.write(`${c.bold('persona')}\n${persona}\n`);
   else if (!writeLaunchFiles(launch.files)) return 1;
-  return runCmd({ argv: launch.argv, cwd: ctx.workdir }, { dryRun: opts.dryRun, base: ctx.workdir });
+  // The persona is the whole system prompt. Echoing the argv prints it as the command line,
+  // which is what a dry run is for and what a live session should not flash before the CLI starts.
+  if (!opts.dryRun) process.stderr.write(`${c.dim(`starting ${choice.agent.label}`)}\n`);
+  return runCmd({ argv: launch.argv, cwd: ctx.workdir }, { dryRun: opts.dryRun, quiet: true, base: ctx.workdir });
 }
 
 /** The agent to save. `code` is the exit status when no agent was chosen. */
