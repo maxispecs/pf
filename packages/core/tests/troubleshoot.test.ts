@@ -5,6 +5,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { buildContext } from '@pulpfixer/kit/context';
+import { stripAnsi } from '@pulpfixer/kit/ui/palette';
 import { linkChoices } from '@pulpfixer/plugin-aws';
 import { buildPersona } from '../src/agent/persona.js';
 import { handle } from '../src/agent/mcp.js';
@@ -141,7 +142,7 @@ test('linkHelp without any profile says how to create one', () => {
   process.env.AWS_CONFIG_FILE = path.join(mkRepo({}), 'none');
   process.env.PF_HOME = mkRepo({});
   try {
-    const text = linkHelp(linkChoices(buildContext(ecsRepo()))).join('\n');
+    const text = stripAnsi(linkHelp(linkChoices(buildContext(ecsRepo()))).join('\n'));
     assert.match(text, /aws configure sso/);
     assert.match(text, /--aws-profile <aws-profile> --account <id>/);
   } finally {
