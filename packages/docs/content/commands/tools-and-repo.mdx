@@ -32,12 +32,31 @@ See [pf.json](/concepts/pf-json) for the format.
 `pf repo` (short: `pf rp`) hooks pf's helpers into a repo and wires its `package.json`:
 
 - the `/pnpm` root commands: `pnpm ask` (every root script, grouped), `pnpm doc` (the docs site) and `pnpm deploy:staging`, adding the last two only where a docs site or a staging target exists;
-- `/ver` versioning: `versions.json` and `pnpm ver`.
+- `/ver` versioning: `versions.json` and `pnpm ver`;
+- **deploy**: tells you what `pf d` runs, or, when the repo has none, wires one (below).
 
 ```bash
 pf repo --dry-run
-pf repo --no-pnpm     # versioning only
-pf repo --no-ver      # pnpm commands only
+pf repo --no-pnpm     # skip the pnpm commands
+pf repo --no-ver      # skip versioning
+pf repo --no-deploy   # skip the deploy step
+pf repo --deploy      # run the deploy setup even when pf d already resolves
 ```
 
 It updates every older copy of the ver CLI, prints what it did and never commits. Run it again after `pf update`.
+
+### Deploy setup
+
+Some repos deploy through their own helper, not a script pf can read: triton's `./tl d`, arbiter's `./al d`. Those scripts have no `# usage:` headers, so pf cannot parse them. When `pf d` resolves to nothing, `pf rp` looks for helpers at the repo root (an executable script with a `"$1" = "d"` or `"deploy"` branch, ranked with the local `GWLOCAL` ones first and server-only ones such as arbiter's `a.sh` last) and offers to start the coding agent with the bundled `deploy-setup` skill. The agent:
+
+1. reads the repo's own deploy notes (`AGENTS.md`, README, docs) and the helper;
+2. picks the dev-machine command and never a server-only one;
+3. asks whether it is staging, production or just a deploy (default: `deploy`);
+4. writes the `pf.json` entry, with `"message": true` when the command commits and takes a commit message;
+5. never runs the deploy, and finishes with `pf deploy --dry-run`.
+
+```json
+{ "commands": { "deploy": { "run": "./al d", "message": true, "description": "Bump version, compile prefect.yaml, commit, push" } } }
+```
+
+After that `pf d` asks and runs `./al d`, and `pf d "fix login"` runs `./al d 'fix login'`. Without a terminal pf only prints the hint (`pf rp --deploy`).

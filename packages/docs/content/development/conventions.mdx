@@ -22,7 +22,7 @@ title: Conventions
 - Never read, print or write a registry token. Only check that an auth line exists. `.npmrc` uses `${NPM_TOKEN}`. The one exception is host mode, which reads secrets with the instance role into a child process's environment only.
 - Host mode (`pf host fix`) gives the agent no shell or file tools. Anything that changes the host is a pf host tool, and the MCP server refuses it without `--apply`.
 - Commands that run something support `--dry-run`.
-- `pf deploy staging` auto-detects its target. `pf deploy production` runs only a `deploy:production` script or `pf.json` entry that the repo defines (never guessed from platform configs), always asks for confirmation, and needs `--yes` without a TTY. The agent and MCP tools deploy to staging only.
+- `pf deploy staging` auto-detects its target. `pf deploy production` runs only a `deploy:production` script or `pf.json` entry that the repo defines (never guessed from platform configs), always asks for confirmation, and needs `--yes` without a TTY. `pf deploy` with no environment (`pf d`) runs staging if the repo has it, else production, else a bare `deploy` entry (`pf.json`, a `deploy` script or `./a deploy`); a bare deploy is production-like (always asks, needs `--yes` without a TTY). `pf d "message"` passes a commit message only to a target marked `"message": true`. The agent and MCP tools deploy to staging only.
 - Never add an AWS operation that returns secrets, file contents or user data.
 
 ## Command resolution

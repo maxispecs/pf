@@ -24,8 +24,9 @@ title: pf.json
 | `description` | Shown in the menu and by `pf list` |
 | `group` | The menu heading |
 | `cwd` | Directory to run in, relative to the repo root |
+| `message` | `true` when the command makes a commit and takes a commit message as its last argument, so `pf d "text"` passes it on (deploy entries only) |
 
-Built-in names (`dev`, `build`, `test`, `lint`, `install`) override detection. `deploy:staging`, `deploy:production`, `publish:staging` and `doc` override those commands. Any other name shows up in the menu and runs with `pf <name>`, for example `pf seed`.
+Built-in names (`dev`, `build`, `test`, `lint`, `install`) override detection. `deploy:staging`, `deploy:production`, `publish:staging` and `doc` override those commands. A plain `deploy` entry is the repo's own deploy when it names no environment: `pf deploy` (`pf d`) runs it when there is no staging or production target, and always asks first, like production. Any other name shows up in the menu and runs with `pf <name>`, for example `pf seed`.
 
 ## Profile and agent limits
 

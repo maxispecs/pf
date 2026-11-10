@@ -130,4 +130,6 @@ pf agent "is i-0abc123 healthy behind the alb? check eu-west-1"   # elb + ec2 sc
 pf agent "find errors in /ecs/api logs from the last hour"        # logs scope (only if the profile allows it)
 ```
 
-A staging deploy returns the plan until the call passes `confirm`, and the agent CLI asks before running it. Production is never targeted.
+A staging deploy returns the plan until the call passes `confirm`, and the agent CLI asks before running it. Production is never targeted, and neither is a repo's bare `deploy` (the `deploy` entry in `pf.json`): only you run `pf deploy`.
+
+The agent also sets up deploys for repos that deploy through their own helper script (`./tl d`, `./al d`). `pf rp --deploy` starts it with the bundled `deploy-setup` skill (`packages/core/assets/skills/deploy-setup/SKILL.md`): it reads the repo's deploy notes and helper, prefers the dev-machine command over a server-only one, asks which environment it is, and writes the `pf.json` entry (with `"message": true` when the command commits). It never runs the deploy. See [Tools and repo setup](/commands/tools-and-repo).

@@ -137,6 +137,12 @@ pf agent "is i-0abc123 healthy behind the alb? check eu-west-1"   # elb + ec2 sc
 pf agent "find errors in /ecs/api logs from the last hour"        # logs scope (only if the profile allows it)
 ```
 
+`pf_deploy_staging` is the only deploy tool. Production and a repo's bare `deploy` (the `deploy` entry in `pf.json`, run with `pf deploy` / `pf d`) are never targeted: only the user runs them.
+
+### Deploy setup (`pf rp --deploy`)
+
+For a repo that deploys through its own helper script (`./tl d`, `./al d`) `pf repo` starts the agent with the bundled `deploy-setup` skill (`packages/core/assets/skills/deploy-setup/SKILL.md`). The prompt lists the helpers pf found at the repo root, ranked (`GWLOCAL` helpers first, server-only ones such as `a.sh` last) as hints only. The agent reads the repo's deploy notes and the helper, picks the dev-machine command, asks which environment it is (default: the plain `deploy` key), and writes the `pf.json` entry, with `"message": true` when the command commits and takes a commit message. It never runs the deploy; it finishes with `pf deploy --dry-run`.
+
 ## Troubleshoot mode (`pf t`)
 
 `pf troubleshoot` (`pf t`) is agent mode with a head start for production-style problems: **what is wrong with this deployment on AWS?** Before the agent starts, pf works out how the repo deploys and which AWS profile it uses. From then on pf is the agent's bridge to AWS: it asks you to approve reads and fixes, runs every call itself, and the agent never sees credentials.
