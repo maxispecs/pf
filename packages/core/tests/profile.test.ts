@@ -88,3 +88,17 @@ test('pf aws: grants list is empty, revoke needs a target', () => {
   assert.equal(pf(cwd, env, 'aws', 'revoke').code, 2);
   assert.equal(pf(cwd, env, 'aws', 'revoke', '--all').code, 0);
 });
+
+test('--actions: only known fix actions are accepted, merged into the profile, and an empty value clears them', () => {
+  assert.equal(validateProfileFlags({ actions: ['ecs update-service', 'ecs stop-task'] }), null);
+  assert.match(validateProfileFlags({ actions: ['ec2 terminate-instances'] })!, /unknown action "ec2 terminate-instances"/);
+  assert.deepEqual(mergeProfile({ aws: { profile: 'a' } }, { actions: ['ecs stop-task'] }), { aws: { profile: 'a' }, agent: { aws: { actions: ['ecs stop-task'] } } });
+  assert.deepEqual(mergeProfile({ aws: { profile: 'a' }, agent: { aws: { scopes: ['ec2'], actions: ['ecs stop-task'] } } }, { actions: [] }), { aws: { profile: 'a' }, agent: { aws: { scopes: ['ec2'] } } });
+
+  const home = mkRepo({});
+  const env = { PF_HOME: home };
+  const cwd = mkRepo({ '.git/HEAD': '', 'pf.json': json({ profile: 'acme' }) });
+  assert.equal(pf(cwd, env, 'profile', 'add', 'acme', '--aws-profile', 'acme-ro', '--actions', 'ecs update-service').code, 0);
+  assert.match(pf(cwd, env, 'profile', 'show').out, /fix actions \(each approved by the user\): ecs update-service/);
+  assert.equal(pf(cwd, env, 'profile', 'add', 'acme', '--actions', 'rds delete-db-instance').code, 2);
+});

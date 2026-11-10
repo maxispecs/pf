@@ -10,6 +10,8 @@ export interface Candidate {
   cmd: Cmd;
   /** Where the command came from, e.g. "package.json script dev". */
   source: string;
+  /** Deploy commands only: the command takes a commit message as its last argument. */
+  acceptsMessage?: boolean;
 }
 
 export interface StackInfo {

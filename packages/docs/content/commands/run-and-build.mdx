@@ -56,3 +56,7 @@ To use another command, set it in [pf.json](/concepts/pf-json):
 ```json
 { "commands": { "doc": { "run": "mkdocs serve", "cwd": "." } } }
 ```
+
+## First run in a repo
+
+When you run `pf dev` (or `pf r`) in a terminal in a repo that `pf repo` has not been run in (no `versions.json` and no pnpm helper copy), pf asks whether to run `pf repo` first. After it finishes, pf asks whether to start `pf dev` now. Answer no to the first question and `pf dev` just runs. Nothing is asked without a terminal or with `--dry-run`; set `PF_NO_REPO_PROMPT=1` to turn the question off.

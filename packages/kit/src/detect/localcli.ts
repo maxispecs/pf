@@ -16,6 +16,8 @@ export interface LocalCliCommand {
   usage: string[];
   /** The script takes `-y` / `--yes` to skip its own confirmation. */
   acceptsYes: boolean;
+  /** The usage mentions a message (`./a deploy:staging [message]`), so `pf d "text"` can pass one. */
+  acceptsMessage: boolean;
 }
 
 export interface LocalCli {
@@ -60,6 +62,7 @@ export function detectLocalCli(root: string): LocalCli | null {
       desc: header(text, 'desc')[0] ?? '',
       usage,
       acceptsYes: usage.some((u) => /(^|\s)(-y|--yes)\b/.test(u)),
+      acceptsMessage: usage.some((u) => /\b(message|msg)\b/i.test(u)),
     };
   });
   return commands.length ? { entry, commands } : null;

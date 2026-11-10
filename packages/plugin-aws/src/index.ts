@@ -9,6 +9,10 @@ import { loadExchange } from './exchange.js';
 export { DEFAULT_MAX_TTL, DEFAULT_SCOPES, HARD_MAX_TTL, SCOPE_NAMES, SCOPES } from './access.js';
 export { whoami } from './agent-tools.js';
 export { describeLimits, projectAws } from './project.js';
+export { ACTIONS, ACTION_NAMES } from './access.js';
+export { candidateDetail, candidateLabel, applyLink, linkChoices, type LinkChoices, type LinkExtra, type LinkResult } from './link.js';
+export { awsConfigPath, listAwsProfiles, matchProfiles, parseAwsConfig, suggestProfileName, type AwsProfileInfo, type LinkCandidate } from './awsconfig.js';
+export { describeDeployment, detectAwsDeployment, scanAwsHints, scopesFor, type AwsDeployment, type AwsHints } from './infra.js';
 
 /**
  * AWS shortcuts: a shared exchange bucket (`pf s3`, `pf dl`), and scoped read-only AWS access

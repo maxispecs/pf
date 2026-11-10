@@ -15,6 +15,15 @@ export interface Context {
   version: string;
 }
 
+/**
+ * Re-read `pf.json` and `~/.pf/config.json` into a context that is already built. A long-running
+ * agent session calls this before each tool, so a profile linked or edited mid-session applies at once.
+ */
+export function refreshContext(ctx: Context): void {
+  ctx.user = loadUserConfig();
+  if (ctx.repo) ctx.config = loadRepoConfig(ctx.repo.root);
+}
+
 export function buildContext(cwd: string = process.cwd()): Context {
   const repo = findRepo(cwd);
   let workdir = repo?.root ?? path.resolve(cwd);

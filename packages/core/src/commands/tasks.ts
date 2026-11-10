@@ -1,12 +1,14 @@
-import type { Context } from '@pulpfixer/kit/context';
+import { buildContext, type Context } from '@pulpfixer/kit/context';
 import { candidates } from '@pulpfixer/kit/detect/resolve';
 import type { Candidate, Task } from '@pulpfixer/kit/detect/stacks';
 import { formatCmd, runCmd, withArgs } from '@pulpfixer/kit/exec';
 import { err } from '@pulpfixer/kit/ui/palette';
 import { badgeLabel, termLine } from '@pulpfixer/kit/ui/text';
 import { pick } from '@pulpfixer/kit/ui/picker';
+import { confirm } from '@pulpfixer/kit/ui/prompt';
 import { interactive, takeFlag } from '@pulpfixer/kit/util';
 import type { Command, Group } from '@pulpfixer/kit/types';
+import { isRepoSetUp, repoCommand } from './repo.js';
 
 const SUMMARIES: Record<Task, string> = {
   dev: 'Run the app locally',
@@ -64,6 +66,23 @@ export async function runTask(ctx: Context, task: Task, opts: TaskRunOptions = {
   return runCmd(withArgs(chosen.cmd, opts.extra ?? []), { dryRun: opts.dryRun, base: ctx.workdir });
 }
 
+/**
+ * `pf dev` in a repo `pf repo` has not been run in: offer to run it first, then offer to start dev.
+ * Returns the exit code when the run is over (the user cancelled or `pf repo` failed), else null to carry on
+ * with the task. Quiet without a terminal, with `--dry-run` or `PF_NO_REPO_PROMPT=1`.
+ */
+export async function offerRepoSetup(ctx: Context, task: Task, opts: { dryRun?: boolean } = {}): Promise<{ ctx: Context; code: number | null }> {
+  const same = { ctx, code: null };
+  if (task !== 'dev' || opts.dryRun || !ctx.repo || process.env.PF_NO_REPO_PROMPT === '1' || !interactive()) return same;
+  if (isRepoSetUp(ctx.repo.root)) return same;
+  const c = err();
+  if (!(await confirm(`This repo is not set up with pf yet. Run ${c.bold('pf repo')} (pnpm commands, versioning, deploy) first?`, true))) return same;
+  const code = await repoCommand.run(ctx, []);
+  if (code !== 0) return { ctx, code };
+  if (!(await confirm(`Start ${c.bold('pf dev')} now?`, true))) return { ctx, code: 0 };
+  return { ctx: buildContext(ctx.cwd), code: null };
+}
+
 export function taskCommand(task: Task): Command {
   return {
     name: task,
@@ -75,7 +94,9 @@ export function taskCommand(task: Task): Command {
       const dryRun = takeFlag(rest, '--dry-run', '-n');
       const pickFlag = takeFlag(rest, '--pick', '-p');
       if (rest[0] === '--') rest.shift();
-      return runTask(ctx, task, { dryRun, pick: pickFlag, extra: rest });
+      const offer = await offerRepoSetup(ctx, task, { dryRun });
+      if (offer.code !== null) return offer.code;
+      return runTask(offer.ctx, task, { dryRun, pick: pickFlag, extra: rest });
     },
   };
 }

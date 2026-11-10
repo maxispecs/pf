@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkOperation, DEFAULT_SCOPES, limitsFor, paramArgv, redactJson, redactText } from '../src/access.js';
+import { checkAction, checkOperation, DEFAULT_SCOPES, limitsFor, paramArgv, redactJson, redactText } from '../src/access.js';
 import { activeGrant, liveGrants, revokeGrants, saveGrant, type Grant } from '../src/grants.js';
 import { mkRepo } from './helpers.js';
 
@@ -99,4 +99,42 @@ test('grants: live until they expire or their server is gone, and revocable', ()
     if (prev === undefined) delete process.env.PF_HOME;
     else process.env.PF_HOME = prev;
   }
+});
+
+test('lambda and cloudformation reads: scopes exist, template and invoke are refused, env values are redacted', () => {
+  assert.deepEqual(checkOperation('lambda', 'get-function-configuration', ['identity', 'lambda-metadata']), { ok: true, scope: 'lambda-metadata' });
+  assert.deepEqual(checkOperation('cloudformation', 'describe-stack-events', ['cloudformation']), { ok: true, scope: 'cloudformation' });
+  assert.match((checkOperation('cloudformation', 'get-template', ['cloudformation']) as { reason: string }).reason, /never allowed: it returns templates/);
+  assert.match((checkOperation('lambda', 'invoke', ['lambda-metadata']) as { reason: string }).reason, /never allowed/);
+  assert.match((checkOperation('lambda', 'get-function', ['lambda-metadata']) as { reason: string }).reason, /never allowed/);
+
+  const fn = redactJson({ FunctionName: 'f', Environment: { Variables: { DB_HOST: 'db', STRIPE: 'sk_live' } } }) as { Environment: { Variables: Record<string, string> } };
+  assert.deepEqual(fn.Environment.Variables, { DB_HOST: '[redacted by pf]', STRIPE: '[redacted by pf]' });
+  const stack = redactJson({ Stacks: [{ Parameters: [{ ParameterKey: 'DbPassword', ParameterValue: 'hunter2' }, { ParameterKey: 'Stage', ParameterValue: 'prod' }] }] }) as { Stacks: { Parameters: { ParameterValue: string }[] }[] };
+  assert.equal(stack.Stacks[0]!.Parameters[0]!.ParameterValue, '[redacted by pf]');
+  assert.equal(stack.Stacks[0]!.Parameters[1]!.ParameterValue, 'prod');
+});
+
+test('fix actions: off by default, only the listed flags and values, destructive calls refused', () => {
+  const on = ['ecs update-service', 'ecs stop-task', 'ec2 reboot-instances', 'autoscaling set-desired-capacity'];
+  assert.deepEqual(limitsFor({ aws: { profile: 'p' } }, undefined).actions, []);
+  assert.deepEqual(limitsFor({ agent: { aws: { actions: ['ecs stop-task', 'ec2 terminate-instances'] } } }, undefined).actions, ['ecs stop-task']);
+  assert.deepEqual(limitsFor({ agent: { aws: { actions: on } } }, { actions: ['ecs stop-task'] }).actions, ['ecs stop-task']);
+
+  const ok = checkAction('ecs', 'update-service', { cluster: 'web', service: 'api', 'force-new-deployment': true }, on);
+  assert.deepEqual(ok.ok && ok.argv, ['--cluster', 'web', '--service', 'api', '--force-new-deployment']);
+  assert.equal(checkAction('ecs', 'update-service', { cluster: 'web', service: 'api', 'desired-count': 3 }, on).ok, true);
+  assert.equal(checkAction('ec2', 'reboot-instances', { 'instance-ids': ['i-0abc12345678'] }, on).ok, true);
+
+  const reason = (r: ReturnType<typeof checkAction>): string => (r.ok ? 'ok' : r.reason);
+  assert.match(reason(checkAction('ecs', 'update-service', { cluster: 'web', service: 'api', 'force-new-deployment': true }, [])), /not enabled for this profile/);
+  assert.match(reason(checkAction('ec2', 'terminate-instances', { 'instance-ids': 'i-0abc12345678' }, on)), /not a fix action pf allows/);
+  assert.match(reason(checkAction('ecs', 'update-service', { cluster: 'web', service: 'api' }, on)), /at least one of/);
+  assert.match(reason(checkAction('ecs', 'update-service', { cluster: 'web' , 'force-new-deployment': true }, on)), /needs --service/);
+  assert.match(reason(checkAction('ecs', 'update-service', { cluster: 'web', service: 'api', 'desired-count': 'lots' }, on)), /not an accepted value/);
+  assert.match(reason(checkAction('ecs', 'update-service', { cluster: 'web', service: 'api', 'force-new-deployment': true, 'deployment-configuration': 'x' }, on)), /not accepted by aws ecs update-service/);
+  assert.match(reason(checkAction('ecs', 'stop-task', { cluster: 'web', task: 'file:///etc/passwd' }, on)), /load a file or URL/);
+  assert.match(reason(checkAction('ec2', 'reboot-instances', { 'instance-ids': 'web-1' }, on)), /not an accepted value/);
+  assert.match(reason(checkAction('ecs', 'update-service', { cluster: 'web', service: 'api', profile: 'x' }, on)), /not accepted/);
+  assert.match(reason(checkAction('ecs', 'stop-task', ['x'], on)), /params must be an object/);
 });

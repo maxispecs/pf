@@ -1,6 +1,6 @@
 # pf agent: tools, profiles and scoped AWS access
 
-`pf agent` starts a coding agent CLI (Claude Code, Codex or Cursor) that works through pulpfixer. The agent gets this repo's resolved commands, versioning, staging deploys and skills as tools. For AWS troubleshooting it can ask for **scoped, read-only, time-limited access**, and pf asks you to approve each request. The agent never receives credentials: pf runs every AWS call itself and checks it against what you approved.
+`pf agent` starts a coding agent CLI (Claude Code, Codex or Cursor) that works through pulpfixer. The agent gets this repo's resolved commands, versioning, staging deploys and skills as tools. For AWS troubleshooting it can ask for **scoped, read-only, time-limited access**, and pf asks you to approve each request. `pf t` (`pf troubleshoot`) adds the repo's deployment detection, a wizard that links its AWS profile, and fix actions you approve one call at a time. The agent never receives credentials: pf runs every AWS call itself and checks it against what you approved.
 
 This guide covers how to use these features and how they are built:
 
@@ -8,13 +8,14 @@ This guide covers how to use these features and how they are built:
 2. [How it fits together](#how-it-fits-together)
 3. [Starting the agent](#starting-the-agent)
 4. [The tools](#the-tools)
-5. [Profiles](#profiles)
-6. [AWS access for the agent](#aws-access-for-the-agent)
-7. [Using the pf tools from other MCP clients](#using-the-pf-tools-from-other-mcp-clients)
-8. [Implementation](#implementation)
-9. [Writing agent tools in a plugin](#writing-agent-tools-in-a-plugin)
-10. [Security model](#security-model)
-11. [Troubleshooting](#troubleshooting)
+5. [Troubleshoot mode (`pf t`)](#troubleshoot-mode-pf-t)
+6. [Profiles](#profiles)
+7. [AWS access for the agent](#aws-access-for-the-agent)
+8. [Using the pf tools from other MCP clients](#using-the-pf-tools-from-other-mcp-clients)
+9. [Implementation](#implementation)
+10. [Writing agent tools in a plugin](#writing-agent-tools-in-a-plugin)
+11. [Security model](#security-model)
+12. [Troubleshooting](#troubleshooting)
 
 The host fix agent (`pf host fix`, for EC2 instances) is a separate, headless mode. It is described in the [README](../README.md#the-fix-agent).
 
@@ -101,6 +102,9 @@ would run claude --mcp-config ~/.pf/agent/mcp.json --append-system-prompt '...'
   --allowedTools mcp__pulpfixer__pf_aws_request_access
   --allowedTools mcp__pulpfixer__pf_aws_whoami
   --allowedTools mcp__pulpfixer__pf_aws_describe
+  --allowedTools mcp__pulpfixer__pf_aws_context
+  --allowedTools mcp__pulpfixer__pf_aws_link_profile
+  --allowedTools mcp__pulpfixer__pf_aws_act
 ```
 
 `pf_run`, `pf_bump` and `pf_deploy_staging` are not on the list, so Claude asks you before each call.
@@ -119,6 +123,9 @@ would run claude --mcp-config ~/.pf/agent/mcp.json --append-system-prompt '...'
 | `pf_aws_request_access` | Ask for a grant: scopes, regions, minutes, reason | no | **pf's dialog** |
 | `pf_aws_whoami` | `sts get-caller-identity`, checked against the pinned account | yes | needs a grant |
 | `pf_aws_describe` | One read-only AWS CLI call the grant allows | yes | needs a grant |
+| `pf_aws_context` | How the repo deploys (read from its files), the profile that applies, scopes to request, enabled fix actions. Local only | yes | none |
+| `pf_aws_link_profile` | Link a profile pf supports to this repo when none applies | no | **pf's dialog** |
+| `pf_aws_act` | One AWS fix action the profile enables, shown as the exact command | no | **pf's dialog, every call** |
 
 Prompts that use them:
 
@@ -129,6 +136,143 @@ pf agent "why are tasks in the web cluster restarting?"           # pf_aws_profi
 pf agent "is i-0abc123 healthy behind the alb? check eu-west-1"   # elb + ec2 scopes
 pf agent "find errors in /ecs/api logs from the last hour"        # logs scope (only if the profile allows it)
 ```
+
+## Troubleshoot mode (`pf t`)
+
+`pf troubleshoot` (`pf t`) is agent mode with a head start for production-style problems: **what is wrong with this deployment on AWS?** Before the agent starts, pf works out how the repo deploys and which AWS profile it uses. From then on pf is the agent's bridge to AWS: it asks you to approve reads and fixes, runs every call itself, and the agent never sees credentials.
+
+```bash
+pf t                                         # start; the agent asks what is wrong
+pf t "the api returns 502 since the last deploy"
+pf t --link                                  # only pick or change the AWS profile this repo uses
+pf t --agent codex --profile side            # another agent CLI or profile for this session
+pf t --dry-run                               # print what pf found, the check and the persona; start nothing
+```
+
+`pf t` needs a repo. Use [`pf agent`](#starting-the-agent) anywhere else.
+
+### What pf does first
+
+```mermaid
+flowchart TD
+  start["pf t [prompt]"] --> detect["Read the repo's deployment: stack, staging/production, AWS hints"]
+  detect --> resolve{"A registered profile applies?"}
+  resolve -->|yes| check["Check the credentials against the pinned account"]
+  resolve -->|"no or unknown"| wizard["Link wizard: pick or register a profile, save it to pf.json"]
+  wizard --> check
+  check --> launch["Start the agent with the troubleshoot persona and skill"]
+  launch --> agent["Claude / Codex / Cursor"]
+  agent <-->|MCP| tools["pf_aws_context, pf_aws_link_profile, pf_aws_request_access, pf_aws_describe, pf_aws_act"]
+  tools -->|"dialogs: link, grant, action"| user[You]
+  tools -->|"argv, --profile"| aws["aws CLI"]
+```
+
+1. **Detect.** pf reads the repo's own files, locally: CI workflows, CDK, SAM, Serverless and SST config, Terraform, ECS task definitions, deploy scripts. It collects the staging and production deploy commands (production only when the repo defines one), AWS account ids, regions, ECS clusters and services, Lambda functions, CloudFormation stacks and log groups, and which AWS services are in use. These are hints, not facts. No secrets are looked for, and nothing is called on AWS.
+2. **Resolve the profile.** The first of `--profile`, `PF_PROFILE`, the repo's `pf.json`, the default profile (see [Profiles](#profiles)). Only a profile in pf's registry (`profiles` in `~/.pf/config.json`) is supported: an AWS profile that pf does not list is never used.
+3. **Link, if none applies.** The wizard lists the registered profiles and the AWS profiles in `~/.aws/config` that match what the repo mentions (a matching account id ranks first). You pick one, pf registers it if it is new (asking for the account to pin and the scopes to allow, with the scopes the repo's services need pre-filled), and writes `"profile": "<name>"` to this repo's `pf.json` after you confirm. Without a terminal, pf prints the best matches and the exact commands instead.
+4. **Check the credentials.** `sts get-caller-identity` through the profile, against the pinned account. An expired SSO session offers `aws sso login --profile <name>`. A different account stops the session before the agent starts.
+5. **Start the agent** with the deployment summary in its persona and the `troubleshoot` skill to follow.
+
+```text
+$ pf t
+Deployment (read from this repo's files)
+  stack: Node (npm)
+  staging deploy: npm run deploy:staging (package.json script deploy:staging)
+  AWS accounts in the repo: 123456789012
+  regions in the repo: eu-west-1
+  AWS services in use: ecs
+  ECS clusters: web
+  ECS services: api
+  suggested scopes: identity, ecs, elb, cloudwatch, logs
+profile acme (from pf.json) AWS profile acme-readonly, account 123456789012, region eu-west-1
+✓ acme: credentials resolve to the pinned account 123456789012
+```
+
+### The bridge
+
+The agent works only through pf tools. It never gets credentials and never runs the `aws` CLI.
+
+| Tool | What it does | Approval |
+|------|--------------|----------|
+| `pf_aws_context` | The deployment summary, the profile that applies, the scopes to request and the fix actions enabled. Local only | none |
+| `pf_aws_link_profile` | When no profile applies: a dialog lists the matching profiles, and you pick one and approve linking it | **pf's dialog** |
+| `pf_aws_request_access` | A read grant: scopes, regions, minutes, reason. See [AWS access](#aws-access-for-the-agent) | **pf's dialog** |
+| `pf_aws_whoami`, `pf_aws_describe` | Read-only calls inside the grant | needs a grant |
+| `pf_aws_act` | One fix action, such as `ecs update-service --force-new-deployment` | **pf's dialog, for every call** |
+
+#### Link dialog
+
+```text
+The agent needs an AWS profile for this repo, and none is linked yet.
+Repo: /Users/me/code/acme-api
+The repo mentions: accounts 123456789012; regions eu-west-1
+Reason: api returns 502
+
+Profiles:
+- acme (registered): AWS profile acme-readonly, account 123456789012, region eu-west-1. Matches: account 123456789012 appears in the repo
+- corp-ro (new, from ~/.aws/config): AWS profile corp-ro, account 123456789012, region eu-west-1. Matches: account 123456789012 appears in the repo
+
+Linking writes "profile" to pf.json in this repo. A new profile is registered in ~/.pf/config.json with the account pinned when known. Read access still needs its own approval.
+
+Profile for this repo   [ acme (registered) v ]
+[ ] Link this profile to the repo
+```
+
+If you decline, the agent is told not to ask again. The link applies to the running session at once.
+
+#### Fix actions
+
+A read grant never changes anything. A fix is separate and stricter:
+
+- **Off by default.** An action works only when your user profile lists it: `pf profile add acme --actions "ecs update-service,ecs stop-task"`. A repo's `pf.json` (`agent.aws.actions`) can only remove actions, never add one.
+- **One call, one approval.** Every `pf_aws_act` call opens its own dialog with the exact command. Nothing runs without your answer there, and an earlier approval does not carry over. If the agent CLI cannot show the dialog, the action is refused, even in Codex or Cursor.
+- **Only listed flags and values.** Each action accepts a fixed set of flags with checked values.
+- **Pinned account and region.** The profile must pin an account, pf verifies it before it asks you, and the region must be within the profile's limits.
+- **Traceable.** `aws-action-request`, `aws-action-decision`, `aws-action` and `aws-action-refused` events go to the session audit log. Output is redacted.
+
+| Action | What it does | Accepted flags |
+|--------|--------------|----------------|
+| `ecs update-service` | redeploy, rescale or point a service at another task definition | `cluster`, `service`, `force-new-deployment`, `desired-count`, `task-definition` (at least one of the last three) |
+| `ecs stop-task` | stop one task; its service starts a replacement | `cluster`, `task`, `reason` |
+| `ec2 reboot-instances` | reboot instances | `instance-ids` |
+| `autoscaling set-desired-capacity` | change an auto scaling group's size | `auto-scaling-group-name`, `desired-capacity` |
+| `rds reboot-db-instance` | reboot a database instance, without failover | `db-instance-identifier` |
+
+Deleting, terminating and anything with IAM or secrets is never an action.
+
+```text
+The agent asks pulpfixer to CHANGE something on AWS.
+Profile: acme (from pf.json), AWS profile acme-readonly, account 123456789012 (verified)
+Action: redeploy (force-new-deployment), rescale or point an ECS service at another task definition
+Command: aws ecs update-service --cluster web --service api --force-new-deployment --output json --profile acme-readonly --region eu-west-1
+Reason: tasks keep failing health checks on image api:1.42, the previous revision was healthy
+This runs once, only if you approve it now. The agent never sees credentials.
+
+[ ] Run this command          (This one call only)
+```
+
+Defense in depth still applies: point the profile at a role that allows only the actions you enabled.
+
+### The skill
+
+The agent follows the bundled `troubleshoot` skill (`packages/core/assets/skills/troubleshoot/SKILL.md`; a same-named skill of yours or in the repo wins): get oriented with `pf_aws_context`, request the fewest scopes, check the account, read from the symptom outward, compare with the last deploy, report the cause with evidence, then propose a fix and wait for your agreement before `pf_aws_act`.
+
+### Without `pf t`
+
+The same tools are served by `pf agent` and `pf mcp`, so any session can use them. `pf t` adds the detection, the link wizard, the credentials check, the persona and the skill.
+
+### Where things live (troubleshoot)
+
+| Path | What |
+|------|------|
+| `packages/core/src/commands/troubleshoot.ts` | the command, the link wizard, the credentials check |
+| `packages/plugin-aws/src/infra.ts` | deployment detection (`detectAwsDeployment`, `scanAwsHints`, `scopesFor`) |
+| `packages/plugin-aws/src/awsconfig.ts` | `~/.aws/config` parsing (names, account, region, kind only) and candidate ranking |
+| `packages/plugin-aws/src/link.ts` | `linkChoices`, `applyLink`: register a profile and name it in `pf.json` |
+| `packages/plugin-aws/src/access.ts` | `ACTIONS`, `checkAction`, the new `lambda-metadata` and `cloudformation` scopes |
+| `packages/plugin-aws/src/agent-tools.ts` | `pf_aws_context`, `pf_aws_link_profile`, `pf_aws_act` |
+| `packages/kit/src/profiles.ts`, `context.ts` | `linkRepoProfile`, `refreshContext` (config reloads before each tool call) |
+| `packages/core/assets/skills/troubleshoot/` | the skill |
 
 ## Profiles
 
@@ -148,6 +292,8 @@ pf profile add acme --aws-profile acme-readonly --account 123456789012 --region 
 pf profile add side --aws-profile sp-ro --region us-east-1      # no --scopes: everything except logs
 pf profile add acme --max-ttl 30                                 # edit one field; others are kept
 pf profile add acme --region ""                                  # clear a field
+pf profile add acme --actions "ecs update-service,ecs stop-task" # let the agent ask for these fixes (each call is approved by you)
+pf profile add acme --actions ""                                 # none again
 pf profile add                                                   # in a terminal: a wizard
 ```
 
@@ -176,6 +322,7 @@ The resulting `~/.pf/config.json`:
 | `agent.aws.scopes` | scopes the agent may be granted | all except `logs` |
 | `agent.aws.regions` | regions the agent may read | `aws.region`, else any |
 | `agent.aws.maxTtlMinutes` | longest grant | 60 (hard cap 480) |
+| `agent.aws.actions` | fix actions the agent may ask for, each approved one call at a time | none |
 
 Pin the account. pf then runs `sts get-caller-identity` before the first read of every grant, and refuses everything if the credentials point somewhere else (a stale SSO session, a mixed-up profile).
 
@@ -190,7 +337,9 @@ Pin the account. pf then runs `sts get-caller-identity` before the first read of
 }
 ```
 
-`agent.aws` is optional. Each list is intersected with the user's limits, and the shorter time wins.
+`agent.aws` is optional. Each list (scopes, regions, actions) is intersected with the user's limits, and the shorter time wins. A repo can remove an action the user enabled, never add one.
+
+`pf t` writes the `"profile"` line for you: when no profile applies it lists the registered profiles and the AWS profiles in `~/.aws/config` that match the repo, and links the one you pick.
 
 ### Which profile applies
 
@@ -346,9 +495,11 @@ What gets refused, and the message the agent gets:
 | `cloudwatch` | `describe-alarms`, `describe-alarm-history`, `list-metrics`, `get-metric-statistics`, `get-metric-data` |
 | `logs` | `describe-log-groups`, `describe-log-streams`, `describe-metric-filters`, `filter-log-events`, `get-log-events` (opt-in: log text can hold secrets) |
 | `ssm-metadata` | `describe-instance-information`, `describe-instance-patch-states`, `describe-parameters` (names, never values), `list-commands` |
+| `lambda-metadata` | `lambda list-functions`, `get-function-configuration`, `list-aliases`, `list-versions-by-function`, `list-event-source-mappings`, `get-event-source-mapping`, `get-function-concurrency` (environment values redacted, never code) |
+| `cloudformation` | `cloudformation list-stacks`, `describe-stacks`, `describe-stack-events`, `describe-stack-resources`, `describe-stack-resource`, `list-stack-resources` (never templates) |
 | `s3-metadata` | `s3api list-buckets`, `get-bucket-location`, `get-bucket-versioning`, `get-bucket-encryption`, `get-public-access-block`, `get-bucket-policy-status`, `get-bucket-lifecycle-configuration`, `list-objects-v2`, `head-object` (never object contents) |
 
-Never allowed, with any grant: secret values (`secretsmanager get-secret-value`, `ssm get-parameter(s)`, `get-parameters-by-path`), command output (`ssm get-command-invocation`), shells (`ssm start-session`), file contents (`s3api get-object`, `s3 cp`, `s3 sync`), decryption (`kms decrypt`), code links (`lambda get-function`), passwords and user data (`ec2 get-password-data`, `describe-instance-attribute`, `describe-launch-template-versions`, `autoscaling describe-launch-configurations`), credentials (`ecr get-login-password`, `sts get-session-token`, `assume-role`, `get-federation-token`, `iam create-access-key`), and `rds download-db-log-file-portion`. Anything not listed in a scope is refused as well.
+Never allowed, with any grant: secret values (`secretsmanager get-secret-value`, `ssm get-parameter(s)`, `get-parameters-by-path`), command output (`ssm get-command-invocation`), shells (`ssm start-session`), file contents (`s3api get-object`, `s3 cp`, `s3 sync`), decryption (`kms decrypt`), code links and invocation (`lambda get-function`, `lambda invoke`), templates (`cloudformation get-template`), passwords and user data (`ec2 get-password-data`, `describe-instance-attribute`, `describe-launch-template-versions`, `autoscaling describe-launch-configurations`), credentials (`ecr get-login-password`, `sts get-session-token`, `assume-role`, `get-federation-token`, `iam create-access-key`), and `rds download-db-log-file-portion`. Anything not listed in a scope is refused as well.
 
 Flags pf sets itself or refuses: `--profile`, `--region`, `--output`, `--endpoint-url`, `--cli-input-json`, `--cli-input-yaml`, `--generate-cli-skeleton`, `--debug`, `--ca-bundle`, `--no-verify-ssl`, `--no-sign-request`, `--cli-binary-format`, `--with-decryption`, `--color`, `--no-paginate`, `--page-size`. Values may not load a file or URL (`file://`, `fileb://`, `http(s)://`) or start with `--`.
 
@@ -356,7 +507,7 @@ Flags pf sets itself or refuses: `--profile`, `--region`, `--output`, `--endpoin
 
 pf parses the JSON and hides:
 
-- every `value` in a container `environment` list (ECS task definitions), keeping the names;
+- every `value` in a container `environment` list (ECS task definitions), keeping the names, and every value in a Lambda `Environment.Variables` map;
 - any string field whose key looks secret (`password`, `secret`, `token`, `credential`, `privateKey`, `apiKey`, `UserData`), except `nextToken`, which paging needs;
 - the `Value` of a name/value pair whose name looks secret (`{ "Name": "db_password", "Value": "..." }`).
 
@@ -411,7 +562,7 @@ Each agent session writes one log to `~/.pf/agent/audit/<time>-<session>.log` (o
 {"at":"...","event":"aws-refused","service":"secretsmanager","operation":"get-secret-value","reason":"..."}
 ```
 
-Other events: `aws-account-mismatch` (expected and actual account), and `tool` for every tool call.
+Other events: `aws-account-mismatch` (expected and actual account), `tool` for every tool call, `aws-link-request`, `aws-link-decision` and `aws-link` for profile linking, and `aws-action-request`, `aws-action-decision`, `aws-action` and `aws-action-refused` for fix actions.
 
 ### When the agent CLI cannot show a dialog
 
@@ -489,7 +640,9 @@ pf accepts form elicitation as `elicitation: {}` (2025-06-18) or `elicitation: {
 | `packages/plugin-aws/src/access.ts` | scopes, `DENIED`, `checkOperation`, `limitsFor`, `paramArgv`, `redactJson`, `redactText` |
 | `packages/plugin-aws/src/grants.ts` | the grant store |
 | `packages/plugin-aws/src/project.ts` | `projectAws(ctx)`: the profile that applies, ready to use, or why not |
-| `packages/plugin-aws/src/agent-tools.ts` | the four `pf_aws_*` tools |
+| `packages/plugin-aws/src/agent-tools.ts` | the `pf_aws_*` tools |
+| `packages/plugin-aws/src/infra.ts`, `awsconfig.ts`, `link.ts` | `pf t`: deployment detection, `~/.aws/config` parsing and ranking, linking a repo to a profile |
+| `packages/core/src/commands/troubleshoot.ts` | `pf t`: the command, the link wizard, the credentials check |
 | `packages/plugin-aws/src/commands/aws.ts` | `pf aws grants` / `pf aws revoke` |
 
 ### The tool contract
@@ -548,9 +701,9 @@ Add one line to `SCOPES` in `packages/plugin-aws/src/access.ts`:
   },
 },
 {
-  name: 'lambda-metadata',                               // a new scope
-  summary: 'functions and their configuration (never code)',
-  ops: { lambda: ['list-functions', 'get-function-configuration'] },
+  name: 'sqs-metadata',                                  // a new scope
+  summary: 'queues and their attributes (never messages)',
+  ops: { sqs: ['list-queues', 'get-queue-attributes'] },
 },
 ```
 
@@ -671,6 +824,8 @@ To test over the protocol, drive `serve()` with in-memory streams: send `initial
 - **Approval outside the model.** A grant needs your answer in a dialog. No tool argument can approve one.
 - **Two layers of limits.** Your profile caps what can be asked for, and a repo can only narrow it. Inside a grant, every call is checked for operation, scope, region, parameters and account.
 - **Fail closed.** No grant, no read. A wrong account means nothing is read. With no dialog and a client that runs the tool unasked, the grant is refused.
+- **Fixes are separate and stricter.** `pf_aws_act` runs only actions your profile enables, with listed flags, on a pinned account, and only after you approve that exact command in pf's dialog. It never falls back to the agent CLI's own prompt.
+- **Only registered profiles.** pf uses an AWS profile only when it is in pf's registry (`~/.pf/config.json`). Linking one to a repo needs your pick and approval.
 - **Short-lived.** Grants last minutes, end with the session, and can be revoked from another terminal.
 - **Traceable.** Every request, decision, call and refusal is logged per session in `~/.pf/agent/audit/`.
 - **Defense in depth.** Point each profile at a read-only IAM role (`ViewOnlyAccess`, or tighter), so AWS refuses writes even if pf had a bug.
@@ -689,9 +844,12 @@ Limits to keep in mind:
 | `The profile "x" ... is not configured` | `pf.json` names a profile this machine does not have: `pf profile add x ...` |
 | `has no AWS profile` | `pf profile add x --aws-profile <name>` |
 | The dialog never shows; the grant says `could not ask the user` | the agent CLI lacks MCP elicitation, or this is `claude -p`. Update the CLI, or run the agent interactively |
+| `aws ... is not enabled for this profile` | the action is off for this profile: `pf profile add <name> --actions "<service> <operation>"`, or run the change yourself |
+| `Fix actions need a pinned account` | `pf profile add <name> --account <id>` |
+| `No AWS profiles are available` (link dialog) | pf has no profiles and `~/.aws/config` lists none: `aws configure sso`, then `pf t --link` |
 | `This is not the pinned account` | the AWS profile resolves to another account, often after an SSO login to another account. Check with `pf profile check`, fix `~/.aws/config` or log in again |
 | `aws ... failed: ... ExpiredToken` / `SSO session expired` | `aws sso login --profile <aws-profile>` |
 | `aws CLI not found on PATH` | install the aws CLI v2 |
 | Output cut | narrow the call with `query`, `filters`, `max-items` or a shorter time range |
-| The agent keeps the old profile | the server reads `~/.pf/config.json` when it starts, so restart the agent after editing profiles |
+| The agent keeps the old profile | the server re-reads `~/.pf/config.json` and `pf.json` before each tool call, so an edit applies on the next call. `--profile` and `PF_PROFILE` still win over `pf.json` for that session |
 | Check what the agent did | `ls -t ~/.pf/agent/audit/ \| head -1`, then read that log |

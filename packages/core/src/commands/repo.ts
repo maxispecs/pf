@@ -1,13 +1,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Context } from '@pulpfixer/kit/context';
-import { capture, runCmd } from '@pulpfixer/kit/exec';
+import { buildContext, type Context } from '@pulpfixer/kit/context';
+import { detectDeploy, detectProduction, detectStaging } from '@pulpfixer/kit/detect/deploy';
+import { findDeployHelpers, type DeployHelper } from '@pulpfixer/kit/detect/helpers';
+import { capture, formatCmd, runCmd } from '@pulpfixer/kit/exec';
 import { err } from '@pulpfixer/kit/ui/palette';
+import { confirm } from '@pulpfixer/kit/ui/prompt';
 import { badgeLabel, h2, termLine, ul } from '@pulpfixer/kit/ui/text';
-import { exists, readText, takeFlag } from '@pulpfixer/kit/util';
+import { exists, interactive, readText, takeFlag } from '@pulpfixer/kit/util';
 import { packageRoot } from '@pulpfixer/kit/version';
 import type { Command } from '@pulpfixer/kit/types';
+import { startAgent } from '../agent/launch.js';
 import { homeSkillFile } from '../skills/stack.js';
+import { runDeployAuto } from './deploy.js';
 import { cliRevision, resolveVerCli } from './ver.js';
 
 /** Path of the /pnpm skill helper bundled with pf (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`); the offline fallback. */
@@ -28,6 +33,11 @@ export const TASKS_HELPER_PATHS = ['scripts/tasks.mjs', 'scripts/pnpm-tasks.mjs'
 
 /** Marker line of the pnpm helper, to tell it from an unrelated tasks.mjs. */
 export const isTasksHelper = (text: string | null): boolean => !!text && text.includes('@skill pnpm');
+
+/** Has `pf repo` (or the /pnpm and /ver skills it installs) been run in this repo? True with a pnpm helper copy or a `versions.json`. */
+export function isRepoSetUp(root: string): boolean {
+  return exists(root, 'versions.json') || TASKS_HELPER_PATHS.some((t) => isTasksHelper(readText(root, t)));
+}
 
 const isVerCli = (file: string): boolean => (readText(file) ?? '').includes('const CLI_VERSION');
 
@@ -171,17 +181,70 @@ async function setupVer(root: string, dryRun: boolean, done: string[]): Promise<
   return 0;
 }
 
+/** What the agent is asked first. The skill carries the method; the ranked helpers are only hints. */
+export function deploySetupPrompt(helpers: DeployHelper[]): string {
+  const hints = helpers.length
+    ? `pf found these scripts at the repo root, best guess first: ${helpers.map((h) => `${h.file} (${h.reasons.join(', ')})`).join('; ')}. Check them yourself.`
+    : 'pf found no helper script at the repo root; look in the docs, a Makefile, a justfile or cli/.';
+  return `Set up pf deploy for this repo: call pf_skill with name "deploy-setup" and follow it. ${hints} Do not run the deploy.`;
+}
+
+interface DeployStep {
+  /** The deploy pf already resolves (`pf d`), printed in the summary. */
+  resolved: string | null;
+  helpers: DeployHelper[];
+  /** Start the agent after the summary. */
+  agent: boolean;
+}
+
+/**
+ * The deploy part of `pf repo`: report what `pf d` runs, or find a custom helper and offer to let the
+ * agent wire it (the agent takes over the terminal, so it starts after the summary).
+ */
+async function planDeploy(ctx: Context, opts: { force: boolean; dryRun: boolean }, done: string[]): Promise<DeployStep> {
+  const root = ctx.repo!.root;
+  const found = (['staging', 'production', 'repo'] as const)
+    .map((env) => ({ env, step: (env === 'staging' ? detectStaging(ctx) : env === 'production' ? detectProduction(ctx) : detectDeploy(ctx)).steps[0] }))
+    .find((x) => x.step);
+  const resolved = found ? `pf d runs ${formatCmd(found.step!.cmd, root)} (${found.step!.source}, ${found.env === 'repo' ? 'bare deploy' : found.env})` : null;
+  if (resolved && !opts.force) {
+    done.push(`deploy: ${resolved}`);
+    return { resolved, helpers: [], agent: false };
+  }
+  const helpers = findDeployHelpers(root);
+  const names = helpers.map((h) => `${h.file}${h.serverOnly ? ' (server only)' : ''}`).join(', ');
+  if (opts.dryRun) {
+    done.push(helpers.length || opts.force ? `deploy: would start the agent to wire pf d${names ? ` (candidates: ${names})` : ''}` : 'deploy: nothing found for pf d');
+    return { resolved, helpers, agent: false };
+  }
+  if (helpers.length === 0 && !opts.force) {
+    done.push('deploy: nothing found for pf d, run pf rp --deploy to let the agent look');
+    return { resolved, helpers, agent: false };
+  }
+  if (!opts.force && !interactive()) {
+    done.push(`deploy: found ${names}, run pf rp --deploy in a terminal to wire pf d to it`);
+    return { resolved, helpers, agent: false };
+  }
+  if (!opts.force && !(await confirm(`Found ${names}. Let the agent read it and wire pf d?`, true))) {
+    done.push('deploy: skipped, run pf rp --deploy later');
+    return { resolved, helpers, agent: false };
+  }
+  return { resolved, helpers, agent: true };
+}
+
 export const repoCommand: Command = {
   name: 'repo',
-  summary: 'Hook pf tools into this repo (pnpm commands, versioning), or update them',
+  summary: 'Hook pf tools into this repo (pnpm commands, versioning, deploy), or update them',
   group: 'Tools',
-  usage: 'pf repo [--dry-run] [--no-pnpm] [--no-ver]',
+  usage: 'pf repo [--dry-run] [--no-pnpm] [--no-ver] [--no-deploy] [--deploy]',
   async run(ctx: Context, args: string[]) {
     const c = err();
     const rest = [...args];
     const dryRun = takeFlag(rest, '--dry-run', '-n');
     const noPnpm = takeFlag(rest, '--no-pnpm');
     const noVer = takeFlag(rest, '--no-ver');
+    const noDeploy = takeFlag(rest, '--no-deploy');
+    const forceDeploy = takeFlag(rest, '--deploy');
     if (!ctx.repo) {
       process.stderr.write(`${badgeLabel('error', c)} pf repo needs a repo. Run it inside a project directory.\n`);
       return 1;
@@ -200,9 +263,24 @@ export const repoCommand: Command = {
       if (code !== 0) return code;
     }
 
+    let deploy: DeployStep | null = null;
+    if (!noDeploy) {
+      process.stderr.write(`\n${h2('Deploy', c)}\n`);
+      deploy = await planDeploy(ctx, { force: forceDeploy, dryRun }, done);
+    }
+
     process.stderr.write(`\n${h2(dryRun ? 'Would do (dry run, nothing written)' : 'Done', c)}\n${ul(done, c)}\n`);
     const next = [!noPnpm && exists(root, 'package.json') ? termLine('pnpm ask', c) : '', !noVer ? termLine('pf ver', c) : ''].filter(Boolean);
     if (next.length) process.stderr.write(`${c.dim('Next:')} ${next.join(c.dim(', '))}${c.dim('. Nothing is committed; rerun pf repo after pf update to refresh the tools.')}\n`);
+
+    if (deploy?.agent) {
+      process.stderr.write(`\n${h2('Deploy setup (agent)', c)}\n`);
+      const code = await startAgent(ctx, { prompt: deploySetupPrompt(deploy.helpers) });
+      if (code !== 0) return code;
+      // The agent may have written pf.json: show what pf d resolves to now (a preview, nothing runs).
+      process.stderr.write(`\n${c.dim('pf d now:')}\n`);
+      return runDeployAuto(buildContext(ctx.cwd), { dryRun: true });
+    }
     return 0;
   },
 };

@@ -2,8 +2,28 @@ import type { Context } from '@pulpfixer/kit/context';
 import { shortDescription, type Skill } from '../skills/discover.js';
 import { commandsText, loadAgentSkills } from './tools.js';
 
+export interface PersonaOptions {
+  /** `pf t`: the deployment summary pf read from the repo (one line per fact). Adds the troubleshooting rules. */
+  troubleshoot?: { deployment: string[] };
+}
+
+/** Extra rules for `pf t`: how the agent works with pf as its bridge to AWS. */
+function troubleshootText(lines: string[]): string {
+  return [
+    'Troubleshooting mode (pf t). The user started this session to find out what is wrong with this repo\'s deployment. pf has already looked at how the repo deploys; this is what it read from the repo\'s files (hints, not facts):',
+    ...lines.map((l) => `  ${l}`),
+    '',
+    'How to work:',
+    '- Call pf_aws_context first. It repeats the above and says which pf profile applies and which scopes to request. If no profile applies, call pf_aws_link_profile: the user picks one in a dialog and pf links it. Do not guess a profile and do not ask the user to type one in chat.',
+    '- Follow the troubleshoot skill: call pf_skill with name "troubleshoot".',
+    '- Diagnose with reads first. Ask pf_aws_request_access for the fewest scopes the evidence needs, then use pf_aws_whoami and pf_aws_describe. Each call goes through pf, which holds the AWS credentials; you never see them.',
+    '- A fix changes AWS. Say what you found, what you would change and why, and wait for the user to agree in the conversation. Only then call pf_aws_act. pf also shows the user the exact command and runs it only if they approve that one call. If they decline, do not retry it; offer another approach.',
+    '- If pf says an action is not enabled or a scope is not allowed, tell the user what they would have to enable (pf profile add <name> --actions ... / --scopes ...). Do not look for a way around it.',
+  ].join('\n');
+}
+
 /** System prompt for the coding agent: what this repo is, and the rules pf enforces. */
-export function buildPersona(ctx: Context, skills: Skill[] = loadAgentSkills(ctx)): string {
+export function buildPersona(ctx: Context, skills: Skill[] = loadAgentSkills(ctx), opts: PersonaOptions = {}): string {
   const skillLines = skills.length
     ? skills.map((s) => `- ${s.name}: ${shortDescription(s.description, 120)}`).join('\n')
     : '- none found';
@@ -19,8 +39,10 @@ export function buildPersona(ctx: Context, skills: Skill[] = loadAgentSkills(ctx
     '- Deploys go to staging only, never production. pf_deploy_staging without confirm returns the plan. Show that plan to the user and pass confirm: true only after they agree.',
     '- Never read, print or write a registry token or other secret. An .npmrc auth line uses ${NPM_TOKEN}; leave it alone.',
     '- For AWS troubleshooting use the pf_aws_* tools, never the aws CLI in a shell and never ask for credentials. Call pf_aws_profile first, then pf_aws_request_access with the fewest scopes the task needs and a clear reason; the user approves it in a dialog. Then read with pf_aws_whoami and pf_aws_describe. If the user declines, do not ask again unless they tell you to.',
+    '- To change anything on AWS use pf_aws_act, never a shell. It only works for actions the user enabled on the profile, and pf asks them to approve each call.',
     '- When a task matches a skill below, call pf_skill with its name and follow the instructions it returns.',
     '',
+    ...(opts.troubleshoot ? [troubleshootText(opts.troubleshoot.deployment), ''] : []),
     'Skills:',
     skillLines,
   ].join('\n');

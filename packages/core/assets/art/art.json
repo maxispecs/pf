@@ -2,6 +2,7 @@
   "actions": {
     "repo": "octopus-repo",
     "update": "coffee",
-    "agent": "octopus-agent"
+    "agent": "octopus-agent",
+    "troubleshoot": "octopus-agent"
   }
 }

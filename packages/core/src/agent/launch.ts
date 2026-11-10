@@ -22,6 +22,8 @@ export interface StartOptions {
   /** `--profile` value: the pf profile the agent's tools use. */
   profile?: string;
   dryRun?: boolean;
+  /** `pf t`: the deployment summary for the persona. Starts the agent in troubleshooting mode. */
+  troubleshoot?: { deployment: string[] };
 }
 
 function agentError(choice: AgentChoice): string {
@@ -108,7 +110,7 @@ export async function startAgent(ctx: Context, opts: StartOptions = {}): Promise
     process.stderr.write(`${c.dim(`using ${choice.agent.label} (auto-detected). Choose one with`)} ${termLine('pf agent use', c)}\n`);
   }
   if (choice.agent.id === 'cursor') await ensureCursorMcp(Boolean(opts.dryRun));
-  const persona = buildPersona(ctx, loadAgentSkills(ctx));
+  const persona = buildPersona(ctx, loadAgentSkills(ctx), opts.troubleshoot ? { troubleshoot: opts.troubleshoot } : {});
   const launch = buildLaunch(choice.agent, {
     persona,
     prompt: opts.prompt ?? '',

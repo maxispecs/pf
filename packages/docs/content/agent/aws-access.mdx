@@ -105,6 +105,8 @@ aws ecs describe-services --cluster web --services api --query '...' --output js
 | `cloudwatch` | `describe-alarms`, `describe-alarm-history`, `list-metrics`, `get-metric-statistics`, `get-metric-data` |
 | `logs` | `describe-log-groups`, `describe-log-streams`, `describe-metric-filters`, `filter-log-events`, `get-log-events` (opt-in: log text can hold secrets) |
 | `ssm-metadata` | `describe-instance-information`, `describe-instance-patch-states`, `describe-parameters` (names, never values), `list-commands` |
+| `lambda-metadata` | `lambda list-functions`, `get-function-configuration`, `list-aliases`, `list-versions-by-function`, `list-event-source-mappings`, `get-event-source-mapping`, `get-function-concurrency` (environment values redacted, never code) |
+| `cloudformation` | `cloudformation list-stacks`, `describe-stacks`, `describe-stack-events`, `describe-stack-resources`, `describe-stack-resource`, `list-stack-resources` (never templates) |
 | `s3-metadata` | `s3api list-buckets`, `get-bucket-location`, `get-bucket-versioning`, `get-bucket-encryption`, `get-public-access-block`, `get-bucket-policy-status`, `get-bucket-lifecycle-configuration`, `list-objects-v2`, `head-object` (never object contents) |
 
 Without `--scopes`, a profile allows every scope except `logs`, for at most 60 minutes per grant (`--max-ttl`, up to 480).
@@ -116,7 +118,8 @@ Never allowed, with any grant:
 - shells: `ssm start-session`
 - file contents: `s3api get-object`, `s3 cp`, `s3 sync`
 - decryption: `kms decrypt`
-- code links: `lambda get-function`
+- code links and invocation: `lambda get-function`, `lambda invoke`
+- templates: `cloudformation get-template`
 - passwords and user data: `ec2 get-password-data`, `describe-instance-attribute`, `describe-launch-template-versions`, `autoscaling describe-launch-configurations`
 - credentials: `ecr get-login-password`, `sts get-session-token`, `assume-role`, `get-federation-token`, `iam create-access-key`
 - `rds download-db-log-file-portion`
@@ -129,7 +132,7 @@ Flags pf sets itself or refuses: `--profile`, `--region`, `--output`, `--endpoin
 
 pf parses the JSON and hides:
 
-- every `value` in a container `environment` list (ECS task definitions), keeping the names;
+- every `value` in a container `environment` list (ECS task definitions), keeping the names, and every value in a Lambda `Environment.Variables` map;
 - any string field whose key looks secret (`password`, `secret`, `token`, `credential`, `privateKey`, `apiKey`, `UserData`), except `nextToken`, which paging needs;
 - the `Value` of a name/value pair whose name looks secret (`{ "Name": "db_password", "Value": "..." }`).
 
@@ -184,7 +187,7 @@ Each agent session writes one log to `~/.pf/agent/audit/<time>-<session>.log` (o
 {"at":"...","event":"aws-refused","service":"secretsmanager","operation":"get-secret-value","reason":"..."}
 ```
 
-Other events: `aws-account-mismatch` (expected and actual account), and `tool` for every tool call.
+Other events: `aws-account-mismatch` (expected and actual account), `tool` for every tool call, `aws-link-request`, `aws-link-decision` and `aws-link` for profile linking, and `aws-action-request`, `aws-action-decision`, `aws-action` and `aws-action-refused` for [fix actions](/agent/troubleshoot#fix-actions).
 
 ## When the agent CLI cannot show a dialog
 
@@ -209,9 +212,9 @@ This is for pf developers. Add one line to `SCOPES` in `packages/plugin-aws/src/
   },
 },
 {
-  name: 'lambda-metadata',                               // a new scope
-  summary: 'functions and their configuration (never code)',
-  ops: { lambda: ['list-functions', 'get-function-configuration'] },
+  name: 'sqs-metadata',                                  // a new scope
+  summary: 'queues and their attributes (never messages)',
+  ops: { sqs: ['list-queues', 'get-queue-attributes'] },
 },
 ```
 

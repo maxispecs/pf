@@ -9,6 +9,8 @@ export interface CustomCommand {
   group?: string;
   /** Relative to the repo root. */
   cwd?: string;
+  /** The command takes a message as its last argument (a deploy that commits): `pf d "text"` passes it on. */
+  message?: boolean;
 }
 
 /** What the agent may be granted on AWS. A missing list means no limit from this layer. */
@@ -16,6 +18,11 @@ export interface AgentAwsScope {
   scopes?: string[];
   regions?: string[];
   maxTtlMinutes?: number;
+  /**
+   * Fix actions (`service operation`, e.g. `ecs update-service`) the agent may ask to run, each approved
+   * by the user one call at a time. Missing means none: it is opt-in on the user's profile, and a repo can only narrow it.
+   */
+  actions?: string[];
 }
 
 /** A named project profile in `~/.pf/config.json`: which AWS account to use and how far the agent may go. Nothing secret. */
@@ -60,7 +67,8 @@ export function parseAgentAwsScope(v: unknown): AgentAwsScope | undefined {
   const scopes = strList(v.scopes);
   const regions = strList(v.regions);
   const ttl = typeof v.maxTtlMinutes === 'number' && v.maxTtlMinutes > 0 ? Math.floor(v.maxTtlMinutes) : undefined;
-  return { ...(scopes ? { scopes } : {}), ...(regions ? { regions } : {}), ...(ttl ? { maxTtlMinutes: ttl } : {}) };
+  const actions = strList(v.actions);
+  return { ...(scopes ? { scopes } : {}), ...(regions ? { regions } : {}), ...(ttl ? { maxTtlMinutes: ttl } : {}), ...(actions ? { actions } : {}) };
 }
 
 export function parseProfile(v: unknown): ProfileConfig {
@@ -90,6 +98,7 @@ export function loadRepoConfig(root: string): RepoConfig {
           ...(typeof o.description === 'string' ? { description: o.description } : {}),
           ...(typeof o.group === 'string' ? { group: o.group } : {}),
           ...(typeof o.cwd === 'string' ? { cwd: o.cwd } : {}),
+          ...(o.message === true ? { message: true } : {}),
         };
       }
     }

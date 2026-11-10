@@ -11,6 +11,8 @@ title: Security and troubleshooting
 - **Short-lived.** Grants last minutes, end with the session, and can be revoked from another terminal.
 - **Traceable.** Every request, decision, call and refusal is logged per session in `~/.pf/agent/audit/`.
 - **Defense in depth.** Point each profile at a read-only IAM role (`ViewOnlyAccess`, or tighter), so AWS refuses writes even if pf had a bug.
+- **Fixes are separate and stricter.** `pf_aws_act` runs only actions your profile enables, with listed flags, on a pinned account, and only after you approve that exact command in pf's dialog. It never falls back to the agent CLI's own prompt.
+- **Only registered profiles.** pf uses an AWS profile only when it is in pf's registry (`~/.pf/config.json`). Linking one to a repo needs your pick and approval.
 - **Staging only.** The agent and MCP tools deploy to staging only. A staging deploy returns a plan until the call passes `confirm`, and the agent CLI asks first.
 
 Limits to keep in mind:
@@ -27,9 +29,12 @@ Limits to keep in mind:
 | `The profile "x" ... is not configured` | `pf.json` names a profile this machine does not have: `pf profile add x ...` |
 | `has no AWS profile` | `pf profile add x --aws-profile <name>` |
 | The dialog never shows; the grant says `could not ask the user` | the agent CLI lacks MCP elicitation, or this is `claude -p`. Update the CLI, or run the agent interactively |
+| `aws ... is not enabled for this profile` | the action is off for this profile: `pf profile add <name> --actions "<service> <operation>"`, or run the change yourself |
+| `Fix actions need a pinned account` | `pf profile add <name> --account <id>` |
+| `No AWS profiles are available` (link dialog) | pf has no profiles and `~/.aws/config` lists none: `aws configure sso`, then `pf t --link` |
 | `This is not the pinned account` | the AWS profile resolves to another account, often after an SSO login to another account. Check with `pf profile check`, fix `~/.aws/config` or log in again |
 | `aws ... failed: ... ExpiredToken` or `SSO session expired` | `aws sso login --profile <aws-profile>` |
 | `aws CLI not found on PATH` | install the aws CLI v2 |
 | Output cut | narrow the call with `query`, `filters`, `max-items` or a shorter time range |
-| The agent keeps the old profile | the server reads `~/.pf/config.json` when it starts, so restart the agent after editing profiles |
+| The agent keeps the old profile | the server re-reads `~/.pf/config.json` and `pf.json` before each tool call, so an edit applies on the next call. `--profile` and `PF_PROFILE` still win over `pf.json` for that session |
 | Check what the agent did | list `~/.pf/agent/audit/` newest first, then read the latest log |

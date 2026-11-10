@@ -13,6 +13,7 @@ import { SHORTCUTS, shortcutCommands } from './shortcuts.js';
 import { skillCommand } from './skill.js';
 import { TASK_COMMANDS } from './tasks.js';
 import { toolsCommand } from './tools.js';
+import { troubleshootCommand } from './troubleshoot.js';
 import type { Command } from '@pulpfixer/kit/types';
 import { uninstallCommand } from './uninstall.js';
 import { updateCommand } from './update.js';
@@ -27,6 +28,7 @@ import { pluginCommands } from '../plugins/index.js';
 export function allCommands(): Command[] {
   const all: Command[] = [
     agentCommand,
+    troubleshootCommand,
     artCommand,
     mcpCommand,
     ...TASK_COMMANDS,

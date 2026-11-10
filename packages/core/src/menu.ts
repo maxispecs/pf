@@ -2,7 +2,7 @@ import path from 'node:path';
 import { resolveAgent } from './agent/agents.js';
 import { aboutCommand } from './commands/about.js';
 import { agentCommand } from './commands/agent.js';
-import { runDeployStaging } from './commands/deploy.js';
+import { runDeployAuto, runDeployStaging } from './commands/deploy.js';
 import { runDoc } from './commands/doc.js';
 import { doctorCommand } from './commands/doctor.js';
 import { initCommand } from './commands/init.js';
@@ -10,6 +10,7 @@ import { setupCommand } from './commands/setup.js';
 import { skillCommand } from './commands/skill.js';
 import { runTask, TASK_COMMANDS } from './commands/tasks.js';
 import { localCliFor, toolsCommand } from './commands/tools.js';
+import { troubleshootCommand } from './commands/troubleshoot.js';
 import { GROUPS, type Entry } from '@pulpfixer/kit/types';
 import { updateCommand } from './commands/update.js';
 import { pluginCommand } from './commands/plugin.js';
@@ -18,7 +19,7 @@ import { repoCommand } from './commands/repo.js';
 import { verCommand } from './commands/ver.js';
 import type { Context } from '@pulpfixer/kit/context';
 import { detectDocs } from '@pulpfixer/kit/detect/docs';
-import { detectStaging } from '@pulpfixer/kit/detect/deploy';
+import { detectDeploy, detectProduction, detectStaging } from '@pulpfixer/kit/detect/deploy';
 import { candidates } from '@pulpfixer/kit/detect/resolve';
 import type { Task } from '@pulpfixer/kit/detect/stacks';
 import { formatCmd, runCmd, shellCmd, withArgs } from '@pulpfixer/kit/exec';
@@ -32,7 +33,7 @@ import { pluginEntries } from './plugins/index.js';
 import { interactive } from '@pulpfixer/kit/util';
 import { resolveProfile } from '@pulpfixer/kit/profiles';
 
-const BUILTIN_NAMES = new Set(['dev', 'build', 'test', 'lint', 'install', 'doc', 'docs', 'deploy:staging']);
+const BUILTIN_NAMES = new Set(['dev', 'build', 'test', 'lint', 'install', 'doc', 'docs', 'deploy:staging', 'deploy:production', 'deploy']);
 
 function agentEntry(ctx: Context): Entry {
   const choice = resolveAgent({ env: process.env.PF_AGENT, configured: ctx.user.agent });
@@ -77,6 +78,7 @@ export function entriesFor(ctx: Context): Entry[] {
 
   if (ctx.repo) {
     entries.push(agentEntry(ctx));
+    entries.push(tool(troubleshootCommand, 'Agent', profileDetail(ctx)));
     for (const t of TASK_COMMANDS) {
       const list = candidates(t.name as Task, ctx);
       if (list.length === 0) continue;
@@ -107,6 +109,20 @@ export function entriesFor(ctx: Context): Entry[] {
         detail: `${staging.steps.length} step(s), asks first`,
         run: () => runDeployStaging(ctx),
       });
+    } else {
+      // No staging: offer the production or bare deploy the repo defines. It always asks first.
+      const production = detectProduction(ctx);
+      const bare = production.steps.length ? null : detectDeploy(ctx);
+      const found = production.steps.length ? production : bare;
+      if (found?.steps.length) {
+        entries.push({
+          name: production.steps.length ? 'deploy production' : 'deploy',
+          summary: production.steps.length ? 'Deploy to production' : 'Deploy (the repo\'s own deploy command)',
+          group: 'Docs & deploy',
+          detail: formatCmd(found.steps[0]!.cmd, ctx.workdir) + ', asks first',
+          run: () => runDeployAuto(ctx),
+        });
+      }
     }
     for (const [name, cfg] of Object.entries(ctx.config.commands)) {
       if (BUILTIN_NAMES.has(name)) continue;

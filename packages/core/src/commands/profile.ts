@@ -7,7 +7,7 @@ import { err, out } from '@pulpfixer/kit/ui/palette';
 import { ask } from '@pulpfixer/kit/ui/prompt';
 import { badgeLabel, h2, table, termLine } from '@pulpfixer/kit/ui/text';
 import { interactive, takeFlag, takeOption, which } from '@pulpfixer/kit/util';
-import { DEFAULT_MAX_TTL, DEFAULT_SCOPES, describeLimits, HARD_MAX_TTL, projectAws, SCOPE_NAMES, whoami } from '@pulpfixer/plugin-aws';
+import { ACTION_NAMES, DEFAULT_MAX_TTL, DEFAULT_SCOPES, describeLimits, HARD_MAX_TTL, projectAws, SCOPE_NAMES, whoami } from '@pulpfixer/plugin-aws';
 
 const AWS_PROFILE_NAME = /^[\w.@+-]{1,128}$/;
 const REGION = /^[a-z]{2}(-[a-z]+)+-\d$/;
@@ -75,6 +75,8 @@ interface ProfileFlags {
   scopes?: string[] | undefined;
   regions?: string[] | undefined;
   maxTtl?: string | undefined;
+  /** Fix actions the agent may ask for (each approved by the user). */
+  actions?: string[] | undefined;
 }
 
 /** Check each value; returns an error message or null. */
@@ -84,6 +86,8 @@ export function validateProfileFlags(f: ProfileFlags): string | null {
   if (f.region !== undefined && f.region !== '' && !REGION.test(f.region)) return `"${f.region}" is not a region (e.g. eu-west-1)`;
   const badScope = f.scopes?.find((s) => !SCOPE_NAMES.includes(s));
   if (badScope) return `unknown scope "${badScope}". Scopes: ${SCOPE_NAMES.join(', ')}`;
+  const badAction = f.actions?.find((a) => !ACTION_NAMES.includes(a));
+  if (badAction) return `unknown action "${badAction}". Actions: ${ACTION_NAMES.join(', ')}`;
   const badRegion = f.regions?.find((r) => !REGION.test(r));
   if (badRegion) return `"${badRegion}" is not a region (e.g. eu-west-1)`;
   if (f.maxTtl !== undefined) {
@@ -107,6 +111,10 @@ export function mergeProfile(current: ProfileConfig, f: ProfileFlags): ProfileCo
   const scope = { ...(current.agent?.aws ?? {}) };
   if (f.scopes) scope.scopes = f.scopes;
   if (f.regions) scope.regions = f.regions;
+  if (f.actions) {
+    if (f.actions.length) scope.actions = f.actions;
+    else delete scope.actions;
+  }
   if (f.maxTtl !== undefined) scope.maxTtlMinutes = Number(f.maxTtl);
   return { ...(Object.keys(aws).length ? { aws } : {}), ...(Object.keys(scope).length ? { agent: { aws: scope } } : {}) };
 }
@@ -145,15 +153,16 @@ async function addProfile(ctx: Context, args: string[], dryRun: boolean): Promis
     scopes: list(takeOption(args, '--scopes')),
     regions: list(takeOption(args, '--regions')),
     maxTtl: takeOption(args, '--max-ttl'),
+    actions: list(takeOption(args, '--actions')),
   };
   let name = args[0];
   if (!name && interactive()) name = (await ask('Profile name', { placeholder: 'acme', validate: (v) => (PROFILE_NAME.test(v) ? null : 'letters, digits, . _ -') })) ?? undefined;
-  if (!name) return fail(`give a name: ${termLine('pf profile add <name> [--aws-profile p] [--account id] [--region r] [--scopes a,b] [--regions r1,r2] [--max-ttl min]', err())}`);
+  if (!name) return fail(`give a name: ${termLine('pf profile add <name> [--aws-profile p] [--account id] [--region r] [--scopes a,b] [--regions r1,r2] [--max-ttl min] [--actions a,b]', err())}`);
   if (!PROFILE_NAME.test(name)) return fail(`"${name}" is not a profile name (letters, digits, . _ -)`);
   const current = ctx.user.profiles?.[name] ?? {};
   let patch = flags;
   if (Object.values(flags).every((v) => v === undefined)) {
-    if (!interactive()) return fail('no terminal: pass the values as flags (--aws-profile, --account, --region, --scopes, --regions, --max-ttl)');
+    if (!interactive()) return fail('no terminal: pass the values as flags (--aws-profile, --account, --region, --scopes, --regions, --max-ttl, --actions)');
     process.stderr.write(`${err().dim(`Profile ${name}. Enter keeps the shown value, esc cancels.`)}\n`);
     const answers = await wizard(name, current);
     if (!answers) {
@@ -210,7 +219,7 @@ export const profileCommand: Command = {
   name: 'profile',
   summary: 'Project profiles: AWS account and what the agent may read',
   group: 'Tools',
-  usage: 'pf profile [list | show [name] | use <name> | add [name] [--aws-profile p] [--account id] [--region r] [--scopes a,b] [--regions r1,r2] [--max-ttl min] | remove <name> | check [name]] [--dry-run]',
+  usage: 'pf profile [list | show [name] | use <name> | add [name] [--aws-profile p] [--account id] [--region r] [--scopes a,b] [--regions r1,r2] [--max-ttl min] [--actions a,b] | remove <name> | check [name]] [--dry-run]',
   async run(ctx, args) {
     const rest = [...args];
     const dryRun = takeFlag(rest, '--dry-run', '-n');

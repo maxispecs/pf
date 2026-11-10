@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { test } from 'node:test';
 import { loadRepoConfig, loadUserConfig, userConfigPath, type RepoConfig, type UserConfig } from '../src/config.js';
-import { narrowLimits, removeProfile, resolveProfile, saveProfile, setDefaultProfile } from '../src/profiles.js';
+import { linkRepoProfile, narrowLimits, removeProfile, resolveProfile, saveProfile, setDefaultProfile } from '../src/profiles.js';
 import { json, mkRepo } from './helpers.js';
 
 function withHome<T>(home: string, fn: () => T): T {
@@ -56,6 +56,32 @@ test('a repo can only narrow the limits, never widen them', () => {
   assert.deepEqual(narrowLimits(caps, undefined), caps);
   assert.deepEqual(narrowLimits(caps, { scopes: ['ec2', 'logs'], regions: ['eu-west-1', 'us-east-1'], maxTtlMinutes: 600 }), { scopes: ['ec2'], regions: ['eu-west-1'], maxTtlMinutes: 60 });
   assert.deepEqual(narrowLimits({ ...caps, regions: null }, { regions: ['us-east-1'], maxTtlMinutes: 15 }), { scopes: caps.scopes, regions: ['us-east-1'], maxTtlMinutes: 15 });
+});
+
+test('actions: parsed from both layers, off unless the user allows them, and a repo only removes', () => {
+  const dir = mkRepo({ 'pf.json': json({ agent: { aws: { actions: ['ecs update-service', 7, ''] } } }) });
+  assert.deepEqual(loadRepoConfig(dir).agent, { aws: { actions: ['ecs update-service'] } });
+  const home = mkRepo({ 'config.json': json({ profiles: { a: { aws: { profile: 'p' }, agent: { aws: { actions: ['ecs stop-task', 'ec2 reboot-instances'] } } } } }) });
+  assert.deepEqual(withHome(home, () => loadUserConfig()).profiles!.a!.agent, { aws: { actions: ['ecs stop-task', 'ec2 reboot-instances'] } });
+
+  const caps = { scopes: ['identity'], regions: null, maxTtlMinutes: 60, actions: ['ecs stop-task', 'ec2 reboot-instances'] };
+  assert.deepEqual(narrowLimits(caps, { actions: ['ec2 reboot-instances', 'rds reboot-db-instance'] }).actions, ['ec2 reboot-instances']);
+  assert.deepEqual(narrowLimits(caps, { actions: [] }).actions, []);
+  assert.deepEqual(narrowLimits(caps, { scopes: ['identity'] }).actions, caps.actions);
+  const none = { scopes: ['identity'], regions: null, maxTtlMinutes: 60 };
+  assert.equal(narrowLimits(none, { actions: ['ecs stop-task'] }).actions, undefined, 'a repo cannot add an action');
+});
+
+test('linkRepoProfile sets "profile" in pf.json, keeps other keys, and never overwrites broken JSON', () => {
+  const dir = mkRepo({ 'pf.json': json({ name: 'api', commands: { x: 'y' } }) });
+  assert.equal(linkRepoProfile(dir, 'acme'), true);
+  assert.deepEqual(JSON.parse(fs.readFileSync(`${dir}/pf.json`, 'utf8')), { name: 'api', commands: { x: 'y' }, profile: 'acme' });
+  const fresh = mkRepo();
+  assert.equal(linkRepoProfile(fresh, 'acme'), true);
+  assert.deepEqual(JSON.parse(fs.readFileSync(`${fresh}/pf.json`, 'utf8')), { profile: 'acme' });
+  const broken = mkRepo({ 'pf.json': '{ nope' });
+  assert.equal(linkRepoProfile(broken, 'acme'), false);
+  assert.equal(fs.readFileSync(`${broken}/pf.json`, 'utf8'), '{ nope');
 });
 
 test('saveProfile, setDefaultProfile and removeProfile keep the rest of the config', () => {

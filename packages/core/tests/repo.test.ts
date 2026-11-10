@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { resolveTasksHelper, wireVerScript } from '../src/commands/repo.js';
+import { isRepoSetUp, resolveTasksHelper, wireVerScript } from '../src/commands/repo.js';
 import { resolveVerCli } from '../src/commands/ver.js';
 import { homeSkillFile } from '../src/skills/stack.js';
 import { json, mkRepo } from './helpers.js';
@@ -161,4 +161,20 @@ test('pf update --repo-only --check and --dry-run write nothing', () => {
     assert.equal(fs.readFileSync(cli, 'utf8'), withRevision(1));
     assert.match(r.out, /update scripts\/version\.mjs from revision 1/);
   }
+});
+
+test('isRepoSetUp is false for a fresh repo and true after pf repo or with a versions.json', () => {
+  const dir = demo();
+  assert.equal(isRepoSetUp(dir), false);
+  assert.equal(pf(dir, 'repo').code, 0);
+  assert.equal(isRepoSetUp(dir), true);
+  assert.equal(isRepoSetUp(mkRepo({ 'versions.json': '{}' })), true);
+  assert.equal(isRepoSetUp(mkRepo({ 'scripts/tasks.mjs': '// my own tasks\n' })), false);
+});
+
+test('pf dev in a repo pf repo was not run in does not ask without a terminal', () => {
+  const dir = demo();
+  const r = pf(dir, 'dev', '--dry-run');
+  assert.doesNotMatch(r.out, /not set up with pf/);
+  assert.equal(isRepoSetUp(dir), false);
 });

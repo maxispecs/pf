@@ -84,6 +84,23 @@ export const SCOPES: Scope[] = [
       ],
     },
   },
+  {
+    name: 'lambda-metadata',
+    summary: 'functions and their configuration (environment values redacted, never code)',
+    ops: {
+      lambda: [
+        'list-functions', 'get-function-configuration', 'list-aliases', 'list-versions-by-function',
+        'list-event-source-mappings', 'get-event-source-mapping', 'get-function-concurrency',
+      ],
+    },
+  },
+  {
+    name: 'cloudformation',
+    summary: 'stacks, their events and resources (never templates)',
+    ops: {
+      cloudformation: ['list-stacks', 'describe-stacks', 'describe-stack-events', 'describe-stack-resources', 'describe-stack-resource', 'list-stack-resources'],
+    },
+  },
 ];
 
 export const SCOPE_NAMES = SCOPES.map((s) => s.name);
@@ -117,7 +134,122 @@ export const DENIED: Record<string, string> = {
   'sts get-federation-token': 'mints credentials',
   'iam create-access-key': 'mints credentials',
   'rds download-db-log-file-portion': 'returns log text outside the logs scope',
+  'cloudformation get-template': 'returns templates, which can hold secrets',
+  'lambda invoke': 'runs code and returns its output',
 };
+
+/**
+ * A fix action the agent may ask for. Unlike a read, it changes AWS, so it is off until the user's
+ * profile lists it (`agent.aws.actions`), and every single call asks the user in its own dialog
+ * with the exact command. Only the listed flags are accepted, each checked against `pattern`.
+ * Deleting, terminating and anything IAM or secret-related never belongs here.
+ */
+export interface Action {
+  service: string;
+  operation: string;
+  summary: string;
+  /** Flags (without dashes) the call may carry. */
+  flags: string[];
+  /** Flags that must be present. */
+  required: string[];
+  /** At least one of these must be present (a call with none would change nothing). */
+  oneOf?: string[];
+  /** Flags that take no value. */
+  bare?: string[];
+  /** Per-flag value pattern, else `SAFE_VALUE`. */
+  patterns?: Record<string, RegExp>;
+}
+
+const SAFE_VALUE = /^[\w:./@=+-]{1,256}$/;
+const COUNT = /^\d{1,4}$/;
+
+export const ACTIONS: Action[] = [
+  {
+    service: 'ecs',
+    operation: 'update-service',
+    summary: 'redeploy (force-new-deployment), rescale or point an ECS service at another task definition',
+    flags: ['cluster', 'service', 'force-new-deployment', 'desired-count', 'task-definition'],
+    required: ['cluster', 'service'],
+    oneOf: ['force-new-deployment', 'desired-count', 'task-definition'],
+    bare: ['force-new-deployment'],
+    patterns: { 'desired-count': COUNT },
+  },
+  {
+    service: 'ecs',
+    operation: 'stop-task',
+    summary: 'stop one ECS task (its service starts a replacement)',
+    flags: ['cluster', 'task', 'reason'],
+    required: ['cluster', 'task'],
+    patterns: { reason: /^[\w :./@=+,-]{1,200}$/ },
+  },
+  {
+    service: 'ec2',
+    operation: 'reboot-instances',
+    summary: 'reboot EC2 instances',
+    flags: ['instance-ids'],
+    required: ['instance-ids'],
+    patterns: { 'instance-ids': /^i-[0-9a-f]{8,17}$/ },
+  },
+  {
+    service: 'autoscaling',
+    operation: 'set-desired-capacity',
+    summary: 'change the desired size of an auto scaling group',
+    flags: ['auto-scaling-group-name', 'desired-capacity'],
+    required: ['auto-scaling-group-name', 'desired-capacity'],
+    patterns: { 'desired-capacity': COUNT },
+  },
+  {
+    service: 'rds',
+    operation: 'reboot-db-instance',
+    summary: 'reboot a database instance (without failover)',
+    flags: ['db-instance-identifier'],
+    required: ['db-instance-identifier'],
+  },
+];
+
+export const actionKey = (service: string, operation: string): string => `${service} ${operation}`;
+export const ACTION_NAMES = ACTIONS.map((a) => actionKey(a.service, a.operation));
+
+export type ActionCheck = { ok: true; action: Action; argv: string[] } | { ok: false; reason: string };
+
+/** Check a fix action against what the profile enables, then its flags. `argv` is ready for `callArgv`. */
+export function checkAction(service: string, operation: string, params: unknown, enabled: string[]): ActionCheck {
+  const key = actionKey(service, operation);
+  const denied = DENIED[key];
+  if (denied) return { ok: false, reason: `aws ${key} is never allowed: it ${denied}.` };
+  const action = ACTIONS.find((a) => actionKey(a.service, a.operation) === key);
+  if (!action) return { ok: false, reason: `aws ${key} is not a fix action pf allows. Call pf_aws_context for the list.` };
+  if (!enabled.includes(key)) {
+    return { ok: false, reason: `aws ${key} is not enabled for this profile (enabled: ${enabled.join(', ') || 'none'}). Only the user can enable it, with pf profile add <name> --actions "${key}".` };
+  }
+  if (params !== undefined && params !== null && (typeof params !== 'object' || Array.isArray(params))) return { ok: false, reason: 'params must be an object of flag -> value' };
+  const given = new Map<string, unknown>();
+  for (const [raw, v] of Object.entries((params ?? {}) as Record<string, unknown>)) {
+    const flag = raw.replace(/^--/, '');
+    if (!action.flags.includes(flag)) return { ok: false, reason: `--${flag} is not accepted by aws ${key} through pf (accepted: ${action.flags.join(', ')}).` };
+    given.set(flag, v);
+  }
+  const missing = action.required.filter((f) => !given.has(f));
+  if (missing.length) return { ok: false, reason: `aws ${key} needs ${missing.map((f) => `--${f}`).join(', ')}.` };
+  if (action.oneOf && !action.oneOf.some((f) => given.has(f) && given.get(f) !== false)) {
+    return { ok: false, reason: `aws ${key} needs at least one of ${action.oneOf.map((f) => `--${f}`).join(', ')}.` };
+  }
+  for (const [flag, v] of given) {
+    if (action.bare?.includes(flag)) {
+      if (typeof v !== 'boolean') return { ok: false, reason: `--${flag} takes no value: pass true.` };
+      continue;
+    }
+    const values = Array.isArray(v) ? v : [v];
+    const pattern = action.patterns?.[flag] ?? SAFE_VALUE;
+    for (const x of values) {
+      const text = typeof x === 'number' ? String(x) : x;
+      if (typeof text !== 'string' || !pattern.test(text)) return { ok: false, reason: `--${flag}: "${String(x).slice(0, 60)}" is not an accepted value.` };
+    }
+  }
+  const argv = paramArgv(params);
+  if (!argv.ok) return { ok: false, reason: argv.reason };
+  return { ok: true, action, argv: argv.argv };
+}
 
 export function scopeOf(name: string): Scope | undefined {
   return SCOPES.find((s) => s.name === name);
@@ -148,6 +280,8 @@ export function limitsFor(profile: ProfileConfig, repo: AgentAwsScope | undefine
     scopes: (caps.scopes ?? DEFAULT_SCOPES).filter((s) => SCOPE_NAMES.includes(s)),
     regions: caps.regions ?? (region ? [region] : null),
     maxTtlMinutes: Math.min(caps.maxTtlMinutes ?? DEFAULT_MAX_TTL, HARD_MAX_TTL),
+    // Fix actions are opt-in: none unless the user's profile lists them.
+    actions: (caps.actions ?? []).filter((a) => ACTION_NAMES.includes(a)),
   };
   const narrowed = narrowLimits(base, repo);
   if (!narrowed.scopes.includes('identity') && base.scopes.includes('identity')) narrowed.scopes.unshift('identity');
@@ -219,10 +353,13 @@ export function redactJson(v: unknown, key = ''): unknown {
   }
   if (v && typeof v === 'object') {
     const o = v as Record<string, unknown>;
-    const name = typeof (o.name ?? o.Name ?? o.Key) === 'string' ? String(o.name ?? o.Name ?? o.Key) : '';
+    // A Lambda `Environment.Variables` map: names stay, every value goes.
+    if (/^variables$/i.test(key)) return Object.fromEntries(Object.entries(o).map(([k, val]) => [k, typeof val === 'string' ? REDACTED : redactJson(val, k)]));
+    const nameValue = o.name ?? o.Name ?? o.Key ?? o.ParameterKey;
+    const name = typeof nameValue === 'string' ? nameValue : '';
     return Object.fromEntries(
       Object.entries(o).map(([k, val]) => {
-        if (typeof val === 'string' && (SECRET_KEY.test(k) || (/^value$/i.test(k) && SECRET_KEY.test(name)))) return [k, REDACTED];
+        if (typeof val === 'string' && (SECRET_KEY.test(k) || (/^(parameter)?value$/i.test(k) && SECRET_KEY.test(name)))) return [k, REDACTED];
         return [k, redactJson(val, k)];
       }),
     );

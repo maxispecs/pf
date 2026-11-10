@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { userConfigPath, writeHomeFile, type AgentAwsScope, type ProfileConfig, type RepoConfig, type UserConfig } from './config.js';
 import { readJson } from './util.js';
 
@@ -39,6 +41,8 @@ export interface Limits {
   /** Null means any region. */
   regions: string[] | null;
   maxTtlMinutes: number;
+  /** Fix actions the agent may ask for (each approved one at a time). Missing means none. */
+  actions?: string[];
 }
 
 export function narrowLimits(caps: Limits, repo: AgentAwsScope | undefined): Limits {
@@ -46,7 +50,9 @@ export function narrowLimits(caps: Limits, repo: AgentAwsScope | undefined): Lim
   const scopes = repo.scopes ? caps.scopes.filter((s) => repo.scopes!.includes(s)) : caps.scopes;
   const regions = repo.regions ? (caps.regions ? caps.regions.filter((r) => repo.regions!.includes(r)) : repo.regions) : caps.regions;
   const maxTtlMinutes = repo.maxTtlMinutes ? Math.min(caps.maxTtlMinutes, repo.maxTtlMinutes) : caps.maxTtlMinutes;
-  return { scopes, regions, maxTtlMinutes };
+  // A repo can only remove actions the user's profile allows, never add one.
+  const actions = caps.actions ? (repo.actions ? caps.actions.filter((a) => repo.actions!.includes(a)) : caps.actions) : undefined;
+  return { scopes, regions, maxTtlMinutes, ...(actions ? { actions } : {}) };
 }
 
 type Obj = Record<string, unknown>;
@@ -71,6 +77,23 @@ export function removeProfile(name: string): boolean {
     if (next.defaultProfile === name) delete next.defaultProfile;
     return next;
   });
+}
+
+/**
+ * Name the profile a repo uses: sets `"profile"` in the repo's `pf.json`, keeping every other key.
+ * False when the file exists but is not valid JSON (it is never overwritten) or cannot be written.
+ */
+export function linkRepoProfile(root: string, name: string): boolean {
+  const file = path.join(root, 'pf.json');
+  const exists = fs.existsSync(file);
+  const current = readJson<Obj>(file);
+  if (exists && !current) return false;
+  try {
+    fs.writeFileSync(file, JSON.stringify({ ...(current ?? {}), profile: name }, null, 2) + '\n');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function setDefaultProfile(name: string): boolean {

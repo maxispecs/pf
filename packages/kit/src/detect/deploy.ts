@@ -41,9 +41,25 @@ export function repoDeployScript(root: string, names: string[]): Candidate | nul
   const cli = detectLocalCli(root);
   const command = cli && names.map((n) => cli.commands.find((c) => c.name === n)).find(Boolean);
   if (cli && command) {
-    return { cmd: { argv: [cli.entry, command.name, ...(command.acceptsYes ? ['-y'] : [])], cwd: root }, source: `${cli.entry} ${command.name}` };
+    return {
+      cmd: { argv: [cli.entry, command.name, ...(command.acceptsYes ? ['-y'] : [])], cwd: root },
+      source: `${cli.entry} ${command.name}`,
+      ...(command.acceptsMessage ? { acceptsMessage: true } : {}),
+    };
   }
   return null;
+}
+
+/** The step for a `pf.json` deploy entry; `"message": true` marks one that takes a commit message. */
+function configStep(ctx: Context, key: string): Candidate | null {
+  const entry = ctx.config.commands[key];
+  if (!entry) return null;
+  const root = ctx.repo?.root ?? ctx.workdir;
+  return {
+    cmd: shellCmd(entry.run, path.resolve(root, entry.cwd ?? '.')),
+    source: 'pf.json',
+    ...(entry.message ? { acceptsMessage: true } : {}),
+  };
 }
 
 /** Run a platform CLI: the local install, else pnpm dlx / npx in Node repos, else the bare binary. */
@@ -80,10 +96,8 @@ export function detectStaging(ctx: Context): StagingPlan {
   const skipped: string[] = [];
 
   // 0. pf.json
-  const override = ctx.config.commands['deploy:staging'];
-  if (override) {
-    return { steps: [{ cmd: shellCmd(override.run, path.resolve(root, override.cwd ?? '.')), source: 'pf.json' }], skipped };
-  }
+  const override = configStep(ctx, 'deploy:staging');
+  if (override) return { steps: [override], skipped };
 
   const dirs = workspaceDirs(root);
 
@@ -160,10 +174,8 @@ export const PRODUCTION_SCRIPTS = ['deploy:production', 'deploy:prod', 'deploy-p
  */
 export function detectProduction(ctx: Context): StagingPlan {
   const root = ctx.repo?.root ?? ctx.workdir;
-  const override = ctx.config.commands['deploy:production'];
-  if (override) {
-    return { steps: [{ cmd: shellCmd(override.run, path.resolve(root, override.cwd ?? '.')), source: 'pf.json' }], skipped: [] };
-  }
+  const override = configStep(ctx, 'deploy:production');
+  if (override) return { steps: [override], skipped: [] };
   for (const d of workspaceDirs(root)) {
     const pkg = readJson<Pkg>(d, 'package.json');
     const name = PRODUCTION_SCRIPTS.find((s) => typeof pkg?.scripts?.[s] === 'string');
@@ -173,5 +185,28 @@ export function detectProduction(ctx: Context): StagingPlan {
     }
   }
   const scripted = repoDeployScript(root, PRODUCTION_SCRIPTS);
+  return { steps: scripted ? [scripted] : [], skipped: [] };
+}
+
+export const DEPLOY_SCRIPTS = ['deploy'];
+
+/**
+ * Find what a bare `deploy` runs: the repo's own single deploy, with no environment in its name. A
+ * `pf.json` `deploy` entry, a `deploy` script in a package, a composer script or `./a deploy`.
+ * Never guessed from platform configs. pf treats it like production: it always asks first.
+ */
+export function detectDeploy(ctx: Context): StagingPlan {
+  const root = ctx.repo?.root ?? ctx.workdir;
+  const override = configStep(ctx, 'deploy');
+  if (override) return { steps: [override], skipped: [] };
+  for (const d of workspaceDirs(root)) {
+    const pkg = readJson<Pkg>(d, 'package.json');
+    const name = DEPLOY_SCRIPTS.find((s) => typeof pkg?.scripts?.[s] === 'string');
+    if (name) {
+      const rel = path.relative(root, d) || '.';
+      return { steps: [{ cmd: { argv: nodeRun(nodeManager(root), name), cwd: d }, source: `${rel}/package.json script ${name}` }], skipped: [] };
+    }
+  }
+  const scripted = repoDeployScript(root, DEPLOY_SCRIPTS);
   return { steps: scripted ? [scripted] : [], skipped: [] };
 }

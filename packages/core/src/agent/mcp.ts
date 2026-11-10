@@ -5,7 +5,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import type { ElicitResult, ToolSession } from '@pulpfixer/kit/agent-tool';
 import { pfHome } from '@pulpfixer/kit/constants';
-import type { Context } from '@pulpfixer/kit/context';
+import { refreshContext, type Context } from '@pulpfixer/kit/context';
 import { openAudit } from '../audit.js';
 import { findSkill, loadAgentSkills, skillText, TOOLS, type Tool } from './tools.js';
 
@@ -99,6 +99,8 @@ export async function handle(ctx: Context, req: JsonRpcRequest, tools: Tool[] = 
       if (!tool) return error(req.id, -32602, `Unknown tool: ${name}`);
       const args = params.arguments && typeof params.arguments === 'object' ? (params.arguments as Record<string, unknown>) : {};
       try {
+        // A profile linked or edited since the last call applies now (pf t links one mid-session).
+        refreshContext(ctx);
         const r = await tool.run(ctx, args, toolSession(session));
         session.audit({ event: 'tool', tool: name, args, ok: r.ok });
         return result(req.id, { content: [{ type: 'text', text: r.text }], isError: !r.ok });

@@ -35,5 +35,6 @@ export function projectAws(ctx: Context, flag?: string): ProjectAws {
 }
 
 export function describeLimits(l: Limits): string {
-  return `scopes ${l.scopes.join(', ') || 'none'}; regions ${l.regions ? l.regions.join(', ') || 'none' : 'any'}; at most ${l.maxTtlMinutes} min`;
+  const actions = l.actions?.length ? `; fix actions (each approved by the user): ${l.actions.join(', ')}` : '';
+  return `scopes ${l.scopes.join(', ') || 'none'}; regions ${l.regions ? l.regions.join(', ') || 'none' : 'any'}; at most ${l.maxTtlMinutes} min${actions}`;
 }

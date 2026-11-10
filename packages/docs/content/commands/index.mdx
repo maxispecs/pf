@@ -20,6 +20,7 @@ Run `pf list` for the list that applies in the current directory, and `pf help` 
 | `pf init` | Write `pf.json` for this repo from what was detected |
 | `pf repo` | Hook pf's tools into this repo, or update them |
 | `pf agent [prompt]` | Open the coding agent (Claude Code, Codex or Cursor). See [Agent](/agent) |
+| `pf troubleshoot [prompt]` (`pf t`) | Find out what is wrong with this repo's deployment on AWS: pf reads how it deploys, links the AWS profile, then starts the agent with scoped AWS access. See [Troubleshoot](/agent/troubleshoot) |
 | `pf profile [...]` | Project profiles: which AWS account a repo uses and what the agent may read there |
 | `pf aws [grants\|revoke]` | AWS access the agent was granted: list it, end it |
 | `pf mcp` | Serve pf's tools to any MCP client over stdio |

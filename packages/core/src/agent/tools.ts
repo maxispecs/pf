@@ -3,7 +3,7 @@ import path from 'node:path';
 import { findVersionsRoot, resolveVerCli } from '../commands/ver.js';
 import type { Context } from '@pulpfixer/kit/context';
 import { detectDocs } from '@pulpfixer/kit/detect/docs';
-import { detectStaging } from '@pulpfixer/kit/detect/deploy';
+import { detectDeploy, detectStaging } from '@pulpfixer/kit/detect/deploy';
 import { candidates } from '@pulpfixer/kit/detect/resolve';
 import { TASKS, type Task } from '@pulpfixer/kit/detect/stacks';
 import { captureAsync, formatCmd, withArgs, type Cmd } from '@pulpfixer/kit/exec';
@@ -73,6 +73,7 @@ export function commandsText(ctx: Context): string {
   lines.push('', `Docs site: ${docs.length ? formatCmd(docs[0]!.cmd, ctx.workdir) : 'none found'}`);
   const staging = detectStaging(ctx);
   lines.push(`Staging deploy: ${staging.steps.length ? `${staging.steps.length} step(s), see pf_deploy_staging` : 'none found'}`);
+  if (detectDeploy(ctx).steps.length) lines.push('Repo deploy (pf deploy, no environment named): defined; only the user runs it, you cannot.');
   lines.push(`Versioning: ${findVersionsRoot(ctx.cwd) ? 'versions.json (use pf_versions / pf_bump)' : 'not set up'}`);
   return lines.join('\n');
 }

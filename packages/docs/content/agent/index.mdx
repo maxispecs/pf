@@ -6,6 +6,8 @@ title: Agent
 
 `pf agent` starts a coding agent CLI (Claude Code, Codex or Cursor) that works through pulpfixer. The agent gets this repo's resolved commands, versioning, staging deploys and skills as tools. For AWS troubleshooting it can ask for **scoped, read-only, time-limited access**, and pf asks you to approve each request. The agent never receives credentials: pf runs every AWS call itself and checks it against what you approved.
 
+For a deployment that is misbehaving, [`pf t`](/agent/troubleshoot) (`pf troubleshoot`) starts the agent after pf has read how the repo deploys and linked its AWS profile, and adds fix actions you approve one call at a time.
+
 The host fix agent (`pf host fix`, for EC2 instances) is a separate, headless mode. See [Host mode](/host).
 
 ## Quick start
@@ -69,7 +71,7 @@ pf agent use claude                        # save the default agent CLI
 pf agent --dry-run                         # print the persona and the command, start nothing
 ```
 
-`pf a` is short for `pf agent`. The first time several agent CLIs are installed, pf asks which one to use and remembers it. `pf agent use cursor` also registers the pf MCP server in `~/.cursor/mcp.json`.
+`pf a` is short for `pf agent`, and `pf t` starts [troubleshooting](/agent/troubleshoot). The first time several agent CLIs are installed, pf asks which one to use and remembers it. `pf agent use cursor` also registers the pf MCP server in `~/.cursor/mcp.json`.
 
 What pf passes to each CLI:
 
@@ -91,6 +93,9 @@ would run claude --mcp-config ~/.pf/agent/mcp.json --append-system-prompt '...'
   --allowedTools mcp__pulpfixer__pf_aws_request_access
   --allowedTools mcp__pulpfixer__pf_aws_whoami
   --allowedTools mcp__pulpfixer__pf_aws_describe
+  --allowedTools mcp__pulpfixer__pf_aws_context
+  --allowedTools mcp__pulpfixer__pf_aws_link_profile
+  --allowedTools mcp__pulpfixer__pf_aws_act
 ```
 
 `pf_run`, `pf_bump` and `pf_deploy_staging` are not on the list, so Claude asks you before each call.
@@ -109,6 +114,9 @@ would run claude --mcp-config ~/.pf/agent/mcp.json --append-system-prompt '...'
 | `pf_aws_request_access` | Ask for a grant: scopes, regions, minutes, reason | no | **pf's dialog** |
 | `pf_aws_whoami` | `sts get-caller-identity`, checked against the pinned account | yes | needs a grant |
 | `pf_aws_describe` | One read-only AWS CLI call the grant allows | yes | needs a grant |
+| `pf_aws_context` | How the repo deploys (read from its files), the profile that applies, scopes to request, enabled fix actions. Local only | yes | none |
+| `pf_aws_link_profile` | Link a profile pf supports to this repo when none applies | no | **pf's dialog** |
+| `pf_aws_act` | One AWS fix action the profile enables, shown as the exact command | no | **pf's dialog, every call** |
 
 Plugins can add their own tools. See [Writing a plugin](/plugins/writing-a-plugin).
 

@@ -20,6 +20,8 @@ pf profile add acme --aws-profile acme-readonly --account 123456789012 --region 
 pf profile add side --aws-profile sp-ro --region us-east-1      # no --scopes: everything except logs
 pf profile add acme --max-ttl 30                                 # edit one field; others are kept
 pf profile add acme --region ""                                  # clear a field
+pf profile add acme --actions "ecs update-service,ecs stop-task" # let the agent ask for these fixes (each call is approved by you)
+pf profile add acme --actions ""                                 # none again
 pf profile add                                                   # in a terminal: a wizard
 ```
 
@@ -48,6 +50,7 @@ The resulting `~/.pf/config.json`:
 | `agent.aws.scopes` | scopes the agent may be granted | all except `logs` |
 | `agent.aws.regions` | regions the agent may read | `aws.region`, else any |
 | `agent.aws.maxTtlMinutes` | longest grant | 60 (hard cap 480) |
+| `agent.aws.actions` | fix actions the agent may ask for, each approved one call at a time (`ecs update-service`, `ecs stop-task`, `ec2 reboot-instances`, `autoscaling set-desired-capacity`, `rds reboot-db-instance`) | none |
 
 Pin the account. pf then runs `sts get-caller-identity` before the first read of every grant, and refuses everything if the credentials point somewhere else (a stale SSO session, a mixed-up profile).
 
@@ -62,7 +65,9 @@ Pin the account. pf then runs `sts get-caller-identity` before the first read of
 }
 ```
 
-`agent.aws` is optional. Each list is intersected with the user's limits, and the shorter time wins.
+`agent.aws` is optional. Each list (scopes, regions, actions) is intersected with the user's limits, and the shorter time wins. A repo can remove an action the user enabled, never add one.
+
+`pf t` writes the `"profile"` line for you: when no profile applies it lists the registered profiles and the AWS profiles in `~/.aws/config` that match the repo, and links the one you pick. See [Troubleshoot](/agent/troubleshoot).
 
 ## Which profile applies
 
