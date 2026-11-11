@@ -25,8 +25,7 @@ import type { Task } from '@pulpfixer/kit/detect/stacks';
 import { formatCmd, runCmd, shellCmd, withArgs } from '@pulpfixer/kit/exec';
 import { findVersionsRoot } from './commands/ver.js';
 import { lastMenuChoice, rememberMenuChoice } from '@pulpfixer/kit/config';
-import { err, out, type Palette } from '@pulpfixer/kit/ui/palette';
-import { SHORTCUTS } from './commands/shortcuts.js';
+import { err, out } from '@pulpfixer/kit/ui/palette';
 import { pick } from '@pulpfixer/kit/ui/picker';
 import { h2, termLine } from '@pulpfixer/kit/ui/text';
 import { pluginEntries } from './plugins/index.js';
@@ -65,9 +64,14 @@ function groupRank(g: string): number {
   return i === -1 ? GROUPS.indexOf('Tools') - 0.5 : i; // custom groups sit between Docs & deploy and Tools
 }
 
-/** Everything the menu and the static list show for this context. */
+/**
+ * Everything the menu and the static list show for this context.
+ * In a repo the entries adapted from it come first, as one block (run, build, deploy, the repo's own
+ * commands and CLI: whatever was found); pf's own tools (agent, versions, plugins, ...) follow.
+ */
 export function entriesFor(ctx: Context): Entry[] {
   const entries: Entry[] = [];
+  const fromRepo: Entry[] = [];
   const tool = (cmd: { name: string; summary: string; run: (c: Context, a: string[]) => Promise<number> }, group: string, detail?: string): Entry => ({
     name: cmd.name,
     summary: cmd.summary,
@@ -82,7 +86,7 @@ export function entriesFor(ctx: Context): Entry[] {
     for (const t of TASK_COMMANDS) {
       const list = candidates(t.name as Task, ctx);
       if (list.length === 0) continue;
-      entries.push({
+      fromRepo.push({
         name: t.name,
         summary: t.summary,
         group: t.group,
@@ -92,7 +96,7 @@ export function entriesFor(ctx: Context): Entry[] {
     }
     const docs = detectDocs(ctx);
     if (docs.length) {
-      entries.push({
+      fromRepo.push({
         name: 'doc',
         summary: 'Run the docs site locally',
         group: 'Docs & deploy',
@@ -102,7 +106,7 @@ export function entriesFor(ctx: Context): Entry[] {
     }
     const staging = detectStaging(ctx);
     if (staging.steps.length) {
-      entries.push({
+      fromRepo.push({
         name: 'deploy staging',
         summary: 'Deploy to staging',
         group: 'Docs & deploy',
@@ -115,7 +119,7 @@ export function entriesFor(ctx: Context): Entry[] {
       const bare = production.steps.length ? null : detectDeploy(ctx);
       const found = production.steps.length ? production : bare;
       if (found?.steps.length) {
-        entries.push({
+        fromRepo.push({
           name: production.steps.length ? 'deploy production' : 'deploy',
           summary: production.steps.length ? 'Deploy to production' : 'Deploy (the repo\'s own deploy command)',
           group: 'Docs & deploy',
@@ -126,7 +130,7 @@ export function entriesFor(ctx: Context): Entry[] {
     }
     for (const [name, cfg] of Object.entries(ctx.config.commands)) {
       if (BUILTIN_NAMES.has(name)) continue;
-      entries.push({
+      fromRepo.push({
         name,
         summary: cfg.description ?? cfg.run,
         group: cfg.group ?? 'Tools',
@@ -136,7 +140,7 @@ export function entriesFor(ctx: Context): Entry[] {
     }
     entries.push(tool(verCommand, 'Tools', findVersionsRoot(ctx.cwd) ? 'versions.json' : 'not set up yet'));
     const localCli = localCliFor(ctx);
-    if (localCli) entries.push(tool(toolsCommand, 'Tools', `${localCli.commands.length} in ${localCli.entry}`));
+    if (localCli) fromRepo.push(tool(toolsCommand, 'Tools', `${localCli.commands.length} in ${localCli.entry}`));
     entries.push(tool(skillCommand, 'Tools'));
     entries.push(tool(pluginCommand, 'Tools'));
     entries.push(tool(repoCommand, 'Tools'));
@@ -156,10 +160,14 @@ export function entriesFor(ctx: Context): Entry[] {
     entries.push(tool(aboutCommand, 'Help'));
   }
   entries.push(...pluginEntries(ctx));
-  return entries
-    .map((e, i) => ({ e, i }))
-    .sort((a, b) => groupRank(a.e.group) - groupRank(b.e.group) || a.i - b.i)
-    .map(({ e }) => e);
+  const byGroup = (list: Entry[]) =>
+    list
+      .map((e, i) => ({ e, i }))
+      .sort((a, b) => groupRank(a.e.group) - groupRank(b.e.group) || a.i - b.i)
+      .map(({ e }) => e);
+  // One group for the repo's own entries keeps them together above the rest, whatever groups they had.
+  const repoGroup = ctx.repo?.name ?? '';
+  return [...byGroup(fromRepo).map((e) => ({ ...e, group: repoGroup })), ...byGroup(entries)];
 }
 
 /** Static grouped list: `pf list`, and the fallback when there is no terminal. */
@@ -178,29 +186,7 @@ export function printList(ctx: Context, entries: Entry[] = entriesFor(ctx), head
     }
     w(`  ${termLine(key(e), c)}${' '.repeat(width - key(e).length)}  ${e.detail ? e.summary.padEnd(sw) + c.dim('  ' + e.detail) : e.summary}`);
   }
-  if (!heading) {
-    const shorts = shortcutList();
-    const sWidth = Math.max(...shorts.map((s) => s.name.length));
-    w(`\n${h2('Shortcuts', c)}`);
-    for (const s of shorts) w(`  ${c.cyan(s.name)}${' '.repeat(sWidth - s.name.length)} ${c.dim('=')} ${s.full}`);
-  }
-  w(`\n${termLine('pf help', c)} ${c.dim('shows every command and option.')}`);
-}
-
-/** Every short name with the full command it stands for. */
-function shortcutList(): { name: string; full: string }[] {
-  return SHORTCUTS.flatMap((s) => s.names.map((name) => ({ name, full: s.target.join(' ') })));
-}
-
-/** Shortcuts as a list, one per line, for under the interactive menu. */
-export function shortcutTrailer(c: Palette = out()): string[] {
-  const shorts = shortcutList();
-  const width = Math.max(...shorts.map((s) => s.name.length));
-  return [
-    '',
-    `  ${c.dim(c.bold('Shortcuts'))}`,
-    ...shorts.map((s) => c.dim(`  ${s.name.padEnd(width)} = ${s.full}`)),
-  ];
+  w(`\n${termLine('pf help', c)} ${c.dim('shows every command and option,')} ${termLine('pf s', c)} ${c.dim('lists the shortcuts.')}`);
 }
 
 /** Interactive menu. Without a terminal it prints the static list instead. */
@@ -229,7 +215,7 @@ export async function runMenu(
     // The main menu keeps its grouping but not the group names; custom menus (the ./pf launcher) keep them.
     {
       ...(last ? { initial: last } : {}),
-      ...(custom ? {} : { groupNames: false, trailer: shortcutTrailer() }),
+      ...(custom ? {} : { groupNames: false }),
     },
   );
   if (!chosen) return 0;

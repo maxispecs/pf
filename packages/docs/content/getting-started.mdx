@@ -35,7 +35,7 @@ pf list         # the same list, static (for scripts and agents)
 pf doctor       # check the machine and repo
 ```
 
-Inside a repo the menu shows what pf found: the resolved `dev`, `build`, `test` and `lint` commands, the docs site, deploy targets, the repo's own tools, and the agent. Outside a repo you get a fallback menu (run a skill, about, doctor).
+Inside a repo the menu starts with what pf found in it: the resolved `dev`, `build`, `test` and `lint` commands, the docs site, deploy targets and the repo's own commands and tools. pf's own entries (the agent, versions, plugins, ...) follow. Shortcuts are not in the menu: `pf s` lists them. Outside a repo you get a fallback menu (run a skill, about, doctor).
 
 Try a command without running it:
 

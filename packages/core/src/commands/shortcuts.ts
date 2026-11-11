@@ -11,18 +11,19 @@ export interface Shortcut {
 }
 
 export const SHORTCUTS: Shortcut[] = [
-  { names: ['a'], target: ['agent'], summary: 'Open the coding agent (pf agent)', group: 'Agent' },
-  { names: ['t'], target: ['troubleshoot'], summary: 'Troubleshoot with the agent and AWS (pf troubleshoot)', group: 'Agent' },
-  { names: ['docs'], target: ['doc'], summary: 'Run the docs site locally (pf doc)', group: 'Docs & deploy' },
-  { names: ['d'], target: ['deploy'], summary: 'Deploy: staging if configured, else production (pf deploy)', group: 'Docs & deploy' },
-  { names: ['ds'], target: ['deploy', 'staging'], summary: 'Deploy to staging (pf deploy staging)', group: 'Docs & deploy' },
-  { names: ['dp'], target: ['deploy', 'production'], summary: 'Deploy to production (pf deploy production)', group: 'Docs & deploy' },
-  { names: ['ps'], target: ['publish', 'staging'], summary: 'Publish to the staging registry, cellars (pf publish staging)', group: 'Docs & deploy' },
-  { names: ['r'], target: ['dev'], summary: 'Run the repo (pf dev)', group: 'Tools' },
-  { names: ['rp'], target: ['repo'], summary: 'Hook pf tools into this repo or update them (pf repo)', group: 'Tools' },
-  { names: ['u'], target: ['update'], summary: 'Update pf, its plugins and skills (pf update)', group: 'Tools' },
-  { names: ['v'], target: ['ver'], summary: 'List versions and bump them (pf ver)', group: 'Tools' },
-  { names: ['up'], target: ['s3'], summary: 'Upload to the exchange bucket (pf s3)', group: 'AWS' },
+  { names: ['a'], target: ['agent'], summary: 'Open the coding agent', group: 'Agent' },
+  { names: ['t'], target: ['troubleshoot'], summary: 'Troubleshoot with the agent and AWS', group: 'Agent' },
+  { names: ['docs'], target: ['doc'], summary: 'Run the docs site locally', group: 'Docs & deploy' },
+  { names: ['d'], target: ['deploy'], summary: 'Deploy: staging if configured, else production', group: 'Docs & deploy' },
+  { names: ['ds'], target: ['deploy', 'staging'], summary: 'Deploy to staging', group: 'Docs & deploy' },
+  { names: ['dp'], target: ['deploy', 'production'], summary: 'Deploy to production', group: 'Docs & deploy' },
+  { names: ['ps'], target: ['publish', 'staging'], summary: 'Publish to the staging registry, cellars', group: 'Docs & deploy' },
+  { names: ['r'], target: ['dev'], summary: 'Run the repo', group: 'Develop' },
+  { names: ['rp'], target: ['repo'], summary: 'Hook pf tools into this repo or update them', group: 'Tools' },
+  { names: ['u'], target: ['update'], summary: 'Update pf, its plugins and skills', group: 'Tools' },
+  { names: ['v'], target: ['ver'], summary: 'List versions and bump them', group: 'Tools' },
+  { names: ['s'], target: ['shortcuts'], summary: 'List the shortcuts', group: 'Help' },
+  { names: ['up'], target: ['s3'], summary: 'Upload to the exchange bucket', group: 'AWS' },
 ];
 
 /** The commands for every name of a shortcut. */

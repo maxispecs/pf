@@ -6,6 +6,8 @@ title: Shortcuts
 
 A shortcut is a short name for a full command. Extra arguments pass through to the target, so `pf ds --dry-run` is `pf deploy staging --dry-run`. That includes a commit message for the deploy shortcuts: `pf d "fix login"`.
 
+`pf s` (or `pf shortcuts`) lists them in the terminal, grouped by what they are for (Agent, Develop, Docs & deploy, ...). Add a word to filter: `pf s deploy`. The menu and `pf list` do not repeat the list.
+
 | Shortcut | Same as | Notes |
 |----------|---------|-------|
 | `pf a` | `pf agent` | Open the coding agent |
@@ -15,6 +17,7 @@ A shortcut is a short name for a full command. Extra arguments pass through to t
 | `pf dp` | `pf deploy production` | Only a repo-defined production script; always confirms |
 | `pf ps` | `pf publish staging` | Runs `publish:cellars`; always confirms |
 | `pf r` | `pf dev` | Run the repo |
+| `pf s` | `pf shortcuts` | List the shortcuts, grouped |
 | `pf rp` | `pf repo` | Hook pf's tools into this repo |
 | `pf u` | `pf update` | Update pf, plugins and skills |
 | `pf v` | `pf ver` | List versions and bump them |
@@ -28,5 +31,7 @@ A shortcut is one entry in `SHORTCUTS` in `packages/core/src/commands/shortcuts.
 ```ts
 { names: ['docs'], target: ['doc'], summary: 'Run the docs site locally (pf doc)', group: 'Docs & deploy' },
 ```
+
+`group` is one of the command groups; `pf s` shows the shortcut under it.
 
 `names` can hold several short names for the same target, and `target` can have fixed arguments, such as `['deploy', 'staging']`. Add a test in `packages/core/tests/shortcuts.test.ts`.

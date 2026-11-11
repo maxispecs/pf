@@ -8,7 +8,7 @@ Run `pf list` for the list that applies in the current directory, and `pf help` 
 
 | Command | What it does |
 |---------|--------------|
-| `pf` | Menu: this repo's commands, or the fallback menu outside a repo. Includes the agent |
+| `pf` | Menu: this repo's own commands first (run, build, deploy, ...), then pf's tools including the agent; the fallback menu outside a repo |
 | `pf list` | The same list, static (for scripts and agents) |
 | `pf dev`, `build`, `test`, `lint`, `install` | Resolved per repo. `--dry-run` prints, `--pick` chooses when several exist, `-- <args>` passes args on. See [Run, build and docs](/commands/run-and-build) |
 | `pf doc` (`pf docs`) | Run the docs site (Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo) |

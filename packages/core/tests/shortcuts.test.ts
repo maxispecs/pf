@@ -5,6 +5,8 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { allCommands } from '../src/commands/index.js';
 import { SHORTCUTS, shortcutCommand, shortcutCommands } from '../src/commands/shortcuts.js';
+import { shortcutLines } from '../src/commands/shortcutlist.js';
+import { entriesFor } from '../src/menu.js';
 import { buildContext } from '@pulpfixer/kit/context';
 import { detectProduction } from '@pulpfixer/kit/detect/deploy';
 import { json, lines, mkRepo } from './helpers.js';
@@ -91,4 +93,57 @@ test('pf ps previews the repo publish:cellars script with --dry-run', () => {
 test('pf dp without --yes refuses without a terminal', () => {
   const dir = mkRepo({ '.git/HEAD': '', 'package.json': json({ scripts: { 'deploy:production': 'b' } }) });
   assert.equal(pf(dir, 'dp').code, 2);
+});
+
+test('shortcutLines groups the shortcuts by niche, in group order', () => {
+  const c = { on: false, bold: (s: string) => s, dim: (s: string) => s } as never;
+  const lines = shortcutLines(
+    [
+      { names: ['up', 'put'], target: ['s3'], summary: 'Upload', group: 'AWS' },
+      { names: ['a'], target: ['agent'], summary: 'Agent', group: 'Agent' },
+      { names: ['ds'], target: ['deploy', 'staging'], summary: 'Staging', group: 'Docs & deploy' },
+    ],
+    c,
+  );
+  const heads = lines.filter((l) => !l.startsWith(' ') && l);
+  assert.deepEqual(heads, ['Agent', 'Docs & deploy', 'AWS']);
+  assert.match(lines.join('\n'), /pf up, pf put\s+= pf s3\s+Upload/);
+  assert.deepEqual(shortcutLines(SHORTCUTS, c, 'staging').filter((l) => l.startsWith('  ')).length > 0, true);
+  assert.deepEqual(shortcutLines(SHORTCUTS, c, 'no-such-thing'), []);
+});
+
+test('pf s and pf shortcuts list the shortcuts; pf list and the menu do not', () => {
+  const dir = mkRepo({ '.git/HEAD': '', 'package.json': json({ scripts: { dev: 'x', 'deploy:staging': 'y' } }), 'pnpm-lock.yaml': '' });
+  const run = (...args: string[]) => {
+    const env = { ...process.env, NO_COLOR: '1', PF_NO_UPDATE_CHECK: '1', PF_HOME: mkRepo({}) };
+    return spawnSync(process.execPath, ['--conditions=source', '--import', loader, entry, ...args], { cwd: dir, encoding: 'utf8', env });
+  };
+  for (const name of ['s', 'shortcuts']) {
+    const r = run(name);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /Docs & deploy/);
+    assert.match(r.stdout, /pf ds\s+= pf deploy staging/);
+  }
+  assert.equal(run('s', 'no-such-thing').status, 1);
+  for (const args of [['list'], []]) {
+    const r = run(...args);
+    assert.equal(r.status, 0);
+    assert.doesNotMatch(r.stdout, /Shortcuts|= deploy staging/);
+    assert.match(r.stdout, /pf s\b/);
+  }
+});
+
+test('in a repo, the entries adapted from it come before pf\'s own', () => {
+  const dir = mkRepo({
+    '.git/HEAD': '',
+    'package.json': json({ scripts: { dev: 'x', build: 'y', 'deploy:staging': 'z' } }),
+    'pnpm-lock.yaml': '',
+    'pulpfixer.json': json({ commands: { seed: { run: 'echo seed' } } }),
+  });
+  const names = entriesFor(buildContext(dir)).map((e) => e.name);
+  const last = Math.max(...['dev', 'build', 'deploy staging', 'seed'].map((n) => names.indexOf(n)));
+  assert.ok(['dev', 'build', 'deploy staging', 'seed'].every((n) => names.includes(n)));
+  assert.ok(last < names.indexOf('agent'), `repo entries first: ${names.join(', ')}`);
+  assert.ok(last < names.indexOf('ver'));
+  assert.ok(entriesFor(buildContext(mkRepo({}))).map((e) => e.name).includes('agent'));
 });

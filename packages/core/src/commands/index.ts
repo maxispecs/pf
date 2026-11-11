@@ -9,6 +9,7 @@ import { doctorCommand } from './doctor.js';
 import { hostCommand } from './host.js';
 import { initCommand } from './init.js';
 import { setupCommand } from './setup.js';
+import { shortcutsCommand } from './shortcutlist.js';
 import { SHORTCUTS, shortcutCommands } from './shortcuts.js';
 import { skillCommand } from './skill.js';
 import { TASK_COMMANDS } from './tasks.js';
@@ -46,6 +47,7 @@ export function allCommands(): Command[] {
     hostCommand,
     pluginCommand,
     ...cycleCommands,
+    shortcutsCommand,
     ...SHORTCUTS.flatMap((sc) => shortcutCommands(sc, findCommand)),
     updateCommand,
     uninstallCommand,
