@@ -117,7 +117,7 @@ Claude's `--allowedTools` and `--mcp-config` take every following argument, so t
 
 | Tool | What it does | Read-only | Approval |
 |------|--------------|-----------|----------|
-| `pf_commands` | Stacks, the resolved dev/build/test/lint/install commands, pf.json commands, docs, staging and versioning | yes | none |
+| `pf_commands` | Stacks, the resolved dev/build/test/lint/install commands, pf.json commands, docs, staging, versioning and the pf link (`linked`, or what `pf rp` would refresh) | yes | none |
 | `pf_run` | Run `build`, `test`, `lint` or `install` and return the exit code and the end of the output | no | the agent CLI's prompt |
 | `pf_versions` | List module and stack versions (`versions.json`) | yes | none |
 | `pf_bump` | Bump a module's minor or major version | no | the agent CLI's prompt |

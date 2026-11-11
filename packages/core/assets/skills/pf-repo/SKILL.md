@@ -11,3 +11,13 @@ description: Work in a repository through pulpfixer's tools. Use when starting o
 4. After changing a module, call `pf_bump` with `minor` (or `major` for a breaking change). Never edit a version in a manifest by hand.
 5. A deploy is `pf_deploy_staging` with no `confirm`, shown to the user, then `confirm: true` only after they agree. Production is never a target.
 6. Leave secrets alone. Do not read, print or write tokens. An `.npmrc` line that says `${NPM_TOKEN}` stays as it is.
+
+## The pf link (still changing)
+
+pf remembers a repo in two places: the `id` in the repo's `pf.json`, and a record under `~/.pf/repos/<id>.json` on the user's machine. The record holds what stays out of the repo, such as security-related settings, the checkout paths and the git remote. The id connects the two, so the record survives a moved checkout or a renamed remote.
+
+This connection is still under active development. Its format and rules change between pf releases, so a repo that was linked before sometimes needs `pf rp` again to update the connection.
+
+- `pf_commands` ends with a `pf link:` line. When it says anything other than `linked` (`stale`, `unlinked` or `foreign`), tell the user what it reports and ask them to run `pf rp` (it may ask them a question). Carry on with the task; a stale link does not block builds, tests or deploys.
+- Never write, change or remove the `id` in `pf.json` yourself, and never copy it into another repo. Keep it when you edit `pf.json` for other reasons.
+- Never read or write files under `~/.pf/repos/`. pf owns them.

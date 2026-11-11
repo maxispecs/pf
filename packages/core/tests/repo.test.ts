@@ -15,7 +15,11 @@ const loader = path.join(root, '..', '..', 'node_modules', 'tsx', 'dist', 'loade
 const bundledVer = fs.readFileSync(path.join(root, 'assets', 'version.mjs'), 'utf8');
 
 function pf(cwd: string, ...args: string[]) {
-  const env = { ...process.env, NO_COLOR: '1', PF_NO_UPDATE_CHECK: '1', PF_NO_TRAVOLTA: '1', PF_HOME: mkRepo({}) };
+  return pfHome(mkRepo({}), cwd, ...args);
+}
+
+function pfHome(home: string, cwd: string, ...args: string[]) {
+  const env = { ...process.env, NO_COLOR: '1', PF_NO_UPDATE_CHECK: '1', PF_NO_TRAVOLTA: '1', PF_HOME: home };
   const r = spawnSync(process.execPath, ['--conditions=source', '--import', loader, entry, ...args], { cwd, encoding: 'utf8', env });
   return { code: r.status, out: r.stdout + r.stderr };
 }
@@ -49,6 +53,36 @@ test('pf repo --dry-run writes nothing', () => {
   assert.equal(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'), before);
   assert.ok(!fs.existsSync(path.join(dir, 'scripts')));
   assert.ok(!fs.existsSync(path.join(dir, 'versions.json')));
+  assert.ok(!fs.existsSync(path.join(dir, 'pf.json')));
+  assert.match(r.out, /would add id demo-/);
+});
+
+test('pf rp links pf.json to a record in the pf home, then reports it linked; --list shows it', () => {
+  const home = mkRepo({});
+  const dir = demo();
+  const r = pfHome(home, dir, 'rp', '--no-pnpm', '--no-ver', '--no-deploy');
+  assert.equal(r.code, 0, r.out);
+  const id = JSON.parse(fs.readFileSync(path.join(dir, 'pf.json'), 'utf8')).id as string;
+  assert.match(id, /^demo-[0-9a-f]{8}$/);
+  const rec = JSON.parse(fs.readFileSync(path.join(home, 'repos', `${id}.json`), 'utf8'));
+  assert.deepEqual(rec.paths, [fs.realpathSync(dir)]);
+
+  const again = pfHome(home, dir, 'rp', '--no-pnpm', '--no-ver', '--no-deploy');
+  assert.match(again.out, new RegExp(`linked as ${id}`));
+  assert.match(pfHome(home, dir, 'rp', '--list').out, new RegExp(id));
+});
+
+test('pf rp without a terminal leaves a foreign id alone and says how to choose', () => {
+  const home = mkRepo({});
+  const first = demo();
+  assert.equal(pfHome(home, first, 'rp', '--no-pnpm', '--no-ver', '--no-deploy').code, 0);
+  const id = JSON.parse(fs.readFileSync(path.join(first, 'pf.json'), 'utf8')).id as string;
+  const copy = mkRepo({ 'pf.json': json({ id }), 'package.json': json({ name: 'demo' }) });
+  const r = pfHome(home, copy, 'rp', '--no-pnpm', '--no-ver', '--no-deploy');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /run pf rp in a terminal to choose/);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(copy, 'pf.json'), 'utf8')).id, id);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(home, 'repos', `${id}.json`), 'utf8')).paths.length, 1);
 });
 
 test('pf rp updates an older ver CLI copy and leaves a newer one', () => {

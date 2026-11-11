@@ -8,6 +8,7 @@ import { candidates } from '@pulpfixer/kit/detect/resolve';
 import { TASKS, type Task } from '@pulpfixer/kit/detect/stacks';
 import { captureAsync, formatCmd, withArgs, type Cmd } from '@pulpfixer/kit/exec';
 import { objectSchema, type Tool, type ToolResult } from '@pulpfixer/kit/agent-tool';
+import { repoLink, type RepoLink } from '@pulpfixer/kit/repo-link';
 import { discoverSkills, type Skill } from '../skills/discover.js';
 
 export type { Tool, ToolResult, ToolSession } from '@pulpfixer/kit/agent-tool';
@@ -75,14 +76,22 @@ export function commandsText(ctx: Context): string {
   lines.push(`Staging deploy: ${staging.steps.length ? `${staging.steps.length} step(s), see pf_deploy_staging` : 'none found'}`);
   if (detectDeploy(ctx).steps.length) lines.push('Repo deploy (pf deploy, no environment named): defined; only the user runs it, you cannot.');
   lines.push(`Versioning: ${findVersionsRoot(ctx.cwd) ? 'versions.json (use pf_versions / pf_bump)' : 'not set up'}`);
+  lines.push(linkText(repoLink(ctx.repo.root, ctx.config, { name: ctx.repo.name })));
   return lines.join('\n');
+}
+
+/** The pf.json `id` <-> `~/.pf/repos` link, with what to tell the user when it needs `pf rp`. */
+export function linkText(link: RepoLink): string {
+  const id = link.id ? ` (id ${link.id})` : '';
+  if (link.state === 'linked') return `pf link: linked${id}`;
+  return `pf link: ${link.state}${id}: ${link.reasons.join('; ')}. Ask the user to run \`pf rp\` to refresh it; do not edit the pf.json id yourself.`;
 }
 
 export const TOOLS: Tool[] = [
   {
     name: 'pf_commands',
     description:
-      'List what pf resolved for this repo: stacks, the dev/build/test/lint/install commands, pf.json commands, docs site, staging deploy and versioning. Call this first instead of guessing commands.',
+      'List what pf resolved for this repo: stacks, the dev/build/test/lint/install commands, pf.json commands, docs site, staging deploy, versioning and the pf link. Call this first instead of guessing commands.',
     inputSchema: obj(),
     readOnly: true,
     run: async (ctx) => ({ ok: true, text: commandsText(ctx) }),

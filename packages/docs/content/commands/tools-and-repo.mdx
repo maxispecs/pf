@@ -31,12 +31,15 @@ See [pf.json](/concepts/pf-json) for the format.
 
 `pf repo` (short: `pf rp`) hooks pf's helpers into a repo and wires its `package.json`:
 
+- **link**: gives `pf.json` an `id` and remembers the repo in pf's state folder (below);
 - the `/pnpm` root commands: `pnpm ask` (every root script, grouped), `pnpm doc` (the docs site) and `pnpm deploy:staging`, adding the last two only where a docs site or a staging target exists;
 - `/ver` versioning: `versions.json` and `pnpm ver`;
 - **deploy**: tells you what `pf d` runs, or, when the repo has none, wires one (below).
 
 ```bash
 pf repo --dry-run
+pf repo --list        # every repo pf remembers
+pf repo --no-link     # skip the link
 pf repo --no-pnpm     # skip the pnpm commands
 pf repo --no-ver      # skip versioning
 pf repo --no-deploy   # skip the deploy step
@@ -44,6 +47,24 @@ pf repo --deploy      # run the deploy setup even when pf d already resolves
 ```
 
 It updates every older copy of the ver CLI, prints what it did and never commits. Run it again after `pf update`.
+
+### The link
+
+pf remembers a repo in two places:
+
+| Where | What | In git |
+|-------|------|--------|
+| `pf.json` `id` | `my-service-3f9a2c1b`: the repo name plus a random suffix | yes |
+| `~/.pf/repos/<id>.json` | the checkout paths, the origin remote (without credentials), the link revision and private settings | no |
+
+Settings that should not live in the repo, such as security-related ones, go in the record. The id connects the two, so moving the checkout or changing its remote keeps the record. `pf rp` creates both and refreshes the record. It reports the link as one of:
+
+- **linked**: `pf.json` and the record agree.
+- **stale**: the same repo, but the checkout moved, the remote or name changed, `pf.json` lost its id (pf finds the record by path or remote and writes the id back), or an older pf wrote the link. `pf rp` refreshes it.
+- **unlinked**: no id yet, or this machine has no record for it (a fresh clone). `pf rp` creates the record.
+- **foreign**: `pf.json` names a record that knows neither this path nor this remote, for example a copy or a `pf.json` taken from another repo. `pf rp` asks whether this is the same repo (share the record) or a different one (new id). Without a terminal it changes nothing. A foreign checkout never gets the record's settings.
+
+The link is still under development. Its format and rules change between pf releases (the link revision), so a linked repo sometimes needs `pf rp` again to update the connection. `pf dev` prints a hint when it does, and the agent sees the state in `pf_commands`.
 
 ### Deploy setup
 

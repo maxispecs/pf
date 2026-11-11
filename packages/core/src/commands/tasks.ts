@@ -2,6 +2,7 @@ import { buildContext, type Context } from '@pulpfixer/kit/context';
 import { candidates } from '@pulpfixer/kit/detect/resolve';
 import type { Candidate, Task } from '@pulpfixer/kit/detect/stacks';
 import { formatCmd, runCmd, withArgs } from '@pulpfixer/kit/exec';
+import { repoLink } from '@pulpfixer/kit/repo-link';
 import { err } from '@pulpfixer/kit/ui/palette';
 import { badgeLabel, termLine } from '@pulpfixer/kit/ui/text';
 import { pick } from '@pulpfixer/kit/ui/picker';
@@ -68,14 +69,19 @@ export async function runTask(ctx: Context, task: Task, opts: TaskRunOptions = {
 
 /**
  * `pf dev` in a repo `pf repo` has not been run in: offer to run it first, then offer to start dev.
+ * In a set-up repo whose pf link is missing or stale, only print a hint to rerun `pf rp`.
  * Returns the exit code when the run is over (the user cancelled or `pf repo` failed), else null to carry on
  * with the task. Quiet without a terminal, with `--dry-run` or `PF_NO_REPO_PROMPT=1`.
  */
 export async function offerRepoSetup(ctx: Context, task: Task, opts: { dryRun?: boolean } = {}): Promise<{ ctx: Context; code: number | null }> {
   const same = { ctx, code: null };
   if (task !== 'dev' || opts.dryRun || !ctx.repo || process.env.PF_NO_REPO_PROMPT === '1' || !interactive()) return same;
-  if (isRepoSetUp(ctx.repo.root)) return same;
   const c = err();
+  if (isRepoSetUp(ctx.repo.root)) {
+    const link = repoLink(ctx.repo.root, ctx.config, { name: ctx.repo.name });
+    if (link.state !== 'linked') process.stderr.write(c.dim(`pf link ${link.state}: ${link.reasons.join('; ')}. Run pf rp to refresh it.\n`));
+    return same;
+  }
   if (!(await confirm(`This repo is not set up with pf yet. Run ${c.bold('pf repo')} (pnpm commands, versioning, deploy) first?`, true))) return same;
   const code = await repoCommand.run(ctx, []);
   if (code !== 0) return { ctx, code };

@@ -4,6 +4,7 @@ import { buildContext, type Context } from '@pulpfixer/kit/context';
 import { detectDeploy, detectProduction, detectStaging } from '@pulpfixer/kit/detect/deploy';
 import { findDeployHelpers, type DeployHelper } from '@pulpfixer/kit/detect/helpers';
 import { capture, formatCmd, runCmd } from '@pulpfixer/kit/exec';
+import { linkRepo, listRepoRecords, REPO_LINK_REVISION, repoLink, repoRemote } from '@pulpfixer/kit/repo-link';
 import { err } from '@pulpfixer/kit/ui/palette';
 import { pick } from '@pulpfixer/kit/ui/picker';
 import { confirm } from '@pulpfixer/kit/ui/prompt';
@@ -245,15 +246,64 @@ async function planDeploy(ctx: Context, opts: { force: boolean; dryRun: boolean 
   return { resolved, helpers, agent: true };
 }
 
+/**
+ * The link between pf.json `id` and `~/.pf/repos/<id>.json`. A `foreign` id (the record knows neither this
+ * path nor this remote) is linked only after the user says this is the same repo; otherwise it gets a new id.
+ */
+async function setupLink(ctx: Context, dryRun: boolean, done: string[]): Promise<number> {
+  const c = err();
+  const root = ctx.repo!.root;
+  const name = ctx.repo!.name;
+  const remote = repoRemote(root);
+  const link = repoLink(root, ctx.config, { name, remote });
+  let fresh = false;
+  if (link.state === 'foreign') {
+    process.stderr.write(`${badgeLabel('warning', c)} ${link.reasons.join('; ')}\n`);
+    if (dryRun || !interactive()) {
+      done.push(`link: ${link.reasons.join('; ')}; run pf rp in a terminal to choose`);
+      return 0;
+    }
+    const choice = await pick<'same' | 'new' | 'skip'>('Is this checkout the same repo?', [
+      { value: 'same', label: 'same repo', hint: 'another checkout, share the record' },
+      { value: 'new', label: 'different repo', hint: 'give it a new id in pf.json' },
+      { value: 'skip', label: 'skip', hint: 'leave the link as it is' },
+    ]);
+    if (!choice) return 130;
+    if (choice === 'skip') {
+      done.push('link: skipped, pf.json names another repo\'s id');
+      return 0;
+    }
+    fresh = choice === 'new';
+  }
+  const r = linkRepo(root, link, { name, remote, fresh, dryRun });
+  for (const ch of r.changes) done.push(`link: ${ch}`);
+  if (!r.ok) process.stderr.write(`${badgeLabel('error', c)} ${r.changes.at(-1)}\n`);
+  return r.ok ? 0 : 1;
+}
+
+function listLinks(): number {
+  const c = err();
+  const records = listRepoRecords();
+  if (!records.length) {
+    process.stderr.write(`${c.dim('pf remembers no repos yet. Run pf rp inside one.')}\n`);
+    return 0;
+  }
+  const rows = records.map((r) => `${c.bold(r.id)}  ${r.paths[0] ?? c.dim('no path')}${r.remote ? c.dim(`  ${r.remote}`) : ''}${r.revision < REPO_LINK_REVISION ? c.dim('  (old link, run pf rp there)') : ''}`);
+  process.stdout.write(`${rows.join('\n')}\n`);
+  return 0;
+}
+
 export const repoCommand: Command = {
   name: 'repo',
-  summary: 'Hook pf tools into this repo (pnpm commands, versioning, deploy), or update them',
+  summary: 'Hook pf tools into this repo (link, pnpm commands, versioning, deploy), or update them',
   group: 'Tools',
-  usage: 'pf repo [--dry-run] [--no-pnpm] [--no-ver] [--no-deploy] [--deploy]',
+  usage: 'pf repo [--dry-run] [--no-link] [--no-pnpm] [--no-ver] [--no-deploy] [--deploy] | pf repo --list',
   async run(ctx: Context, args: string[]) {
     const c = err();
     const rest = [...args];
+    if (takeFlag(rest, '--list', '-l')) return listLinks();
     const dryRun = takeFlag(rest, '--dry-run', '-n');
+    const noLink = takeFlag(rest, '--no-link');
     const noPnpm = takeFlag(rest, '--no-pnpm');
     const noVer = takeFlag(rest, '--no-ver');
     const noDeploy = takeFlag(rest, '--no-deploy');
@@ -265,6 +315,12 @@ export const repoCommand: Command = {
     const root = ctx.repo.root;
     const done: string[] = [];
 
+    if (!noLink) {
+      process.stderr.write(`${h2('Link', c)}\n`);
+      const code = await setupLink(ctx, dryRun, done);
+      if (code !== 0) return code;
+      process.stderr.write('\n');
+    }
     if (!noPnpm) {
       process.stderr.write(`${h2('pnpm commands', c)}\n`);
       const code = await setupPnpm(root, dryRun, done);

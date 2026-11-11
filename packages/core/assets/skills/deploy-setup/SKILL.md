@@ -45,7 +45,7 @@ Default to `deploy`. Never choose production for the user.
 
 ## 5. Write `pf.json`
 
-Add the entry under `commands`, keeping everything already in the file (create the file at the repo root if missing):
+Add the entry under `commands`, keeping everything already in the file, including its `id`, which links the repo to pf's state; never change or add it (create the file at the repo root if missing):
 
 ```json
 {

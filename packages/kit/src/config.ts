@@ -39,6 +39,8 @@ export interface ProfileConfig {
 
 /** Repo config: `pf.json` at the repo root. */
 export interface RepoConfig {
+  /** Links the repo to its record in `~/.pf/repos/<id>.json` (see `repo-link.ts`). Written by `pf rp`. */
+  id?: string;
   name?: string;
   commands: Record<string, CustomCommand>;
   /** Name of the user's profile this repo uses. */
@@ -85,7 +87,7 @@ export function parseProfile(v: unknown): ProfileConfig {
 }
 
 export function loadRepoConfig(root: string): RepoConfig {
-  const raw = readJson<{ name?: unknown; commands?: unknown; profile?: unknown; agent?: unknown }>(root, 'pf.json');
+  const raw = readJson<{ id?: unknown; name?: unknown; commands?: unknown; profile?: unknown; agent?: unknown }>(root, 'pf.json');
   const commands: Record<string, CustomCommand> = {};
   if (raw && raw.commands && typeof raw.commands === 'object') {
     for (const [name, v] of Object.entries(raw.commands as Record<string, unknown>)) {
@@ -105,6 +107,7 @@ export function loadRepoConfig(root: string): RepoConfig {
   }
   const scope = isObj(raw?.agent) ? parseAgentAwsScope(raw.agent.aws) : undefined;
   return {
+    ...(typeof raw?.id === 'string' && raw.id.trim() ? { id: raw.id.trim() } : {}),
     ...(typeof raw?.name === 'string' ? { name: raw.name } : {}),
     commands,
     ...(typeof raw?.profile === 'string' && raw.profile.trim() ? { profile: raw.profile.trim() } : {}),

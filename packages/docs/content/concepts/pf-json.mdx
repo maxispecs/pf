@@ -28,6 +28,14 @@ title: pf.json
 
 Built-in names (`dev`, `build`, `test`, `lint`, `install`) override detection. `deploy:staging`, `deploy:production`, `publish:staging` and `doc` override those commands. A plain `deploy` entry is the repo's own deploy when it names no environment: `pf deploy` (`pf d`) runs it when there is no staging or production target, and always asks first, like production. Any other name shows up in the menu and runs with `pf <name>`, for example `pf seed`.
 
+## id
+
+```json
+{ "id": "my-service-3f9a2c1b", "name": "my-service" }
+```
+
+`id` links the repo to pf's own record of it, `~/.pf/repos/<id>.json` on your machine. pf keeps the things that should stay out of the repo there: the checkouts it has seen, the git remote, and private per-repo settings such as security-related ones. `pf rp` writes the id (the repo name plus a random suffix) and the record. Because the id travels with the repo, the record survives a moved checkout or a renamed remote. Commit the id and do not edit it by hand. See [pf repo](/commands/tools-and-repo#the-link).
+
 ## Profile and agent limits
 
 ```json
