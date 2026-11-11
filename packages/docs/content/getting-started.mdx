@@ -56,11 +56,11 @@ pf uninstall         # remove pf from this machine
 
 ## Set up a repo
 
-Most repos need nothing. To give pf a few hints, or to add your own commands, write a `pf.json`:
+Most repos need nothing. To give pf a few hints, or to add your own commands, write a `pulpfixer.json`:
 
 ```bash
-pf init            # writes pf.json from what was detected (--dry-run to preview)
+pf init            # writes pulpfixer.json from what was detected (--dry-run to preview)
 pf repo            # hooks pf's pnpm commands and versioning into the repo
 ```
 
-See [pf.json](/concepts/pf-json) and [Tools and repo setup](/commands/tools-and-repo).
+See [pulpfixer.json](/concepts/pulpfixer-json) and [Tools and repo setup](/commands/tools-and-repo).

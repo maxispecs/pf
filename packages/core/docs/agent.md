@@ -27,7 +27,7 @@ pf profile add acme --aws-profile acme-readonly --account 123456789012 --region 
 pf profile check acme            # do the credentials resolve to the pinned account?
 
 # 2. Once per repo: say which profile it uses (commit this)
-echo '{ "profile": "acme" }' > pf.json        # or merge "profile" into your existing pf.json
+echo '{ "profile": "acme" }' > pulpfixer.json        # or merge "profile" into your existing pulpfixer.json
 
 # 3. Work with the agent
 pf agent "the api service returns 502 since the last deploy, find out why"
@@ -37,7 +37,7 @@ The agent calls `pf_aws_profile`, then asks for access with a reason. A dialog o
 
 ```text
 The agent asks pulpfixer for read-only AWS access.
-Profile: acme (from pf.json), AWS profile acme-readonly, account 123456789012
+Profile: acme (from pulpfixer.json), AWS profile acme-readonly, account 123456789012
 Scopes: identity, ecs
 Regions: eu-west-1
 For: 20 minutes
@@ -117,7 +117,7 @@ Claude's `--allowedTools` and `--mcp-config` take every following argument, so t
 
 | Tool | What it does | Read-only | Approval |
 |------|--------------|-----------|----------|
-| `pf_commands` | Stacks, the resolved dev/build/test/lint/install commands, pf.json commands, docs, staging, versioning and the pf link (`linked`, or what `pf rp` would refresh) | yes | none |
+| `pf_commands` | Stacks, the resolved dev/build/test/lint/install commands, pulpfixer.json commands, docs, staging, versioning and the pf link (`linked`, or what `pf rp` would refresh) | yes | none |
 | `pf_run` | Run `build`, `test`, `lint` or `install` and return the exit code and the end of the output | no | the agent CLI's prompt |
 | `pf_versions` | List module and stack versions (`versions.json`) | yes | none |
 | `pf_bump` | Bump a module's minor or major version | no | the agent CLI's prompt |
@@ -141,11 +141,11 @@ pf agent "is i-0abc123 healthy behind the alb? check eu-west-1"   # elb + ec2 sc
 pf agent "find errors in /ecs/api logs from the last hour"        # logs scope (only if the profile allows it)
 ```
 
-`pf_deploy_staging` is the only deploy tool. Production and a repo's bare `deploy` (the `deploy` entry in `pf.json`, run with `pf deploy` / `pf d`) are never targeted: only the user runs them.
+`pf_deploy_staging` is the only deploy tool. Production and a repo's bare `deploy` (the `deploy` entry in `pulpfixer.json`, run with `pf deploy` / `pf d`) are never targeted: only the user runs them.
 
 ### Deploy setup (`pf rp --deploy`)
 
-For a repo that deploys through its own helper script (`./tl d`, `./al d`) `pf repo` asks which `pf.json` key to write (`deploy`, `deploy:staging` or `deploy:production`; no terminal means `deploy`), then starts the agent with the bundled `deploy-setup` skill (`packages/core/assets/skills/deploy-setup/SKILL.md`). Claude and Cursor are started in print mode, so the process exits when the task is done and pf continues. The prompt lists the helpers pf found at the repo root, ranked (`GWLOCAL` helpers first, server-only ones such as `a.sh` last) as hints only. The agent reads the repo's deploy notes and the helper, picks the dev-machine command, and writes that key, with `"message": true` when the command commits and takes a commit message. It never runs the deploy. pf then previews `pf d`.
+For a repo that deploys through its own helper script (`./tl d`, `./al d`) `pf repo` asks which `pulpfixer.json` key to write (`deploy`, `deploy:staging` or `deploy:production`; no terminal means `deploy`), then starts the agent with the bundled `deploy-setup` skill (`packages/core/assets/skills/deploy-setup/SKILL.md`). Claude and Cursor are started in print mode, so the process exits when the task is done and pf continues. Print mode writes stream-json events (`--output-format stream-json`, plus `--verbose` for Claude), and pf shows them live (`packages/core/src/agent/stream.ts`): the agent's messages, each tool call with its main argument, failed tools, and a closing line with the time, turns and cost. If the repo still has a legacy `pf.json`, `pf repo` renames it to `pulpfixer.json` before the agent starts. The prompt lists the helpers pf found at the repo root, ranked (`GWLOCAL` helpers first, server-only ones such as `a.sh` last) as hints only. The agent reads the repo's deploy notes and the helper, picks the dev-machine command, and writes that key, with `"message": true` when the command commits and takes a commit message. It never runs the deploy. pf then previews `pf d`.
 
 ## Troubleshoot mode (`pf t`)
 
@@ -168,7 +168,7 @@ flowchart TD
   start["pf t [prompt]"] --> detect["Read the repo's deployment: stack, staging/production, AWS hints"]
   detect --> resolve{"A registered profile applies?"}
   resolve -->|yes| check["Check the credentials against the pinned account"]
-  resolve -->|"no or unknown"| wizard["Link wizard: pick or register a profile, save it to pf.json"]
+  resolve -->|"no or unknown"| wizard["Link wizard: pick or register a profile, save it to pulpfixer.json"]
   wizard --> check
   check --> launch["Start the agent with the troubleshoot persona and skill"]
   launch --> agent["Claude / Codex / Cursor"]
@@ -178,8 +178,8 @@ flowchart TD
 ```
 
 1. **Detect.** pf reads the repo's own files, locally: CI workflows, CDK, SAM, Serverless and SST config, Terraform, ECS task definitions, deploy scripts. It collects the staging and production deploy commands (production only when the repo defines one), AWS account ids, regions, ECS clusters and services, Lambda functions, CloudFormation stacks and log groups, and which AWS services are in use. These are hints, not facts. No secrets are looked for, and nothing is called on AWS.
-2. **Resolve the profile.** The first of `--profile`, `PF_PROFILE`, the repo's `pf.json`, the default profile (see [Profiles](#profiles)). Only a profile in pf's registry (`profiles` in `~/.pf/config.json`) is supported: an AWS profile that pf does not list is never used.
-3. **Link, if none applies.** The wizard lists the registered profiles and the AWS profiles in `~/.aws/config` that match what the repo mentions (a matching account id ranks first). You pick one, pf registers it if it is new (asking for the account to pin and the scopes to allow, with the scopes the repo's services need pre-filled), and writes `"profile": "<name>"` to this repo's `pf.json` after you confirm. Without a terminal, pf prints the best matches and the exact commands instead.
+2. **Resolve the profile.** The first of `--profile`, `PF_PROFILE`, the repo's `pulpfixer.json`, the default profile (see [Profiles](#profiles)). Only a profile in pf's registry (`profiles` in `~/.pf/config.json`) is supported: an AWS profile that pf does not list is never used.
+3. **Link, if none applies.** The wizard lists the registered profiles and the AWS profiles in `~/.aws/config` that match what the repo mentions (a matching account id ranks first). You pick one, pf registers it if it is new (asking for the account to pin and the scopes to allow, with the scopes the repo's services need pre-filled), and writes `"profile": "<name>"` to this repo's `pulpfixer.json` after you confirm. Without a terminal, pf prints the best matches and the exact commands instead.
 4. **Check the credentials.** `sts get-caller-identity` through the profile, against the pinned account. An expired SSO session offers `aws sso login --profile <name>`. A different account stops the session before the agent starts.
 5. **Start the agent** with the deployment summary in its persona and the `troubleshoot` skill to follow.
 
@@ -194,7 +194,7 @@ Deployment (read from this repo's files)
   ECS clusters: web
   ECS services: api
   suggested scopes: identity, ecs, elb, cloudwatch, logs
-profile acme (from pf.json) AWS profile acme-readonly, account 123456789012, region eu-west-1
+profile acme (from pulpfixer.json) AWS profile acme-readonly, account 123456789012, region eu-west-1
 ✓ acme: credentials resolve to the pinned account 123456789012
 ```
 
@@ -222,7 +222,7 @@ Profiles:
 - acme (registered): AWS profile acme-readonly, account 123456789012, region eu-west-1. Matches: account 123456789012 appears in the repo
 - corp-ro (new, from ~/.aws/config): AWS profile corp-ro, account 123456789012, region eu-west-1. Matches: account 123456789012 appears in the repo
 
-Linking writes "profile" to pf.json in this repo. A new profile is registered in ~/.pf/config.json with the account pinned when known. Read access still needs its own approval.
+Linking writes "profile" to pulpfixer.json in this repo. A new profile is registered in ~/.pf/config.json with the account pinned when known. Read access still needs its own approval.
 
 Profile for this repo   [ acme (registered) v ]
 [ ] Link this profile to the repo
@@ -234,7 +234,7 @@ If you decline, the agent is told not to ask again. The link applies to the runn
 
 A read grant never changes anything. A fix is separate and stricter:
 
-- **Off by default.** An action works only when your user profile lists it: `pf profile add acme --actions "ecs update-service,ecs stop-task"`. A repo's `pf.json` (`agent.aws.actions`) can only remove actions, never add one.
+- **Off by default.** An action works only when your user profile lists it: `pf profile add acme --actions "ecs update-service,ecs stop-task"`. A repo's `pulpfixer.json` (`agent.aws.actions`) can only remove actions, never add one.
 - **One call, one approval.** Every `pf_aws_act` call opens its own dialog with the exact command. Nothing runs without your answer there, and an earlier approval does not carry over. If the agent CLI cannot show the dialog, the action is refused, even in Codex or Cursor.
 - **Only listed flags and values.** Each action accepts a fixed set of flags with checked values.
 - **Pinned account and region.** The profile must pin an account, pf verifies it before it asks you, and the region must be within the profile's limits.
@@ -252,7 +252,7 @@ Deleting, terminating and anything with IAM or secrets is never an action.
 
 ```text
 The agent asks pulpfixer to CHANGE something on AWS.
-Profile: acme (from pf.json), AWS profile acme-readonly, account 123456789012 (verified)
+Profile: acme (from pulpfixer.json), AWS profile acme-readonly, account 123456789012 (verified)
 Action: redeploy (force-new-deployment), rescale or point an ECS service at another task definition
 Command: aws ecs update-service --cluster web --service api --force-new-deployment --output json --profile acme-readonly --region eu-west-1
 Reason: tasks keep failing health checks on image api:1.42, the previous revision was healthy
@@ -278,7 +278,7 @@ The same tools are served by `pf agent` and `pf mcp`, so any session can use the
 | `packages/core/src/commands/troubleshoot.ts` | the command, the link wizard, the credentials check |
 | `packages/plugin-aws/src/infra.ts` | deployment detection (`detectAwsDeployment`, `scanAwsHints`, `scopesFor`) |
 | `packages/plugin-aws/src/awsconfig.ts` | `~/.aws/config` parsing (names, account, region, kind only) and candidate ranking |
-| `packages/plugin-aws/src/link.ts` | `linkChoices`, `applyLink`: register a profile and name it in `pf.json` |
+| `packages/plugin-aws/src/link.ts` | `linkChoices`, `applyLink`: register a profile and name it in `pulpfixer.json` |
 | `packages/plugin-aws/src/access.ts` | `ACTIONS`, `checkAction`, the new `lambda-metadata` and `cloudformation` scopes |
 | `packages/plugin-aws/src/agent-tools.ts` | `pf_aws_context`, `pf_aws_link_profile`, `pf_aws_act` |
 | `packages/kit/src/profiles.ts`, `context.ts` | `linkRepoProfile`, `refreshContext` (config reloads before each tool call) |
@@ -291,9 +291,9 @@ A profile ties a project to an AWS account and limits what the agent may be gran
 | Layer | File | Holds | Trusted to |
 |-------|------|-------|------------|
 | User | `~/.pf/config.json` | AWS profile name, pinned account, region, agent limits | widen and narrow |
-| Repo | `pf.json` (committed) | which profile the repo uses, optional tighter limits | narrow only |
+| Repo | `pulpfixer.json` (committed) | which profile the repo uses, optional tighter limits | narrow only |
 
-A cloned repo is not trusted, so its `pf.json` can never allow more than your user profile does.
+A cloned repo is not trusted, so its `pulpfixer.json` can never allow more than your user profile does.
 
 ### User profiles
 
@@ -357,14 +357,14 @@ The first of:
 
 1. `pf agent --profile <name>`, or the name given to `pf profile show <name>` / `pf profile check <name>`
 2. `PF_PROFILE`
-3. `"profile"` in the repo's `pf.json`
+3. `"profile"` in the repo's `pulpfixer.json`
 4. `"defaultProfile"` (`pf profile use <name>`)
 
 ### Commands
 
 ```bash
 pf profile                 # list (also in the pf menu)
-pf profile show [name]     # the effective profile here, after pf.json narrowing
+pf profile show [name]     # the effective profile here, after pulpfixer.json narrowing
 pf profile use <name>      # make it the default
 pf profile check [name]    # sts get-caller-identity vs the pinned account (--dry-run prints the command)
 pf profile remove <name>
@@ -397,9 +397,9 @@ pf profile add side    --aws-profile sp-ro          --account 333333333333 --reg
 ```
 
 ```text
-~/code/acme-api/pf.json        { "profile": "acme" }
-~/code/acme-warehouse/pf.json  { "profile": "acme-dw" }
-~/code/side-project/pf.json    { "profile": "side", "agent": { "aws": { "scopes": ["identity", "ec2"] } } }
+~/code/acme-api/pulpfixer.json        { "profile": "acme" }
+~/code/acme-warehouse/pulpfixer.json  { "profile": "acme-dw" }
+~/code/side-project/pulpfixer.json    { "profile": "side", "agent": { "aws": { "scopes": ["identity", "ec2"] } } }
 ```
 
 Each repo's agent sessions then use their own account and limits, with no switching. `pf agent --profile acme-dw` overrides one session.
@@ -417,7 +417,7 @@ sequenceDiagram
   Agent->>Pf: pf_aws_profile
   Pf-->>Agent: profile, limits, allowed operations
   Agent->>Pf: pf_aws_request_access(scopes, reason, ttl)
-  Pf->>Pf: check against profile and pf.json limits
+  Pf->>Pf: check against profile and pulpfixer.json limits
   Pf->>Agent: elicitation/create (dialog text)
   Agent->>You: dialog
   You-->>Agent: approve or decline
@@ -436,7 +436,7 @@ sequenceDiagram
 `pf_aws_profile` (abridged):
 
 ```text
-pf profile: acme (from pf.json)
+pf profile: acme (from pulpfixer.json)
 AWS profile: acme-readonly
 account: 123456789012 (pinned)
 region: eu-west-1
@@ -637,7 +637,7 @@ pf accepts form elicitation as `elicitation: {}` (2025-06-18) or `elicitation: {
 |------|------|
 | `packages/kit/src/agent-tool.ts` | `Tool`, `ToolResult`, `ToolSession`, `ElicitResult`, `objectSchema()` |
 | `packages/kit/src/plugin.ts` | `Plugin.tools(ctx)`: plugins contribute tools |
-| `packages/kit/src/config.ts` | `ProfileConfig`, `AgentAwsScope`, parsing of `profiles` and pf.json `profile` / `agent.aws` |
+| `packages/kit/src/config.ts` | `ProfileConfig`, `AgentAwsScope`, parsing of `profiles` and pulpfixer.json `profile` / `agent.aws` |
 | `packages/kit/src/profiles.ts` | `resolveProfile`, `narrowLimits`, `saveProfile`, `removeProfile`, `setDefaultProfile` |
 | `packages/core/src/agent/launch.ts` | `startAgent`: picks the CLI, builds the persona, writes launch files, spawns |
 | `packages/core/src/agent/adapters.ts` | `buildLaunch` per CLI, `mcpServerArgv`, Claude's allowlist |
@@ -846,14 +846,14 @@ Limits to keep in mind:
 
 - Read-only metadata can still be sensitive: resource names, IPs, tags, and log lines with the `logs` scope.
 - Redaction catches common patterns only.
-- A repo's `pf.json` chooses which of your profiles applies. The dialog always names the profile, its source, and the account, so read it before approving.
+- A repo's `pulpfixer.json` chooses which of your profiles applies. The dialog always names the profile, its source, and the account, so read it before approving.
 
 ## Troubleshooting
 
 | Symptom | Cause and fix |
 |---------|---------------|
-| `No pf profile applies here` | Add one (`pf profile add`) and name it in `pf.json`, or set a default with `pf profile use` |
-| `The profile "x" ... is not configured` | `pf.json` names a profile this machine does not have: `pf profile add x ...` |
+| `No pf profile applies here` | Add one (`pf profile add`) and name it in `pulpfixer.json`, or set a default with `pf profile use` |
+| `The profile "x" ... is not configured` | `pulpfixer.json` names a profile this machine does not have: `pf profile add x ...` |
 | `has no AWS profile` | `pf profile add x --aws-profile <name>` |
 | The dialog never shows; the grant says `could not ask the user` | the agent CLI lacks MCP elicitation, or this is `claude -p`. Update the CLI, or run the agent interactively |
 | `aws ... is not enabled for this profile` | the action is off for this profile: `pf profile add <name> --actions "<service> <operation>"`, or run the change yourself |
@@ -863,5 +863,5 @@ Limits to keep in mind:
 | `aws ... failed: ... ExpiredToken` / `SSO session expired` | `aws sso login --profile <aws-profile>` |
 | `aws CLI not found on PATH` | install the aws CLI v2 |
 | Output cut | narrow the call with `query`, `filters`, `max-items` or a shorter time range |
-| The agent keeps the old profile | the server re-reads `~/.pf/config.json` and `pf.json` before each tool call, so an edit applies on the next call. `--profile` and `PF_PROFILE` still win over `pf.json` for that session |
+| The agent keeps the old profile | the server re-reads `~/.pf/config.json` and `pulpfixer.json` before each tool call, so an edit applies on the next call. `--profile` and `PF_PROFILE` still win over `pulpfixer.json` for that session |
 | Check what the agent did | `ls -t ~/.pf/agent/audit/ \| head -1`, then read that log |

@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { hasRepoConfig, repoConfigPath } from '../config.js';
 import { exists, readJson, listDir } from '../util.js';
 
 export interface Repo {
@@ -20,12 +21,12 @@ export function hasProjectMarker(dir: string): boolean {
   return listDir(dir).some((f) => /\.(sln|slnx|csproj|fsproj)$/.test(f));
 }
 
-/** Nearest ancestor with `.git` or `pf.json`; failing that, `cwd` itself when it looks like a project. */
+/** Nearest ancestor with `.git` or a repo config (`pulpfixer.json`, legacy `pf.json`); failing that, `cwd` itself when it looks like a project. */
 export function findRepo(cwd: string): Repo | null {
   let dir = path.resolve(cwd);
   for (;;) {
     const hasGit = exists(dir, '.git');
-    const hasConfig = exists(dir, 'pf.json');
+    const hasConfig = hasRepoConfig(dir);
     if (hasGit || hasConfig) return makeRepo(dir, hasGit, hasConfig);
     const parent = path.dirname(dir);
     if (parent === dir) break;
@@ -37,7 +38,7 @@ export function findRepo(cwd: string): Repo | null {
 
 function makeRepo(root: string, hasGit: boolean, hasConfig: boolean): Repo {
   const pkgName = readJson<{ name?: string }>(root, 'package.json')?.name;
-  const cfgName = readJson<{ name?: string }>(root, 'pf.json')?.name;
+  const cfgName = readJson<{ name?: string }>(repoConfigPath(root))?.name;
   const name = cfgName ?? (typeof pkgName === 'string' ? pkgName.replace(/^@[^/]+\//, '') : path.basename(root));
   return { root, name, hasGit, hasConfig };
 }

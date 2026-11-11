@@ -53,7 +53,7 @@ function profileDetail(ctx: Context): string {
   return p.config ? `${p.name} (${p.source})` : `${p.name} (not configured)`;
 }
 
-/** Run a custom command from pf.json. */
+/** Run a custom command from pulpfixer.json. */
 export function runCustom(ctx: Context, name: string, args: string[]): Promise<number> {
   const cfg = ctx.config.commands[name]!;
   const root = ctx.repo?.root ?? ctx.cwd;

@@ -91,7 +91,7 @@ export const doctorCommand: Command = {
     else {
       r.ok(`${ctx.repo.name} at ${ctx.repo.root}`);
       r.info(`stacks: ${ctx.stacks.map((s) => s.label).join(', ') || 'none detected'}`);
-      r.info(`pf.json: ${ctx.repo.hasConfig ? Object.keys(ctx.config.commands).length + ' command(s)' : 'none (pf init creates it)'}`);
+      r.info(`pulpfixer.json: ${ctx.repo.hasConfig ? Object.keys(ctx.config.commands).length + ' command(s)' : 'none (pf init creates it)'}`);
       r.info(`versions.json: ${findVersionsRoot(ctx.cwd) ? 'yes' : 'no (pf ver init sets it up)'}`);
     }
 

@@ -11,8 +11,8 @@ test('finds the nearest .git ancestor', () => {
   assert.equal(repo.hasGit, true);
 });
 
-test('pf.json marks a repo root and can name it', () => {
-  const dir = mkRepo({ 'pf.json': json({ name: 'custom', commands: {} }), 'x/y.txt': '' });
+test('pulpfixer.json marks a repo root and can name it', () => {
+  const dir = mkRepo({ 'pulpfixer.json': json({ name: 'custom', commands: {} }), 'x/y.txt': '' });
   const repo = findRepo(`${dir}/x`)!;
   assert.equal(repo.root, dir);
   assert.equal(repo.name, 'custom');

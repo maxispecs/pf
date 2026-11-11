@@ -37,7 +37,7 @@ test('mergeProfile edits fields in place and an empty value clears one', () => {
 test('pf profile: add, list, use, show with repo narrowing, remove', () => {
   const home = mkRepo({});
   const env = { PF_HOME: home };
-  const cwd = mkRepo({ '.git/HEAD': '', 'pf.json': json({ profile: 'acme', agent: { aws: { scopes: ['ec2'] } } }) });
+  const cwd = mkRepo({ '.git/HEAD': '', 'pulpfixer.json': json({ profile: 'acme', agent: { aws: { scopes: ['ec2'] } } }) });
 
   const empty = pf(cwd, env, 'profile');
   assert.equal(empty.code, 0);
@@ -59,12 +59,12 @@ test('pf profile: add, list, use, show with repo narrowing, remove', () => {
 
   const list = pf(cwd, env, 'profile');
   assert.match(list.out, /acme-ro/);
-  assert.match(list.out, /here: acme \(from pf\.json\)/);
+  assert.match(list.out, /here: acme \(from pulpfixer\.json\)/);
 
   const show = pf(cwd, env, 'profile', 'show');
   assert.equal(show.code, 0, show.err);
   assert.match(show.out, /scopes identity, ec2; regions eu-west-1; at most 60 min/);
-  assert.match(show.out, /narrowed by this repo's pf\.json/);
+  assert.match(show.out, /narrowed by this repo's pulpfixer\.json/);
 
   assert.equal(pf(cwd, env, 'profile', 'use', 'nope').code, 2);
   assert.equal(pf(cwd, env, 'profile', 'use', 'acme').code, 0);
@@ -97,7 +97,7 @@ test('--actions: only known fix actions are accepted, merged into the profile, a
 
   const home = mkRepo({});
   const env = { PF_HOME: home };
-  const cwd = mkRepo({ '.git/HEAD': '', 'pf.json': json({ profile: 'acme' }) });
+  const cwd = mkRepo({ '.git/HEAD': '', 'pulpfixer.json': json({ profile: 'acme' }) });
   assert.equal(pf(cwd, env, 'profile', 'add', 'acme', '--aws-profile', 'acme-ro', '--actions', 'ecs update-service').code, 0);
   assert.match(pf(cwd, env, 'profile', 'show').out, /fix actions \(each approved by the user\): ecs update-service/);
   assert.equal(pf(cwd, env, 'profile', 'add', 'acme', '--actions', 'rds delete-db-instance').code, 2);

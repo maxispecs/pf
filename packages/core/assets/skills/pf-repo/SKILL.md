@@ -14,10 +14,11 @@ description: Work in a repository through pulpfixer's tools. Use when starting o
 
 ## The pf link (still changing)
 
-pf remembers a repo in two places: the `id` in the repo's `pf.json`, and a record under `~/.pf/repos/<id>.json` on the user's machine. The record holds what stays out of the repo, such as security-related settings, the checkout paths and the git remote. The id connects the two, so the record survives a moved checkout or a renamed remote.
+pf remembers a repo in two places: the `id` in the repo's `pulpfixer.json`, and a record under `~/.pf/repos/<id>.json` on the user's machine. The record holds what stays out of the repo, such as security-related settings, the checkout paths and the git remote. The id connects the two, so the record survives a moved checkout or a renamed remote.
 
 This connection is still under active development. Its format and rules change between pf releases, so a repo that was linked before sometimes needs `pf rp` again to update the connection.
 
 - `pf_commands` ends with a `pf link:` line. When it says anything other than `linked` (`stale`, `unlinked` or `foreign`), tell the user what it reports and ask them to run `pf rp` (it may ask them a question). Carry on with the task; a stale link does not block builds, tests or deploys.
-- Never write, change or remove the `id` in `pf.json` yourself, and never copy it into another repo. Keep it when you edit `pf.json` for other reasons.
+- Never write, change or remove the `id` in `pulpfixer.json` yourself, and never copy it into another repo. Keep it when you edit `pulpfixer.json` for other reasons.
 - Never read or write files under `~/.pf/repos/`. pf owns them.
+- `pf.json` is the old name of `pulpfixer.json`. pf still reads it, and `pf rp` renames it. Never create a `pulpfixer.json` next to it; ask the user to run `pf rp`.

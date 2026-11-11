@@ -42,7 +42,7 @@ test('a shortcut can have several names, all running the same target', () => {
   assert.ok(allCommands().some((c) => c.name === 'up'));
 });
 
-test('production is only taken from pf.json or a production script', () => {
+test('production is only taken from pulpfixer.json or a production script', () => {
   const script = detectProduction(buildContext(mkRepo({ '.git/HEAD': '', 'package.json': json({ scripts: { 'deploy:production': 'x' } }) })));
   assert.deepEqual(lines(script.steps), ['npm run deploy:production']);
   const none = detectProduction(buildContext(mkRepo({ '.git/HEAD': '', 'vercel.json': '{}', 'netlify.toml': '' })));
@@ -84,7 +84,7 @@ test('pf ps previews the repo publish:cellars script with --dry-run', () => {
   assert.match(ps.err, /pnpm run publish:cellars/);
   assert.equal(pf(dir, 'ps').code, 2); // no terminal: needs --yes
   assert.equal(pf(mkRepo({ '.git/HEAD': '', 'package.json': json({ scripts: {} }) }), 'ps', '--dry-run').code, 1);
-  const override = mkRepo({ '.git/HEAD': '', 'pf.json': json({ commands: { 'publish:staging': { run: 'echo hi' } } }) });
+  const override = mkRepo({ '.git/HEAD': '', 'pulpfixer.json': json({ commands: { 'publish:staging': { run: 'echo hi' } } }) });
   assert.match(pf(override, 'ps', '--dry-run').err, /echo hi/);
 });
 

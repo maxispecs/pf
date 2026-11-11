@@ -7,7 +7,7 @@ import { scanAwsHints, type AwsHints } from './infra.js';
  * Linking a repo to an AWS profile pf supports. The registry is `profiles` in `~/.pf/config.json`:
  * only a registered profile can be used. Linking either picks a registered profile, or registers an
  * existing `~/.aws/config` profile first (name, pinned account, region; nothing secret), and then
- * names the profile in the repo's `pf.json`. The user always makes the choice: in `pf t`'s wizard or
+ * names the profile in the repo's `pulpfixer.json`. The user always makes the choice: in `pf t`'s wizard or
  * in the dialog of `pf_aws_link_profile`.
  */
 
@@ -45,8 +45,8 @@ export type LinkResult =
   | { ok: false; reason: string };
 
 /**
- * Register the candidate when it is new, name it in the repo's `pf.json`, and refresh `ctx`.
- * A repo that cannot be written (no repo, read-only, broken pf.json) still gets the profile for
+ * Register the candidate when it is new, name it in the repo's `pulpfixer.json`, and refresh `ctx`.
+ * A repo that cannot be written (no repo, read-only, broken pulpfixer.json) still gets the profile for
  * this session: the caller sets `PF_PROFILE` from `name`, and `wroteRepo` says what to tell the user.
  */
 export function applyLink(ctx: Context, c: LinkCandidate, extra: LinkExtra = {}): LinkResult {

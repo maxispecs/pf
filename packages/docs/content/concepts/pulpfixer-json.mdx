@@ -1,10 +1,12 @@
 ---
-title: pf.json
+title: pulpfixer.json
 ---
 
-# pf.json
+# pulpfixer.json
 
-`pf.json` sits at the root of a repo. It overrides detection, adds commands to the menu, and names the repo's [profile](/agent/profiles). `pf init` writes a starting file from what pf detected.
+`pulpfixer.json` sits at the root of a repo. It overrides detection, adds commands to the menu, and names the repo's [profile](/agent/profiles). `pf init` writes a starting file from what pf detected.
+
+Older pf versions called it `pf.json`. pf still reads a `pf.json` when the repo has no `pulpfixer.json`, and `pf rp` (or `pf init`) renames it; the content is unchanged. When both files exist, pf reads only `pulpfixer.json`.
 
 ```json
 {

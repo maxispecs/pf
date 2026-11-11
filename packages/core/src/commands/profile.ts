@@ -52,7 +52,7 @@ function showProfile(ctx: Context, name: string | undefined): number {
     ['agent limits', describeLimits(p.limits)],
   ];
   for (const [k, v] of rows) process.stdout.write(`  ${c.dim(k.padEnd(13))} ${v}\n`);
-  if (ctx.config.agent?.aws) process.stdout.write(`  ${c.dim(''.padEnd(13))} ${c.dim('narrowed by this repo\'s pf.json')}\n`);
+  if (ctx.config.agent?.aws) process.stdout.write(`  ${c.dim(''.padEnd(13))} ${c.dim('narrowed by this repo\'s pulpfixer.json')}\n`);
   return 0;
 }
 
@@ -182,7 +182,7 @@ async function addProfile(ctx: Context, args: string[], dryRun: boolean): Promis
   if (!saveProfile(name, next)) return fail('could not write ~/.pf/config.json', 1);
   process.stderr.write(`${err().green('✓')} saved profile ${name}\n`);
   const c = err();
-  process.stderr.write(`${c.dim('Use it in a repo with')} ${termLine(`"profile": "${name}"`, c)} ${c.dim('in pf.json, or everywhere with')} ${termLine(`pf profile use ${name}`, c)}\n`);
+  process.stderr.write(`${c.dim('Use it in a repo with')} ${termLine(`"profile": "${name}"`, c)} ${c.dim('in pulpfixer.json, or everywhere with')} ${termLine(`pf profile use ${name}`, c)}\n`);
   if (!next.aws.account) process.stderr.write(`${c.dim('Pin the account so pf never reads the wrong one:')} ${termLine(`pf profile add ${name} --account <id>`, c)}\n`);
   return 0;
 }

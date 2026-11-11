@@ -17,7 +17,7 @@ export type DeployEnv = 'staging' | 'production' | 'repo';
 export interface DeployOptions {
   dryRun?: boolean;
   yes?: boolean;
-  /** Commit message for a deploy command that commits (`pf.json` `"message": true`). */
+  /** Commit message for a deploy command that commits (`pulpfixer.json` `"message": true`). */
   message?: string;
 }
 
@@ -39,19 +39,19 @@ function noTarget(env: DeployEnv): string {
   const c = err();
   if (env === 'production') {
     return (
-      `${badgeLabel('error', c)} no production target found.\nProduction is only run from a script or pf.json entry you define.\n` +
-      `Add one to ${c.bold('pf.json')}: { "commands": { "deploy:production": { "run": "<your command>" } } }\n`
+      `${badgeLabel('error', c)} no production target found.\nProduction is only run from a script or pulpfixer.json entry you define.\n` +
+      `Add one to ${c.bold('pulpfixer.json')}: { "commands": { "deploy:production": { "run": "<your command>" } } }\n`
     );
   }
   if (env === 'repo') {
     return (
       `${badgeLabel('error', c)} no deploy command found.\n` +
-      `Add one to ${c.bold('pf.json')}: { "commands": { "deploy": { "run": "<your command>" } } }, or let the agent read the repo's helper with ${termLine('pf rp --deploy', c)}.\n`
+      `Add one to ${c.bold('pulpfixer.json')}: { "commands": { "deploy": { "run": "<your command>" } } }, or let the agent read the repo's helper with ${termLine('pf rp --deploy', c)}.\n`
     );
   }
   return (
     `${badgeLabel('error', c)} no staging target found.\n` +
-    `Add one to ${c.bold('pf.json')}: { "commands": { "deploy:staging": { "run": "<your command>" } } }\n`
+    `Add one to ${c.bold('pulpfixer.json')}: { "commands": { "deploy:staging": { "run": "<your command>" } } }\n`
   );
 }
 
@@ -72,7 +72,7 @@ export async function runDeploy(ctx: Context, env: DeployEnv, opts: DeployOption
   if (ignored) {
     process.stderr.write(
       `${badgeLabel('warning', c)} this target takes no message, ignored: ${opts.message}\n` +
-        `${c.dim('A pf.json command that commits can take one with')} ${termLine('"message": true', c)}${c.dim('.')}\n`,
+        `${c.dim('A pulpfixer.json command that commits can take one with')} ${termLine('"message": true', c)}${c.dim('.')}\n`,
     );
   }
 
@@ -119,7 +119,7 @@ export async function runDeployAuto(ctx: Context, opts: DeployOptions = {}): Pro
   if (!pick) {
     process.stderr.write(
       `${badgeLabel('error', c)} nothing to deploy: no staging, production or deploy command found.\n` +
-        `Add ${c.bold('deploy:staging')}, ${c.bold('deploy:production')} or ${c.bold('deploy')} to ${c.bold('pf.json')}, or run ${termLine('pf rp --deploy', c)} to let the agent read the repo's helper.\n`,
+        `Add ${c.bold('deploy:staging')}, ${c.bold('deploy:production')} or ${c.bold('deploy')} to ${c.bold('pulpfixer.json')}, or run ${termLine('pf rp --deploy', c)} to let the agent read the repo's helper.\n`,
     );
     return 1;
   }

@@ -18,7 +18,7 @@ export async function runPublishStaging(ctx: Context, opts: { dryRun?: boolean; 
   if (plan.steps.length === 0) {
     process.stderr.write(
       `${badgeLabel('error', c)} no publish target found.\n` +
-        `Add a ${c.bold('publish:cellars')} script to package.json, or to ${c.bold('pf.json')}: { "commands": { "publish:staging": { "run": "<your command>" } } }\n`,
+        `Add a ${c.bold('publish:cellars')} script to package.json, or to ${c.bold('pulpfixer.json')}: { "commands": { "publish:staging": { "run": "<your command>" } } }\n`,
     );
     return 1;
   }

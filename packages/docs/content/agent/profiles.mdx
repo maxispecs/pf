@@ -9,9 +9,9 @@ A profile ties a project to an AWS account and limits what the agent may be gran
 | Layer | File | Holds | Trusted to |
 |-------|------|-------|------------|
 | User | `~/.pf/config.json` | AWS profile name, pinned account, region, agent limits | widen and narrow |
-| Repo | `pf.json` (committed) | which profile the repo uses, optional tighter limits | narrow only |
+| Repo | `pulpfixer.json` (committed) | which profile the repo uses, optional tighter limits | narrow only |
 
-A cloned repo is not trusted, so its `pf.json` can never allow more than your user profile does.
+A cloned repo is not trusted, so its `pulpfixer.json` can never allow more than your user profile does.
 
 ## User profiles
 
@@ -75,14 +75,14 @@ The first of:
 
 1. `pf agent --profile <name>`, or the name given to `pf profile show <name>` or `pf profile check <name>`
 2. `PF_PROFILE`
-3. `"profile"` in the repo's `pf.json`
+3. `"profile"` in the repo's `pulpfixer.json`
 4. `"defaultProfile"` (`pf profile use <name>`)
 
 ## Commands
 
 ```bash
 pf profile                 # list (also in the pf menu)
-pf profile show [name]     # the effective profile here, after pf.json narrowing
+pf profile show [name]     # the effective profile here, after pulpfixer.json narrowing
 pf profile use <name>      # make it the default
 pf profile check [name]    # sts get-caller-identity vs the pinned account (--dry-run prints the command)
 pf profile remove <name>
@@ -106,9 +106,9 @@ pf profile add side    --aws-profile sp-ro          --account 333333333333 --reg
 ```
 
 ```text
-~/code/acme-api/pf.json        { "profile": "acme" }
-~/code/acme-warehouse/pf.json  { "profile": "acme-dw" }
-~/code/side-project/pf.json    { "profile": "side", "agent": { "aws": { "scopes": ["identity", "ec2"] } } }
+~/code/acme-api/pulpfixer.json        { "profile": "acme" }
+~/code/acme-warehouse/pulpfixer.json  { "profile": "acme-dw" }
+~/code/side-project/pulpfixer.json    { "profile": "side", "agent": { "aws": { "scopes": ["identity", "ec2"] } } }
 ```
 
 Each repo's agent sessions then use their own account and limits, with no switching. `pf agent --profile acme-dw` overrides one session.

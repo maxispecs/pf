@@ -35,7 +35,7 @@ When several candidates exist and you do not pass `--pick`, pf uses the first an
 
 `pf docs` is the same command as `pf doc`. It starts the repo's local docs site and finds it in this order:
 
-1. A `doc` (or `docs`) entry in `pf.json`
+1. A `doc` (or `docs`) entry in `pulpfixer.json`
 2. A root script named `docs:dev`, `docs:start`, `doc:dev` or `docs`
 3. A docs package in the repo: `docs`, `documentation`, `website`, or any package under `apps/` or `packages/` that uses a docs framework and has a `dev` or `start` script
 4. The root package itself, when it is a docs site
@@ -51,7 +51,7 @@ pf docs -- --port 4000
 
 In this repo, `pf docs` runs the root `docs:dev` script, which starts the Nextra site in `packages/docs` on port 4400.
 
-To use another command, set it in [pf.json](/concepts/pf-json):
+To use another command, set it in [pulpfixer.json](/concepts/pulpfixer-json):
 
 ```json
 { "commands": { "doc": { "run": "mkdocs serve", "cwd": "." } } }

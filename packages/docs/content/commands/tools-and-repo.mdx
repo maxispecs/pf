@@ -20,18 +20,19 @@ A command named like a task (`dev`, `build`, `test`, `lint`, `install` or `setup
 ## pf init
 
 ```bash
-pf init            # write pf.json from what was detected
+pf init            # write pulpfixer.json from what was detected
 pf init --dry-run  # preview
 pf init --ver      # also set up versioning
 ```
 
-See [pf.json](/concepts/pf-json) for the format.
+See [pulpfixer.json](/concepts/pulpfixer-json) for the format.
 
 ## pf repo
 
 `pf repo` (short: `pf rp`) hooks pf's helpers into a repo and wires its `package.json`:
 
-- **link**: gives `pf.json` an `id` and remembers the repo in pf's state folder (below);
+- **config**: renames an older `pf.json` to `pulpfixer.json` (the format is the same). A `pf.json` identical to an existing `pulpfixer.json` is deleted; one that differs is left alone with a warning, since pf reads only `pulpfixer.json` then;
+- **link**: gives `pulpfixer.json` an `id` and remembers the repo in pf's state folder (below);
 - the `/pnpm` root commands: `pnpm ask` (every root script, grouped), `pnpm doc` (the docs site) and `pnpm deploy:staging`, adding the last two only where a docs site or a staging target exists;
 - `/ver` versioning: `versions.json` and `pnpm ver`;
 - **deploy**: tells you what `pf d` runs, or, when the repo has none, wires one (below).
@@ -46,7 +47,7 @@ pf repo --no-deploy   # skip the deploy step
 pf repo --deploy      # run the deploy setup even when pf d already resolves
 ```
 
-It updates every older copy of the ver CLI, prints what it did and never commits. Run it again after `pf update`.
+It updates every older copy of the ver CLI, prints what it did and never commits. When everything succeeds it closes with the pulpfixer logo and a success message (just the message without a terminal). Run it again after `pf update`.
 
 ### The link
 
@@ -54,21 +55,21 @@ pf remembers a repo in two places:
 
 | Where | What | In git |
 |-------|------|--------|
-| `pf.json` `id` | `my-service-3f9a2c1b`: the repo name plus a random suffix | yes |
+| `pulpfixer.json` `id` | `my-service-3f9a2c1b`: the repo name plus a random suffix | yes |
 | `~/.pf/repos/<id>.json` | the checkout paths, the origin remote (without credentials), the link revision and private settings | no |
 
 Settings that should not live in the repo, such as security-related ones, go in the record. The id connects the two, so moving the checkout or changing its remote keeps the record. `pf rp` creates both and refreshes the record. It reports the link as one of:
 
-- **linked**: `pf.json` and the record agree.
-- **stale**: the same repo, but the checkout moved, the remote or name changed, `pf.json` lost its id (pf finds the record by path or remote and writes the id back), or an older pf wrote the link. `pf rp` refreshes it.
+- **linked**: `pulpfixer.json` and the record agree.
+- **stale**: the same repo, but the checkout moved, the remote or name changed, `pulpfixer.json` lost its id (pf finds the record by path or remote and writes the id back), or an older pf wrote the link. `pf rp` refreshes it.
 - **unlinked**: no id yet, or this machine has no record for it (a fresh clone). `pf rp` creates the record.
-- **foreign**: `pf.json` names a record that knows neither this path nor this remote, for example a copy or a `pf.json` taken from another repo. `pf rp` asks whether this is the same repo (share the record) or a different one (new id). Without a terminal it changes nothing. A foreign checkout never gets the record's settings.
+- **foreign**: `pulpfixer.json` names a record that knows neither this path nor this remote, for example a copy or a `pulpfixer.json` taken from another repo. `pf rp` asks whether this is the same repo (share the record) or a different one (new id). Without a terminal it changes nothing. A foreign checkout never gets the record's settings.
 
 The link is still under development. Its format and rules change between pf releases (the link revision), so a linked repo sometimes needs `pf rp` again to update the connection. `pf dev` prints a hint when it does, and the agent sees the state in `pf_commands`.
 
 ### Deploy setup
 
-Some repos deploy through their own helper, not a script pf can read: triton's `./tl d`, arbiter's `./al d`. Those scripts have no `# usage:` headers, so pf cannot parse them. When `pf d` resolves to nothing, `pf rp` looks for helpers at the repo root (an executable script with a `"$1" = "d"` or `"deploy"` branch, ranked with the local `GWLOCAL` ones first and server-only ones such as arbiter's `a.sh` last) and offers to start the coding agent with the bundled `deploy-setup` skill. pf asks which key to write, then starts Claude (or Cursor) in print mode so it exits when it is done and pf can show the result. The agent:
+Some repos deploy through their own helper, not a script pf can read: triton's `./tl d`, arbiter's `./al d`. Those scripts have no `# usage:` headers, so pf cannot parse them. When `pf d` resolves to nothing, `pf rp` looks for helpers at the repo root (an executable script with a `"$1" = "d"` or `"deploy"` branch, ranked with the local `GWLOCAL` ones first and server-only ones such as arbiter's `a.sh` last) and offers to start the coding agent with the bundled `deploy-setup` skill. pf asks which key to write, then starts Claude (or Cursor) in print mode so it exits when it is done and pf can show the result. Print mode streams its events (`--output-format stream-json`), and pf shows each step as it happens: what the agent says (`│`), each tool it runs with its main argument (`▸ Read tl`), any tool that fails (`✗`), and a closing line with the time, turns and cost. The agent:
 
 1. reads the repo's own deploy notes (`AGENTS.md`, README, docs) and the helper;
 2. picks the dev-machine command and never a server-only one;

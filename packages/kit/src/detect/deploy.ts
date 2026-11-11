@@ -50,14 +50,14 @@ export function repoDeployScript(root: string, names: string[]): Candidate | nul
   return null;
 }
 
-/** The step for a `pf.json` deploy entry; `"message": true` marks one that takes a commit message. */
+/** The step for a `pulpfixer.json` deploy entry; `"message": true` marks one that takes a commit message. */
 function configStep(ctx: Context, key: string): Candidate | null {
   const entry = ctx.config.commands[key];
   if (!entry) return null;
   const root = ctx.repo?.root ?? ctx.workdir;
   return {
     cmd: shellCmd(entry.run, path.resolve(root, entry.cwd ?? '.')),
-    source: 'pf.json',
+    source: 'pulpfixer.json',
     ...(entry.message ? { acceptsMessage: true } : {}),
   };
 }
@@ -95,7 +95,7 @@ export function detectStaging(ctx: Context): StagingPlan {
   const rel = (d: string) => path.relative(root, d) || '.';
   const skipped: string[] = [];
 
-  // 0. pf.json
+  // 0. pulpfixer.json
   const override = configStep(ctx, 'deploy:staging');
   if (override) return { steps: [override], skipped };
 
@@ -170,7 +170,7 @@ export const PRODUCTION_SCRIPTS = ['deploy:production', 'deploy:prod', 'deploy-p
 
 /**
  * Find what `pf deploy production` would run. Only something the repo defines explicitly
- * counts (pf.json or a production deploy script): platform configs are never guessed for production.
+ * counts (pulpfixer.json or a production deploy script): platform configs are never guessed for production.
  */
 export function detectProduction(ctx: Context): StagingPlan {
   const root = ctx.repo?.root ?? ctx.workdir;
@@ -192,7 +192,7 @@ export const DEPLOY_SCRIPTS = ['deploy'];
 
 /**
  * Find what a bare `deploy` runs: the repo's own single deploy, with no environment in its name. A
- * `pf.json` `deploy` entry, a `deploy` script in a package, a composer script or `./a deploy`.
+ * `pulpfixer.json` `deploy` entry, a `deploy` script in a package, a composer script or `./a deploy`.
  * Never guessed from platform configs. pf treats it like production: it always asks first.
  */
 export function detectDeploy(ctx: Context): StagingPlan {

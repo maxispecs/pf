@@ -75,9 +75,9 @@ function paintLogoRow(i: number, c: Palette): string {
 /**
  * The large header: the logo (the detective in braille dots, colored by part) on the left,
  * name, motto and the versioned info line on the right. It always contains
- * `pf v<version>` so the banner invariant holds.
+ * `pf v<version>` so the banner invariant holds. `extra` lines go below the info line, after a blank row.
  */
-export function renderLogo(info: BannerInfo, c: Palette = err(), cols = 80): string {
+export function renderLogo(info: BannerInfo, c: Palette = err(), cols = 80, extra: string[] = []): string {
   const side: string[] = [];
   side[0] = `${c.boldBrand('p u l p f i x e r')}`;
   side[1] = c.fg(MOTTO_GRAY, MOTTO);
@@ -89,6 +89,7 @@ export function renderLogo(info: BannerInfo, c: Palette = err(), cols = 80): str
   if (latest && compareVersions(latest, info.version) > 0) {
     side[4] = c.yellow('↑ v' + displayVersion(latest) + ' available, run pf update');
   }
+  if (extra.length) side.push('', ...extra);
   const art = LOGO_ART.map((_, i) => paintLogoRow(i, c));
   const rows = art.map((row, i) => fitLine(`  ${row}${GAP}${side[i - TEXT_TOP] ?? ''}`, cols));
   return ['', ...rows, ''].join('\n');
@@ -106,6 +107,15 @@ export function printBanner(info: BannerInfo, opts: PrintOptions = {}): void {
     return;
   }
   process.stderr.write(renderBanner(info) + '\n');
+}
+
+/** The logo with a success message beside it, to close a command that set something up. Just the message without a TTY or room. */
+export function printSuccessLogo(info: BannerInfo, message: string, details: string[] = []): void {
+  const c = err();
+  const lines = [`${c.green('✔')} ${c.bold(message)}`, ...details.map((d) => c.dim(d))];
+  const cols = process.stderr.columns;
+  if (process.stderr.isTTY && logoFits(cols, process.stderr.rows)) process.stderr.write(renderLogo(info, c, cols, lines) + '\n');
+  else process.stderr.write(lines.join('\n') + '\n');
 }
 
 /** Plain width of a rendered block (for tests). */

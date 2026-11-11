@@ -17,7 +17,7 @@ sequenceDiagram
   Agent->>Pf: pf_aws_profile
   Pf-->>Agent: profile, limits, allowed operations
   Agent->>Pf: pf_aws_request_access(scopes, reason, ttl)
-  Pf->>Pf: check against profile and pf.json limits
+  Pf->>Pf: check against profile and pulpfixer.json limits
   Pf->>Agent: elicitation/create (dialog text)
   Agent->>You: dialog
   You-->>Agent: approve or decline
@@ -36,7 +36,7 @@ sequenceDiagram
 `pf_aws_profile` (abridged):
 
 ```text
-pf profile: acme (from pf.json)
+pf profile: acme (from pulpfixer.json)
 AWS profile: acme-readonly
 account: 123456789012 (pinned)
 region: eu-west-1

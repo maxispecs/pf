@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pfHome } from './constants.js';
-import { readJson } from './util.js';
+import { exists, readJson, readText } from './util.js';
 
 export interface CustomCommand {
   run: string;
@@ -37,7 +37,56 @@ export interface ProfileConfig {
   agent?: { aws?: AgentAwsScope };
 }
 
-/** Repo config: `pf.json` at the repo root. */
+/** The repo config file at the repo root. */
+export const REPO_CONFIG = 'pulpfixer.json';
+/** The name older pf versions wrote. Still read while no pulpfixer.json exists; `pf rp` converts it. */
+export const LEGACY_REPO_CONFIG = 'pf.json';
+
+/** The repo's config file name: pulpfixer.json, else a legacy pf.json not converted yet, else pulpfixer.json (to create). */
+export function repoConfigName(root: string): string {
+  return !exists(root, REPO_CONFIG) && exists(root, LEGACY_REPO_CONFIG) ? LEGACY_REPO_CONFIG : REPO_CONFIG;
+}
+
+export function repoConfigPath(root: string): string {
+  return path.join(root, repoConfigName(root));
+}
+
+export function hasRepoConfig(root: string): boolean {
+  return exists(root, REPO_CONFIG) || exists(root, LEGACY_REPO_CONFIG);
+}
+
+export type ConfigMigration =
+  /** No config file at all. */
+  | { state: 'none' }
+  /** pulpfixer.json only. */
+  | { state: 'current' }
+  /** pf.json was renamed to pulpfixer.json (or would be, on a dry run). `removed`: it matched an existing pulpfixer.json and was deleted. */
+  | { state: 'converted'; removed: boolean }
+  /** Both exist and differ: pulpfixer.json is the one read, pf.json is left for the user to merge. */
+  | { state: 'both' }
+  | { state: 'failed'; error: string };
+
+/**
+ * Convert a legacy pf.json to pulpfixer.json. The content is kept as is (the format did not change), so this
+ * is a rename. A pf.json identical to an existing pulpfixer.json is deleted; one that differs is never touched.
+ */
+export function migrateRepoConfig(root: string, opts: { dryRun?: boolean } = {}): ConfigMigration {
+  const legacy = path.join(root, LEGACY_REPO_CONFIG);
+  const current = path.join(root, REPO_CONFIG);
+  if (!fs.existsSync(legacy)) return { state: fs.existsSync(current) ? 'current' : 'none' };
+  const same = fs.existsSync(current) && readText(current)?.trim() === readText(legacy)?.trim();
+  if (fs.existsSync(current) && !same) return { state: 'both' };
+  if (opts.dryRun) return { state: 'converted', removed: same };
+  try {
+    if (same) fs.rmSync(legacy);
+    else fs.renameSync(legacy, current);
+    return { state: 'converted', removed: same };
+  } catch (e) {
+    return { state: 'failed', error: (e as Error).message };
+  }
+}
+
+/** Repo config: `pulpfixer.json` (or a legacy `pf.json`) at the repo root. */
 export interface RepoConfig {
   /** Links the repo to its record in `~/.pf/repos/<id>.json` (see `repo-link.ts`). Written by `pf rp`. */
   id?: string;
@@ -56,7 +105,7 @@ export interface UserConfig {
   /** Extra directories scanned for skills. */
   skillDirs?: string[];
   profiles?: Record<string, ProfileConfig>;
-  /** Profile used when neither a flag, PF_PROFILE nor pf.json names one. */
+  /** Profile used when neither a flag, PF_PROFILE nor pulpfixer.json names one. */
   defaultProfile?: string;
 }
 
@@ -87,7 +136,7 @@ export function parseProfile(v: unknown): ProfileConfig {
 }
 
 export function loadRepoConfig(root: string): RepoConfig {
-  const raw = readJson<{ id?: unknown; name?: unknown; commands?: unknown; profile?: unknown; agent?: unknown }>(root, 'pf.json');
+  const raw = readJson<{ id?: unknown; name?: unknown; commands?: unknown; profile?: unknown; agent?: unknown }>(repoConfigPath(root));
   const commands: Record<string, CustomCommand> = {};
   if (raw && raw.commands && typeof raw.commands === 'object') {
     for (const [name, v] of Object.entries(raw.commands as Record<string, unknown>)) {

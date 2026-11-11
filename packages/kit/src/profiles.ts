@@ -1,18 +1,17 @@
 import fs from 'node:fs';
-import path from 'node:path';
-import { userConfigPath, writeHomeFile, type AgentAwsScope, type ProfileConfig, type RepoConfig, type UserConfig } from './config.js';
+import { repoConfigPath, userConfigPath, writeHomeFile, type AgentAwsScope, type ProfileConfig, type RepoConfig, type UserConfig } from './config.js';
 import { readJson } from './util.js';
 
 /**
  * Project profiles come in two layers. `~/.pf/config.json` maps a name to an AWS profile, a pinned
- * account and the most the agent may be granted. A repo's `pf.json` names the profile it uses and may
+ * account and the most the agent may be granted. A repo's `pulpfixer.json` names the profile it uses and may
  * narrow those limits. A cloned repo is not trusted, so it can never widen them.
  */
 
 export const PROFILE_NAME = /^[a-zA-Z0-9][\w.-]{0,63}$/;
 export const ACCOUNT_ID = /^\d{12}$/;
 
-export type ProfileSource = 'flag' | 'env' | 'pf.json' | 'default';
+export type ProfileSource = 'flag' | 'env' | 'pulpfixer.json' | 'default';
 
 export interface ResolvedProfile {
   name: string;
@@ -21,7 +20,7 @@ export interface ResolvedProfile {
   config: ProfileConfig | null;
 }
 
-/** Which profile applies: `--profile`, then PF_PROFILE, then `pf.json`, then the user's default. Null when none is named. */
+/** Which profile applies: `--profile`, then PF_PROFILE, then `pulpfixer.json`, then the user's default. Null when none is named. */
 export function resolveProfile(
   cfg: { config: RepoConfig; user: UserConfig },
   opts: { flag?: string | undefined; env?: string | undefined } = {},
@@ -32,7 +31,7 @@ export function resolveProfile(
     if (!n) return null;
     return { name: n, source, config: cfg.user.profiles?.[n] ?? null };
   };
-  return pick(opts.flag, 'flag') ?? pick(env, 'env') ?? pick(cfg.config.profile, 'pf.json') ?? pick(cfg.user.defaultProfile, 'default');
+  return pick(opts.flag, 'flag') ?? pick(env, 'env') ?? pick(cfg.config.profile, 'pulpfixer.json') ?? pick(cfg.user.defaultProfile, 'default');
 }
 
 /** Effective limits: the user's caps (defaults applied by the caller) narrowed by what the repo asks for. */
@@ -80,11 +79,11 @@ export function removeProfile(name: string): boolean {
 }
 
 /**
- * Name the profile a repo uses: sets `"profile"` in the repo's `pf.json`, keeping every other key.
+ * Name the profile a repo uses: sets `"profile"` in the repo's `pulpfixer.json`, keeping every other key.
  * False when the file exists but is not valid JSON (it is never overwritten) or cannot be written.
  */
 export function linkRepoProfile(root: string, name: string): boolean {
-  const file = path.join(root, 'pf.json');
+  const file = repoConfigPath(root);
   const exists = fs.existsSync(file);
   const current = readJson<Obj>(file);
   if (exists && !current) return false;

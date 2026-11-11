@@ -5,7 +5,7 @@ import type { Candidate, Task } from './stacks.js';
 
 /**
  * Candidate commands for a task, best first:
- *   1. pf.json `commands.<task>`
+ *   1. pulpfixer.json `commands.<task>`
  *   2. scripts or targets the repo already defines (package.json, composer.json, Makefile, justfile)
  *   3. conventional stack defaults
  */
@@ -13,7 +13,7 @@ export function candidates(task: Task, ctx: Context): Candidate[] {
   const list: Candidate[] = [];
   const override = ctx.config.commands[task];
   if (override && ctx.repo) {
-    list.push({ cmd: shellCmd(override.run, path.resolve(ctx.repo.root, override.cwd ?? '.')), source: 'pf.json' });
+    list.push({ cmd: shellCmd(override.run, path.resolve(ctx.repo.root, override.cwd ?? '.')), source: 'pulpfixer.json' });
   }
   for (const s of ctx.stacks) list.push(...(s.scripts[task] ?? []));
   for (const s of ctx.stacks) list.push(...(s.defaults[task] ?? []));

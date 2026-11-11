@@ -15,10 +15,10 @@ Run `pf list` for the list that applies in the current directory, and `pf help` 
 | `pf ver [list\|bump\|init\|sync]` | Major.minor versioning with the bundled `/ver` CLI. See [Versioning](/commands/ver) |
 | `pf deploy` (`pf d`) | Deploy: staging if configured, else production, else the repo's own deploy. Optional commit message. See [Deploy and publish](/commands/deploy) |
 | `pf deploy staging` | Deploy to staging. `--dry-run`, `--yes`. See [Deploy and publish](/commands/deploy) |
-| `pf deploy production` | Only a `deploy:production` script or `pf.json` entry; always confirms |
+| `pf deploy production` | Only a `deploy:production` script or `pulpfixer.json` entry; always confirms |
 | `pf publish staging` | Run the repo's `publish:cellars` script; always confirms |
 | `pf tools [name] [args]` | List and run the repo's own `./a` tools. See [Tools and repo setup](/commands/tools-and-repo) |
-| `pf init` | Write `pf.json` for this repo from what was detected |
+| `pf init` | Write `pulpfixer.json` for this repo from what was detected |
 | `pf repo` | Hook pf's tools into this repo, or update them |
 | `pf agent [prompt]` | Open the coding agent (Claude Code, Codex or Cursor). See [Agent](/agent) |
 | `pf troubleshoot [prompt]` (`pf t`) | Find out what is wrong with this repo's deployment on AWS: pf reads how it deploys, links the AWS profile, then starts the agent with scoped AWS access. See [Troubleshoot](/agent/troubleshoot) |

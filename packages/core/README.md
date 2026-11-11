@@ -43,13 +43,13 @@ scripts/install.sh --dry-run      # show what would happen
 | `pf dev`, `build`, `test`, `lint`, `install` | Resolved per repo, see below. `--dry-run` prints, `--pick` chooses when several exist, `-- <args>` passes args on |
 | `pf ver [list\|bump\|init\|sync]` | Major.minor versioning with the bundled `/ver` CLI |
 | `pf doc` (`pf docs`) | Run the docs site (Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo) |
-| `pf deploy` (`pf d`) | Deploy: staging if configured, else production, else the repo's own `deploy` (`pf.json`, a `deploy` script or `./a deploy`; production-like, always asks). `pf d "message"` passes a commit message to a target marked `"message": true`. `--dry-run`, `--yes`, `-m` |
+| `pf deploy` (`pf d`) | Deploy: staging if configured, else production, else the repo's own `deploy` (`pulpfixer.json`, a `deploy` script or `./a deploy`; production-like, always asks). `pf d "message"` passes a commit message to a target marked `"message": true`. `--dry-run`, `--yes`, `-m` |
 | `pf deploy staging` | Deploy to staging. `--dry-run`, `--yes`. Never production |
 | `pf skill [name]` | Pick and run an agent skill. `available`, `install`, `update`, `remove` manage skills from the registry |
 | `pf plugin [list\|available\|install\|update\|remove]` | Administer plugins from the registry. Without a command it opens an interactive menu. See [Plugins](#plugins) |
 | `pf update` (`pf u`) | Update pf, installed plugins, the `ver` and `pnpm` skills and registry skills, then this repo's copies of their helpers. `--check`, `--yes`, `--dry-run` |
-| `pf init` | Write `pf.json` for this repo from what was detected |
-| `pf repo` (`pf rp`) | Hook pf's tools into this repo, or update them: the `/pnpm` root commands (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`) and `/ver` versioning (`versions.json`, `pnpm ver`). Updates every older ver CLI copy, prints what it did. Also reports what `pf d` runs, or, when the repo deploys through its own helper (`./tl d`, `./al d`), offers to start the agent with the bundled `deploy-setup` skill, which writes the `pf.json` entry (never runs the deploy). `--dry-run`, `--no-pnpm`, `--no-ver`, `--no-deploy`, `--deploy`. Never commits |
+| `pf init` | Write `pulpfixer.json` for this repo from what was detected |
+| `pf repo` (`pf rp`) | Hook pf's tools into this repo, or update them: the `/pnpm` root commands (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`) and `/ver` versioning (`versions.json`, `pnpm ver`). Updates every older ver CLI copy, prints what it did. Also reports what `pf d` runs, or, when the repo deploys through its own helper (`./tl d`, `./al d`), offers to start the agent with the bundled `deploy-setup` skill, which writes the `pulpfixer.json` entry (never runs the deploy). `--dry-run`, `--no-pnpm`, `--no-ver`, `--no-deploy`, `--deploy`. Never commits |
 | `pf host ...` | pf on EC2 instances: install, login, update, security patching and the fix agent. See [Hosts](#hosts-ec2) |
 | `pf s3 <file...>`, `pf dl [name]` | AWS plugin: upload to and download from a shared exchange bucket. See [AWS plugin](#aws-plugin) |
 | `pf setup`, `update`, `uninstall`, `doctor` | Machine tooling |
@@ -59,11 +59,11 @@ scripts/install.sh --dry-run      # show what would happen
 
 For `dev`, `build`, `test`, `lint` and `install`, in order:
 
-1. `pf.json` `commands.<name>`
+1. `pulpfixer.json` `commands.<name>`
 2. A script or target the repo already has: `package.json` scripts, `composer.json` scripts, Makefile and justfile targets
 3. A stack default: Node (pnpm, npm, yarn, bun), Python (uv, poetry, pipenv, pip), Go, Rust, Java (Maven, Gradle), .NET, Ruby, PHP, Elixir, Swift, Docker Compose
 
-### pf.json
+### pulpfixer.json
 
 ```json
 {
@@ -113,21 +113,21 @@ A profile names the AWS account a project uses and caps what the agent may read 
 
 ```bash
 pf profile add acme --aws-profile acme-readonly --account 123456789012 --region eu-west-1 --scopes identity,ec2,ecs,logs
-pf profile use acme        # default everywhere, or name it per repo in pf.json
+pf profile use acme        # default everywhere, or name it per repo in pulpfixer.json
 pf profile check           # sts get-caller-identity, compared with the pinned account
 ```
 
-A repo picks its profile in `pf.json` and may narrow it, never widen it (a cloned repo is not trusted):
+A repo picks its profile in `pulpfixer.json` and may narrow it, never widen it (a cloned repo is not trusted):
 
 ```json
 { "profile": "acme", "agent": { "aws": { "scopes": ["identity", "ecs"] } } }
 ```
 
-The profile is the first of `--profile`, `PF_PROFILE`, `pf.json` `profile` and the default. Without `--scopes` a profile allows every scope except `logs` (log text can hold secrets), for at most 60 minutes per grant (`--max-ttl`, up to 480).
+The profile is the first of `--profile`, `PF_PROFILE`, `pulpfixer.json` `profile` and the default. Without `--scopes` a profile allows every scope except `logs` (log text can hold secrets), for at most 60 minutes per grant (`--max-ttl`, up to 480).
 
 The agent never gets credentials. It calls `pf_aws_profile`, then `pf_aws_request_access` with scopes and a reason, and pf asks you in a dialog inside the agent CLI (MCP elicitation) showing the profile, account, scopes, regions and time. After you approve, `pf_aws_whoami` and `pf_aws_describe` run read-only calls (`describe-*`, `list-*` and a few `get-*` per scope; never secret values, file contents or user data) with the profile, after checking the pinned account. Secret-looking values are redacted. A grant belongs to one agent session and ends when it expires, when the session ends, or with `pf aws revoke`. `pf aws grants` lists them, and every request, decision and call is logged in `~/.pf/agent/audit/`. Claude Code runs these tools unasked because pf asks you itself. If a CLI cannot show the dialog, Claude sessions refuse the grant, and Codex and Cursor fall back to their own tool prompt. Use a read-only IAM role (`ViewOnlyAccess`) for the AWS profile as well: pf's scopes are a second layer.
 
-`pf troubleshoot` (`pf t`) is agent mode for a misbehaving deployment. pf first reads how the repo deploys (CI workflows, CDK/SAM/Serverless/SST, Terraform, task definitions: staging and production commands, accounts, regions, clusters, services, functions, log groups) and resolves the AWS profile. Only profiles registered in `~/.pf/config.json` are supported; when none applies, a wizard lists the registered profiles and the ones in `~/.aws/config` that match the repo, registers the one you pick if it is new, and writes `"profile"` to `pf.json`. It then checks that the credentials resolve to the pinned account (offering `aws sso login` when the session expired) and starts the agent with the deployment in its persona and the bundled `troubleshoot` skill. Beyond read grants, the agent can ask for a fix with `pf_aws_act` (`ecs update-service`, `ecs stop-task`, `ec2 reboot-instances`, `autoscaling set-desired-capacity`, `rds reboot-db-instance`). Fixes are off until your profile lists them (`pf profile add <name> --actions ...`), and every single call shows you the exact command and runs only if you approve it. `pf t --link` runs only the wizard, `pf t --dry-run` prints what pf found and what it would start. See `docs/agent.md`.
+`pf troubleshoot` (`pf t`) is agent mode for a misbehaving deployment. pf first reads how the repo deploys (CI workflows, CDK/SAM/Serverless/SST, Terraform, task definitions: staging and production commands, accounts, regions, clusters, services, functions, log groups) and resolves the AWS profile. Only profiles registered in `~/.pf/config.json` are supported; when none applies, a wizard lists the registered profiles and the ones in `~/.aws/config` that match the repo, registers the one you pick if it is new, and writes `"profile"` to `pulpfixer.json`. It then checks that the credentials resolve to the pinned account (offering `aws sso login` when the session expired) and starts the agent with the deployment in its persona and the bundled `troubleshoot` skill. Beyond read grants, the agent can ask for a fix with `pf_aws_act` (`ecs update-service`, `ecs stop-task`, `ec2 reboot-instances`, `autoscaling set-desired-capacity`, `rds reboot-db-instance`). Fixes are off until your profile lists them (`pf profile add <name> --actions ...`), and every single call shows you the exact command and runs only if you approve it. `pf t --link` runs only the wizard, `pf t --dry-run` prints what pf found and what it would start. See `docs/agent.md`.
 
 ## Plugins
 
@@ -273,4 +273,4 @@ pnpm publish:cellars        # the real publish (asks you to type the version)
 
 ## Shortcuts
 
-`pf docs` is `pf doc` (run the repo's docs site; `--dry-run` previews, `--pick` chooses between several), `pf r` is `pf dev` (run the repo), `pf rp` is `pf repo`, `pf d` is `pf deploy` (staging if configured, else production, else the repo's own deploy), `pf ds` is `pf deploy staging` and `pf dp` is `pf deploy production` (only a `deploy:production` script or `pf.json` entry; always confirms). `pf ps` is `pf publish staging`: it runs the repo's `publish:cellars` (or `publish:staging`) script, or the `publish:staging` / `publish:cellars` entry in `pf.json`, and always confirms (`--yes` without a TTY, `--dry-run` to preview). Add more in `packages/core/src/commands/shortcuts.ts`.
+`pf docs` is `pf doc` (run the repo's docs site; `--dry-run` previews, `--pick` chooses between several), `pf r` is `pf dev` (run the repo), `pf rp` is `pf repo`, `pf d` is `pf deploy` (staging if configured, else production, else the repo's own deploy), `pf ds` is `pf deploy staging` and `pf dp` is `pf deploy production` (only a `deploy:production` script or `pulpfixer.json` entry; always confirms). `pf ps` is `pf publish staging`: it runs the repo's `publish:cellars` (or `publish:staging`) script, or the `publish:staging` / `publish:cellars` entry in `pulpfixer.json`, and always confirms (`--yes` without a TTY, `--dry-run` to preview). Add more in `packages/core/src/commands/shortcuts.ts`.

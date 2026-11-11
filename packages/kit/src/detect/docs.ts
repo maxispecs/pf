@@ -32,7 +32,7 @@ export function detectDocs(ctx: Context): Candidate[] {
   const cmd = (...argv: string[]): Cmd => ({ argv, cwd: root });
 
   const override = ctx.config.commands.doc ?? ctx.config.commands.docs;
-  if (override && ctx.repo) out.push({ cmd: shellCmd(override.run, path.resolve(ctx.repo.root, override.cwd ?? '.')), source: 'pf.json' });
+  if (override && ctx.repo) out.push({ cmd: shellCmd(override.run, path.resolve(ctx.repo.root, override.cwd ?? '.')), source: 'pulpfixer.json' });
 
   const rootPkg = readJson<Pkg>(root, 'package.json');
   const pm = rootPkg ? nodeManager(root) : 'npm';

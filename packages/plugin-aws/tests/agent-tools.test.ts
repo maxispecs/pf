@@ -57,7 +57,7 @@ function setup(opts: { account?: string; pinned?: string; repo?: Record<string, 
   process.env.PF_HOME = home;
   process.env.PATH = `${fake.bin}${path.delimiter}${prev.path}`;
   delete process.env.PF_PROFILE;
-  const repo = mkRepo({ '.git/HEAD': '', 'pf.json': json({ ...(opts.noProfile ? {} : { profile: 'acme' }), ...(opts.repo ?? {}) }), ...(opts.files ?? {}) });
+  const repo = mkRepo({ '.git/HEAD': '', 'pulpfixer.json': json({ ...(opts.noProfile ? {} : { profile: 'acme' }), ...(opts.repo ?? {}) }), ...(opts.files ?? {}) });
   return {
     ctx: buildContext(repo),
     repo,
@@ -110,7 +110,7 @@ test('request, approve in the dialog, then read within the grant', async () => {
     assert.match(before.text, /No live AWS grant/);
 
     const profile = await tool('pf_aws_profile').run(s.ctx, {}, sess);
-    assert.match(profile.text, /pf profile: acme \(from pf\.json\)/);
+    assert.match(profile.text, /pf profile: acme \(from pulpfixer\.json\)/);
     assert.match(profile.text, /123456789012 \(pinned\)/);
 
     const granted = await tool('pf_aws_request_access').run(s.ctx, { scopes: ['ecs'], reason: 'api returns 502', ttlMinutes: 15 }, sess);
@@ -218,7 +218,7 @@ test('pf_aws_context: deployment, profile, scopes to request and the actions in 
     assert.equal(r.ok, true);
     assert.match(r.text, /AWS accounts in the repo: 123456789012/);
     assert.match(r.text, /ECS clusters: web/);
-    assert.match(r.text, /pf profile: acme \(from pf\.json\), AWS profile acme-ro, account 123456789012 \(pinned\)/);
+    assert.match(r.text, /pf profile: acme \(from pulpfixer\.json\), AWS profile acme-ro, account 123456789012 \(pinned\)/);
     assert.match(r.text, /scopes to request for this repo: identity, ecs, logs/);
     assert.match(r.text, /useful but not allowed by the profile .*: elb, cloudwatch/);
     assert.match(r.text, /fix actions enabled .*: ecs update-service/);
@@ -262,7 +262,7 @@ test('pf_aws_link_profile: the user picks, pf registers and links, and nothing h
     // the profile registered in the user's config matches the repo's account, then the AWS profile in that account
     assert.match(declined.asked[0]!, /- acme \(registered\): AWS profile acme-ro, account 123456789012.*Matches: account 123456789012 appears in the repo/);
     assert.match(declined.asked[0]!, /- corp-ro \(new, from ~\/\.aws\/config\)/);
-    assert.equal(JSON.parse(fs.readFileSync(`${s.repo}/pf.json`, 'utf8')).profile, undefined);
+    assert.equal(JSON.parse(fs.readFileSync(`${s.repo}/pulpfixer.json`, 'utf8')).profile, undefined);
 
     const unticked = await tool('pf_aws_link_profile').run(s.ctx, {}, session(s, picks('acme (registered)', false)));
     assert.equal(unticked.ok, false);
@@ -272,8 +272,8 @@ test('pf_aws_link_profile: the user picks, pf registers and links, and nothing h
     const sess = session(s, picks('acme (registered)'));
     const ok = await tool('pf_aws_link_profile').run(s.ctx, {}, sess);
     assert.equal(ok.ok, true, ok.text);
-    assert.match(ok.text, /Linked pf profile "acme" and saved it to this repo's pf\.json/);
-    assert.equal(JSON.parse(fs.readFileSync(`${s.repo}/pf.json`, 'utf8')).profile, 'acme');
+    assert.match(ok.text, /Linked pf profile "acme" and saved it to this repo's pulpfixer\.json/);
+    assert.equal(JSON.parse(fs.readFileSync(`${s.repo}/pulpfixer.json`, 'utf8')).profile, 'acme');
     assert.equal(s.ctx.config.profile, 'acme', 'the context reloads');
     assert.ok(s.events.some((e) => e.event === 'aws-link' && e.profile === 'acme' && e.registered === false));
     const profile = await tool('pf_aws_profile').run(s.ctx, {}, sess);
@@ -289,7 +289,7 @@ test('pf_aws_link_profile: the user picks, pf registers and links, and nothing h
     assert.match(r.text, /Linked pf profile "other" \(registered just now\)/);
     const saved = JSON.parse(fs.readFileSync(`${process.env.PF_HOME}/config.json`, 'utf8'));
     assert.deepEqual(saved.profiles.other, { aws: { profile: 'other', account: '555555555555' } });
-    assert.equal(JSON.parse(fs.readFileSync(`${fresh.repo}/pf.json`, 'utf8')).profile, 'other');
+    assert.equal(JSON.parse(fs.readFileSync(`${fresh.repo}/pulpfixer.json`, 'utf8')).profile, 'other');
     assert.equal(process.env.PF_PROFILE, 'other', 'this agent session uses it');
   } finally {
     fresh.restore();

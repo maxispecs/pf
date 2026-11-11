@@ -12,6 +12,7 @@ import { interactive } from '@pulpfixer/kit/util';
 import { buildLaunch, cursorMcpPath, cursorMcpRegistered, writeCursorMcp } from './adapters.js';
 import { agentInfo, installedAgents, resolveAgent, saveAgent, type AgentChoice, type AgentInfo } from './agents.js';
 import { buildPersona } from './persona.js';
+import { runStreaming } from './stream.js';
 import { loadAgentSkills } from './tools.js';
 import { agentTools } from '../plugins/index.js';
 
@@ -125,7 +126,8 @@ export async function startAgent(ctx: Context, opts: StartOptions = {}): Promise
   else if (!writeLaunchFiles(launch.files)) return 1;
   // The persona is the whole system prompt. Echoing the argv prints it as the command line,
   // which is what a dry run is for and what a live session should not flash before the CLI starts.
-  if (!opts.dryRun) process.stderr.write(`${c.dim(`starting ${choice.agent.label}`)}\n`);
+  if (!opts.dryRun) process.stderr.write(`${c.dim(`starting ${choice.agent.label}${launch.stream ? ', it exits when the task is done' : ''}`)}\n`);
+  if (launch.stream && !opts.dryRun) return runStreaming(launch.argv, ctx.workdir);
   return runCmd({ argv: launch.argv, cwd: ctx.workdir }, { dryRun: opts.dryRun, quiet: true, base: ctx.workdir });
 }
 

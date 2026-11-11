@@ -272,7 +272,7 @@ export function checkOperation(service: string, operation: string, granted: stri
   return { ok: false, reason: `aws ${service} ${operation} is not a read-only operation pf allows. Call pf_aws_profile for the list.` };
 }
 
-/** The profile's caps, with defaults, narrowed by the repo's pf.json. */
+/** The profile's caps, with defaults, narrowed by the repo's pulpfixer.json. */
 export function limitsFor(profile: ProfileConfig, repo: AgentAwsScope | undefined): Limits {
   const caps = profile.agent?.aws ?? {};
   const region = profile.aws?.region;

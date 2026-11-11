@@ -18,7 +18,7 @@ export async function runDoc(ctx: Context, opts: { dryRun?: boolean; pick?: bool
   if (list.length === 0) {
     process.stderr.write(
       `${badgeLabel('error', c)} no docs site found (looked for doc scripts, Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo).\n` +
-        `Add one to ${c.bold('pf.json')}: { "commands": { "doc": { "run": "<your command>" } } }\n`,
+        `Add one to ${c.bold('pulpfixer.json')}: { "commands": { "doc": { "run": "<your command>" } } }\n`,
     );
     return 1;
   }

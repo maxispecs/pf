@@ -80,7 +80,13 @@ test('launch argv: claude gets a system prompt, codex and cursor get the persona
   assert.ok(once.argv.indexOf('--permission-mode') < once.argv.indexOf('--allowedTools'));
   assert.ok(once.argv.lastIndexOf('--allowedTools') < once.argv.indexOf('--append-system-prompt'));
   assert.equal(once.argv.at(-1), 'fix the build');
-  assert.equal(buildLaunch(cursor, { ...input, once: true }).argv[1], '-p');
+  assert.equal(once.stream, true);
+  assert.equal(once.argv[once.argv.indexOf('--output-format') + 1], 'stream-json');
+  assert.ok(once.argv.indexOf('--verbose') < once.argv.indexOf('--mcp-config'), 'a boolean flag ahead of the variadic ones');
+  assert.equal(claudeLaunch.stream, undefined);
+  const cursorOnce = buildLaunch(cursor, { ...input, once: true });
+  assert.deepEqual(cursorOnce.argv.slice(1, 4), ['-p', '--output-format', 'stream-json']);
+  assert.equal(cursorOnce.stream, true);
   const mcp = JSON.parse(claudeLaunch.files[0]!.contents) as { mcpServers: { pulpfixer: { command: string; args: string[] } } };
   assert.equal(mcp.mcpServers.pulpfixer.command, 'node');
   assert.deepEqual(mcp.mcpServers.pulpfixer.args, ['pf.js', 'mcp', '--cwd', '/repo']);
@@ -147,7 +153,7 @@ test('mcp serve: a grant request asks the user through elicitation and is audite
   process.env.PF_HOME = home;
   delete process.env.PF_PROFILE;
   try {
-    const ctx = buildContext(mkRepo({ '.git/HEAD': '', 'pf.json': json({ profile: 'acme' }) }));
+    const ctx = buildContext(mkRepo({ '.git/HEAD': '', 'pulpfixer.json': json({ profile: 'acme' }) }));
     const auditDir = path.join(home, 'audit');
     const pipe = mcpPipe();
     const done = serve(ctx, pipe.input, pipe.output, agentTools(ctx), { requireElicitation: true, auditDir });

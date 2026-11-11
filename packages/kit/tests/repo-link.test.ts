@@ -51,13 +51,13 @@ test('newRepoId is a slug of the name plus a random suffix', () => {
   assert.match(newRepoId('!!!'), /^repo-[0-9a-f]{8}$/);
 });
 
-test('linking writes the id into pf.json and a record in the state folder, keeping other keys', () => {
+test('linking writes the id into pulpfixer.json and a record in the state folder, keeping other keys', () => {
   withHome(mkRepo({}), () => {
-    const root = mkRepo({ 'pf.json': json({ profile: 'acme', commands: { seed: './seed.sh' } }) });
+    const root = mkRepo({ 'pulpfixer.json': json({ profile: 'acme', commands: { seed: './seed.sh' } }) });
     assert.equal(repoLink(root, loadRepoConfig(root), { remote: REMOTE }).state, 'unlinked');
     const now = link(root);
     assert.equal(now.state, 'linked');
-    const file = JSON.parse(fs.readFileSync(path.join(root, 'pf.json'), 'utf8'));
+    const file = JSON.parse(fs.readFileSync(path.join(root, 'pulpfixer.json'), 'utf8'));
     assert.equal(Object.keys(file)[0], 'id');
     assert.equal(file.profile, 'acme');
     assert.deepEqual(file.commands, { seed: './seed.sh' });
@@ -75,7 +75,7 @@ test('a moved checkout or a changed remote is stale, and relinking keeps the id 
     const { id } = link(root);
     assert.ok(saveRepoSettings(id!, { secretRef: 'vault:acme' }));
 
-    const moved = mkRepo({ 'pf.json': fs.readFileSync(path.join(root, 'pf.json'), 'utf8') });
+    const moved = mkRepo({ 'pulpfixer.json': fs.readFileSync(path.join(root, 'pulpfixer.json'), 'utf8') });
     const stale = repoLink(moved, loadRepoConfig(moved), { name: 'api', remote: REMOTE });
     assert.equal(stale.state, 'stale');
     assert.match(stale.reasons.join(), /checkout moved/);
@@ -91,11 +91,11 @@ test('a moved checkout or a changed remote is stale, and relinking keeps the id 
   });
 });
 
-test('pf.json without its id finds the record by path, and an older link revision is stale', () => {
+test('pulpfixer.json without its id finds the record by path, and an older link revision is stale', () => {
   withHome(mkRepo({}), () => {
     const root = mkRepo({});
     const { id } = link(root);
-    fs.writeFileSync(path.join(root, 'pf.json'), json({ name: 'api' }));
+    fs.writeFileSync(path.join(root, 'pulpfixer.json'), json({ name: 'api' }));
     const lost = repoLink(root, loadRepoConfig(root), { name: 'api', remote: REMOTE });
     assert.equal(lost.state, 'stale');
     assert.equal(lost.id, id);
@@ -112,7 +112,7 @@ test('an id whose record knows neither the path nor the remote is foreign and ge
     const root = mkRepo({});
     const { id } = link(root);
     saveRepoSettings(id!, { secretRef: 'vault:acme' });
-    const other = mkRepo({ 'pf.json': json({ id }) });
+    const other = mkRepo({ 'pulpfixer.json': json({ id }) });
     const foreign = repoLink(other, loadRepoConfig(other), { name: 'api', remote: 'github.com/evil/clone' });
     assert.equal(foreign.state, 'foreign');
     assert.deepEqual(repoSettings(foreign), {});
@@ -126,7 +126,7 @@ test('an id whose record knows neither the path nor the remote is foreign and ge
 
 test('an id that is not a safe file name is never used as a path', () => {
   withHome(mkRepo({}), () => {
-    const root = mkRepo({ 'pf.json': json({ id: '../config' }) });
+    const root = mkRepo({ 'pulpfixer.json': json({ id: '../config' }) });
     const l = repoLink(root, loadRepoConfig(root), { name: 'api', remote: undefined });
     assert.equal(l.state, 'unlinked');
     assert.match(l.reasons.join(), /not valid/);
@@ -136,12 +136,12 @@ test('an id that is not a safe file name is never used as a path', () => {
   });
 });
 
-test('dry run writes neither pf.json nor a record', () => {
+test('dry run writes neither pulpfixer.json nor a record', () => {
   withHome(mkRepo({}), () => {
     const root = mkRepo({});
     const r = linkRepo(root, repoLink(root, loadRepoConfig(root), { remote: REMOTE }), { name: 'api', remote: REMOTE, dryRun: true });
     assert.match(r.changes.join(), /would add id/);
-    assert.ok(!fs.existsSync(path.join(root, 'pf.json')));
+    assert.ok(!fs.existsSync(path.join(root, 'pulpfixer.json')));
     assert.equal(listRepoRecords().length, 0);
   });
 });

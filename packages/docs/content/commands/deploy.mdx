@@ -19,7 +19,7 @@ With no environment, pf picks the first target the repo has:
 
 1. **Staging**, when pf finds one (see below).
 2. **Production**, when that is the only target.
-3. **A bare `deploy`**: a `deploy` entry in `pf.json`, a `deploy` script in `package.json` or `composer.json`, or the repo's own `./a deploy`. A bare deploy does not name an environment, so pf treats it like production: it always asks first and needs `--yes` without a terminal. pf never guesses it from platform configs.
+3. **A bare `deploy`**: a `deploy` entry in `pulpfixer.json`, a `deploy` script in `package.json` or `composer.json`, or the repo's own `./a deploy`. A bare deploy does not name an environment, so pf treats it like production: it always asks first and needs `--yes` without a terminal. pf never guesses it from platform configs.
 
 pf says which one it picked. `pf deploy staging` and `pf deploy production` (or `pf ds`, `pf dp`) pick one yourself. The coding agent and the MCP tools never run a bare deploy.
 
@@ -29,14 +29,14 @@ pf says which one it picked. `pf deploy staging` and `pf deploy production` (or 
 
 pf cannot tell whether an arbitrary command commits, so only a target that says it takes a message gets one:
 
-- a `pf.json` command with `"message": true`, for example `{ "run": "./tl d", "message": true }`;
+- a `pulpfixer.json` command with `"message": true`, for example `{ "run": "./tl d", "message": true }`;
 - a repo CLI command (`./a deploy`) whose `# usage:` header mentions `message`.
 
 The message goes on as one quoted argument (`./tl d 'fix login'`), on the last step of the plan. A target that takes none prints a warning and runs without it.
 
 ### Repos with their own helper script
 
-Older repos deploy with a hand-written helper such as `./tl d` or `./al d`. Run `pf rp` (or `pf rp --deploy`) once: the coding agent reads the repo's docs and helper, asks which environment it is, and writes the `pf.json` entry. See [Tools and repo setup](/commands/tools-and-repo).
+Older repos deploy with a hand-written helper such as `./tl d` or `./al d`. Run `pf rp` (or `pf rp --deploy`) once: the coding agent reads the repo's docs and helper, asks which environment it is, and writes the `pulpfixer.json` entry. See [Tools and repo setup](/commands/tools-and-repo).
 
 ## Staging
 
@@ -48,7 +48,7 @@ pf ds                        # same as pf deploy staging
 
 pf finds the staging target by itself, in this order:
 
-1. A `deploy:staging` entry in `pf.json`
+1. A `deploy:staging` entry in `pulpfixer.json`
 2. A `deploy:staging` script in a `package.json` or `composer.json`, or the repo's own `./a deploy:staging` tool
 3. A GitHub workflow with `stag` in its file name and a `workflow_dispatch` trigger, run with `gh workflow run`
 4. Platform configs: Firebase, Cloudflare Workers (`wrangler`, with a staging env), Fly.io (`fly.staging.toml`), Serverless, SST, Netlify and Vercel (a preview)
@@ -65,7 +65,7 @@ pf dp
 Production is never guessed from platform configs. pf runs it only when the repo defines it:
 
 - a `deploy:production` script (`package.json` or `composer.json`),
-- a `deploy:production` entry in `pf.json`, or
+- a `deploy:production` entry in `pulpfixer.json`, or
 - the repo's own `./a deploy:production` tool.
 
 It always asks for confirmation. Without a terminal it refuses unless you pass `--yes`. `--dry-run` previews it.
@@ -80,4 +80,4 @@ The coding agent and the MCP tools deploy to staging only. Production is never t
 pf publish staging           # same as pf ps
 ```
 
-Runs the repo's `publish:cellars` script (or `publish:staging`), or the matching `pf.json` entry, and always confirms (`--yes` without a terminal, `--dry-run` to preview). A repo with neither fails with exit code 1.
+Runs the repo's `publish:cellars` script (or `publish:staging`), or the matching `pulpfixer.json` entry, and always confirms (`--yes` without a terminal, `--dry-run` to preview). A repo with neither fails with exit code 1.

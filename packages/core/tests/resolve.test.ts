@@ -7,17 +7,17 @@ import { detectProduction, detectStaging } from '@pulpfixer/kit/detect/deploy';
 import { detectedEntries } from '../src/commands/init.js';
 import { json, lines, mkRepo } from './helpers.js';
 
-test('resolution order: pf.json, then repo scripts, then stack defaults', () => {
+test('resolution order: pulpfixer.json, then repo scripts, then stack defaults', () => {
   const dir = mkRepo({
     '.git/HEAD': '',
     'package.json': json({ scripts: { dev: 'vite' } }),
     Makefile: 'dev:\n\techo\n',
     'compose.yaml': 'services: {}\n',
-    'pf.json': json({ commands: { dev: { run: './run.sh', description: 'x' } } }),
+    'pulpfixer.json': json({ commands: { dev: { run: './run.sh', description: 'x' } } }),
   });
   const ctx = buildContext(dir);
   assert.deepEqual(lines(candidates('dev', ctx)), ['./run.sh', 'npm run dev', 'make dev', 'docker compose up']);
-  assert.equal(candidates('dev', ctx)[0]!.source, 'pf.json');
+  assert.equal(candidates('dev', ctx)[0]!.source, 'pulpfixer.json');
 });
 
 test('a script beats a default of another stack', () => {
@@ -25,8 +25,8 @@ test('a script beats a default of another stack', () => {
   assert.deepEqual(lines(candidates('dev', buildContext(dir))), ['make run', 'go run .']);
 });
 
-test('pf.json cwd is resolved against the repo root', () => {
-  const dir = mkRepo({ '.git/HEAD': '', 'pf.json': json({ commands: { test: { run: 'npm t', cwd: 'sub' } } }), 'sub/x': '' });
+test('pulpfixer.json cwd is resolved against the repo root', () => {
+  const dir = mkRepo({ '.git/HEAD': '', 'pulpfixer.json': json({ commands: { test: { run: 'npm t', cwd: 'sub' } } }), 'sub/x': '' });
   const c = candidates('test', buildContext(dir))[0]!;
   assert.ok(c.cmd.cwd!.endsWith('/sub'));
 });

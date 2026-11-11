@@ -1,26 +1,26 @@
 {
   "stack": {
-    "version": "2.30",
+    "version": "2.31",
     "since": "2026-11-10"
   },
   "packages": {
     "packages/core": {
-      "version": "5.5",
+      "version": "5.6",
       "since": "2026-11-10",
       "type": "node"
     },
     "packages/docs": {
-      "version": "1.4",
+      "version": "1.5",
       "since": "2026-11-10",
       "type": "node"
     },
     "packages/kit": {
-      "version": "6.1",
+      "version": "6.2",
       "since": "2026-11-10",
       "type": "node"
     },
     "packages/plugin-aws": {
-      "version": "5.0",
+      "version": "5.1",
       "since": "2026-11-10",
       "type": "node"
     },

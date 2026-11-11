@@ -16,6 +16,8 @@ export interface Launch {
   argv: string[];
   /** Written before the CLI starts. Empty for a dry run. */
   files: LaunchFile[];
+  /** The CLI writes stream-json events on stdout (a `once` task), for `runStreaming` to show. */
+  stream?: boolean;
 }
 
 export interface LaunchInput {
@@ -32,7 +34,8 @@ export interface LaunchInput {
   /** pf profile the server uses (`pf agent --profile`). */
   profile?: string;
   /**
-   * Run the task and exit, so the caller continues. Claude and Cursor use print mode (`-p`).
+   * Run the task and exit, so the caller continues. Claude and Cursor use print mode (`-p`) with
+   * stream-json output, which `runStreaming` shows as it arrives.
    * An empty prompt still starts an interactive session.
    */
   once?: boolean;
@@ -92,10 +95,11 @@ export function buildLaunch(agent: AgentInfo, input: LaunchInput): Launch {
     // and opens an interactive session with no prompt.
     // `-p` prints the reply and exits. `--permission-mode acceptEdits` lets the write through:
     // print mode has no permission dialog. Both are single-value or boolean, so they stay ahead of
-    // the variadic flags and do not swallow the task.
+    // the variadic flags and do not swallow the task. stream-json in print mode needs `--verbose`.
+    const once = Boolean(input.once && prompt);
     const argv = [
       agent.bin,
-      ...(input.once && prompt ? ['-p', '--permission-mode', 'acceptEdits'] : []),
+      ...(once ? ['-p', '--permission-mode', 'acceptEdits', '--output-format', 'stream-json', '--verbose'] : []),
       '--mcp-config',
       configPath,
       ...claudeAllowedTools(input.tools ?? TOOLS).flatMap((t) => ['--allowedTools', t]),
@@ -103,7 +107,7 @@ export function buildLaunch(agent: AgentInfo, input: LaunchInput): Launch {
       input.persona,
     ];
     if (prompt) argv.push(prompt);
-    return { argv, files: [{ path: configPath, contents: mcpJson(serverArgv) }] };
+    return { argv, files: [{ path: configPath, contents: mcpJson(serverArgv) }], ...(once ? { stream: true } : {}) };
   }
   if (agent.id === 'codex') {
     const [command, ...args] = serverArgv;
@@ -117,10 +121,11 @@ export function buildLaunch(agent: AgentInfo, input: LaunchInput): Launch {
     ];
     return { argv, files: [] };
   }
-  const argv = [agent.bin, ...(input.once && prompt ? ['-p'] : []), '--workspace', input.cwd];
+  const once = Boolean(input.once && prompt);
+  const argv = [agent.bin, ...(once ? ['-p', '--output-format', 'stream-json'] : []), '--workspace', input.cwd];
   const text = prompt ? `${input.persona}\n\n${prompt}` : input.persona;
   argv.push(text);
-  return { argv, files: [] };
+  return { argv, files: [], ...(once ? { stream: true } : {}) };
 }
 
 export function cursorMcpPath(): string {

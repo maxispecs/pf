@@ -1,10 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { LEGACY_REPO_CONFIG, migrateRepoConfig, REPO_CONFIG, repoConfigName } from '@pulpfixer/kit/config';
 import { buildContext, type Context } from '@pulpfixer/kit/context';
 import { detectDeploy, detectProduction, detectStaging } from '@pulpfixer/kit/detect/deploy';
 import { findDeployHelpers, type DeployHelper } from '@pulpfixer/kit/detect/helpers';
 import { capture, formatCmd, runCmd } from '@pulpfixer/kit/exec';
 import { linkRepo, listRepoRecords, REPO_LINK_REVISION, repoLink, repoRemote } from '@pulpfixer/kit/repo-link';
+import { printSuccessLogo } from '@pulpfixer/kit/ui/banner';
 import { err } from '@pulpfixer/kit/ui/palette';
 import { pick } from '@pulpfixer/kit/ui/picker';
 import { confirm } from '@pulpfixer/kit/ui/prompt';
@@ -190,13 +192,13 @@ export function deploySetupPrompt(helpers: DeployHelper[], key: DeployKey = 'dep
   const hints = helpers.length
     ? `pf found these scripts at the repo root, best guess first: ${helpers.map((h) => `${h.file} (${h.reasons.join(', ')})`).join('; ')}. Check them yourself.`
     : 'pf found no helper script at the repo root; look in the docs, a Makefile, a justfile or cli/.';
-  return `Set up pf deploy for this repo: call pf_skill with name "deploy-setup" and follow it. ${hints} The user chose the pf.json key "${key}". Use that key and do not ask. This session exits when you finish. Write pf.json only, then stop. pf will preview the deploy after you exit. Do not run the deploy.`;
+  return `Set up pf deploy for this repo: call pf_skill with name "deploy-setup" and follow it. ${hints} The user chose the ${REPO_CONFIG} key "${key}". Use that key and do not ask. This session exits when you finish. Write ${REPO_CONFIG} only, then stop. pf will preview the deploy after you exit. Do not run the deploy.`;
 }
 
 /** The environment question, asked here so the agent can run once and exit. No terminal means the plain `deploy` key. */
 async function chooseDeployKey(): Promise<DeployKey | null> {
   if (!interactive()) return 'deploy';
-  return pick<DeployKey>('Which pf.json key should this deploy use?', [
+  return pick<DeployKey>(`Which ${REPO_CONFIG} key should this deploy use?`, [
     { value: 'deploy', label: 'deploy', hint: 'just deploy, pf asks first' },
     { value: 'deploy:staging', label: 'deploy:staging', hint: 'staging' },
     { value: 'deploy:production', label: 'deploy:production', hint: 'production, pf asks first' },
@@ -246,8 +248,26 @@ async function planDeploy(ctx: Context, opts: { force: boolean; dryRun: boolean 
   return { resolved, helpers, agent: true };
 }
 
+/** Convert a legacy pf.json to pulpfixer.json, before any step writes to the repo config. */
+function setupConfig(root: string, dryRun: boolean, done: string[]): number {
+  const c = err();
+  const m = migrateRepoConfig(root, { dryRun });
+  if (m.state === 'converted' && m.removed) {
+    done.push(`config: ${dryRun ? 'would remove' : 'removed'} ${LEGACY_REPO_CONFIG}, it matches ${REPO_CONFIG}`);
+  } else if (m.state === 'converted') {
+    done.push(`config: ${dryRun ? 'would rename' : 'renamed'} ${LEGACY_REPO_CONFIG} to ${REPO_CONFIG}`);
+  } else if (m.state === 'both') {
+    process.stderr.write(`${badgeLabel('warning', c)} this repo has both ${REPO_CONFIG} and ${LEGACY_REPO_CONFIG}, and pf reads only ${REPO_CONFIG}. Move what you need out of ${LEGACY_REPO_CONFIG}, then delete it.\n`);
+    done.push(`config: ${LEGACY_REPO_CONFIG} left as is, it differs from ${REPO_CONFIG}`);
+  } else if (m.state === 'failed') {
+    process.stderr.write(`${badgeLabel('error', c)} could not rename ${LEGACY_REPO_CONFIG} to ${REPO_CONFIG}: ${m.error}\n`);
+    return 1;
+  }
+  return 0;
+}
+
 /**
- * The link between pf.json `id` and `~/.pf/repos/<id>.json`. A `foreign` id (the record knows neither this
+ * The link between pulpfixer.json `id` and `~/.pf/repos/<id>.json`. A `foreign` id (the record knows neither this
  * path nor this remote) is linked only after the user says this is the same repo; otherwise it gets a new id.
  */
 async function setupLink(ctx: Context, dryRun: boolean, done: string[]): Promise<number> {
@@ -265,12 +285,12 @@ async function setupLink(ctx: Context, dryRun: boolean, done: string[]): Promise
     }
     const choice = await pick<'same' | 'new' | 'skip'>('Is this checkout the same repo?', [
       { value: 'same', label: 'same repo', hint: 'another checkout, share the record' },
-      { value: 'new', label: 'different repo', hint: 'give it a new id in pf.json' },
+      { value: 'new', label: 'different repo', hint: `give it a new id in ${repoConfigName(root)}` },
       { value: 'skip', label: 'skip', hint: 'leave the link as it is' },
     ]);
     if (!choice) return 130;
     if (choice === 'skip') {
-      done.push('link: skipped, pf.json names another repo\'s id');
+      done.push(`link: skipped, ${repoConfigName(root)} names another repo's id`);
       return 0;
     }
     fresh = choice === 'new';
@@ -315,6 +335,8 @@ export const repoCommand: Command = {
     const root = ctx.repo.root;
     const done: string[] = [];
 
+    const converted = setupConfig(root, dryRun, done);
+    if (converted !== 0) return converted;
     if (!noLink) {
       process.stderr.write(`${h2('Link', c)}\n`);
       const code = await setupLink(ctx, dryRun, done);
@@ -342,6 +364,7 @@ export const repoCommand: Command = {
     const next = [!noPnpm && exists(root, 'package.json') ? termLine('pnpm ask', c) : '', !noVer ? termLine('pf ver', c) : ''].filter(Boolean);
     if (next.length) process.stderr.write(`${c.dim('Next:')} ${next.join(c.dim(', '))}${c.dim('. Nothing is committed; rerun pf repo after pf update to refresh the tools.')}\n`);
 
+    const details = [`config: ${REPO_CONFIG}`, 'nothing is committed'];
     if (deploy?.agent) {
       process.stderr.write(`\n${h2('Deploy setup (agent)', c)}\n`);
       const key = await chooseDeployKey();
@@ -352,9 +375,10 @@ export const repoCommand: Command = {
       // The agent was told to exit when the file was written. Show what pf d resolves to now.
       process.stderr.write(`\n${c.dim('pf d now:')}\n`);
       const check = await runDeployAuto(buildContext(ctx.cwd), { dryRun: true });
-      if (check === 0) process.stderr.write(`${badgeLabel('success', c)} wired. pf d will ask before it runs; nothing was deployed.\n`);
-      return check;
+      if (check !== 0) return check;
+      details.unshift('pf d is wired: it asks before it runs, nothing was deployed');
     }
+    if (!dryRun) printSuccessLogo({ version: ctx.version, repo: ctx.repo.name }, `${ctx.repo.name} is set up for pulpfixer`, details);
     return 0;
   },
 };

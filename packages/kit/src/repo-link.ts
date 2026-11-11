@@ -1,13 +1,13 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { writeHomeFile, type RepoConfig } from './config.js';
+import { repoConfigName, repoConfigPath, writeHomeFile, type RepoConfig } from './config.js';
 import { pfHome } from './constants.js';
 import { capture } from './exec.js';
 import { listDir, readJson } from './util.js';
 
 /**
- * pf remembers a repo in two places. The repo's `pf.json` carries an `id`, and `~/.pf/repos/<id>.json`
+ * pf remembers a repo in two places. The repo's `pulpfixer.json` carries an `id`, and `~/.pf/repos/<id>.json`
  * holds what stays out of the repo: the checkouts pf has seen, the origin remote and private settings.
  * The id ties the two together, so the record survives a moved checkout or a changed remote.
  * `pf repo` (`pf rp`) writes and refreshes both.
@@ -16,7 +16,7 @@ import { listDir, readJson } from './util.js';
 /** Raised when the record format or the rules for linking change; older records read as stale until `pf rp` runs again. */
 export const REPO_LINK_REVISION = 1;
 
-/** A pf.json `id`. Also the record's file name, so nothing outside this shape is ever used as a path. */
+/** A pulpfixer.json `id`. Also the record's file name, so nothing outside this shape is ever used as a path. */
 export const REPO_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
 const MAX_PATHS = 10;
@@ -40,12 +40,12 @@ export type LinkState = 'linked' | 'stale' | 'foreign' | 'unlinked';
 
 export interface RepoLink {
   /**
-   * `linked`: pf.json and the record agree. `stale`: same repo, but the path, remote, name or link revision
-   * changed. `foreign`: pf.json names a record that knows neither this path nor this remote (a copy, or a
-   * pf.json taken from another repo); pf rp asks before linking it. `unlinked`: no id, or no record for it.
+   * `linked`: pulpfixer.json and the record agree. `stale`: same repo, but the path, remote, name or link revision
+   * changed. `foreign`: pulpfixer.json names a record that knows neither this path nor this remote (a copy, or a
+   * config file taken from another repo); pf rp asks before linking it. `unlinked`: no id, or no record for it.
    */
   state: LinkState;
-  /** The pf.json id, else the id of a record found for this path or remote. */
+  /** The pulpfixer.json id, else the id of a record found for this path or remote. */
   id: string | null;
   record: RepoRecord | null;
   /** What `pf rp` would refresh, in plain words. Empty when linked. */
@@ -129,8 +129,9 @@ export function repoLink(root: string, config: RepoConfig, opts: { name?: string
   const raw = config.id;
   if (!raw || !REPO_ID.test(raw)) {
     const found = listRepoRecords().find((r) => r.paths.includes(here)) ?? (remote ? listRepoRecords().find((r) => r.remote === remote) : undefined);
-    const bad = raw ? [`pf.json id "${raw}" is not valid (lowercase letters, digits and dashes)`] : [];
-    if (found) return { state: 'stale', id: found.id, record: found, reasons: [...bad, `pf.json has no id; pf rp writes back ${found.id}`] };
+    const file = repoConfigName(root);
+    const bad = raw ? [`${file} id "${raw}" is not valid (lowercase letters, digits and dashes)`] : [];
+    if (found) return { state: 'stale', id: found.id, record: found, reasons: [...bad, `${file} has no id; pf rp writes back ${found.id}`] };
     return { state: 'unlinked', id: null, record: null, reasons: [...bad, 'not linked yet'] };
   }
   const record = readRepoRecord(raw);
@@ -161,9 +162,9 @@ export function saveRepoSettings(id: string, patch: Record<string, unknown>): bo
   return writeRecord({ ...record, settings: { ...record.settings, ...patch }, updatedAt: new Date().toISOString() });
 }
 
-/** Set `id` in pf.json, first, keeping every other key. False when pf.json is not valid JSON (never overwritten) or cannot be written. */
+/** Set `id` in the repo config, first, keeping every other key. False when the file is not valid JSON (never overwritten) or cannot be written. */
 export function writeRepoId(root: string, id: string): boolean {
-  const file = path.join(root, 'pf.json');
+  const file = repoConfigPath(root);
   const current = readJson<Record<string, unknown>>(file);
   if (fs.existsSync(file) && !current) return false;
   const { id: _old, ...rest } = current ?? {};
@@ -183,7 +184,7 @@ export interface LinkResult {
 }
 
 /**
- * Link this checkout: give pf.json an id when it has none (or `fresh` asks for a new one) and create or
+ * Link this checkout: give pulpfixer.json an id when it has none (or `fresh` asks for a new one) and create or
  * refresh the record. Confirm a `foreign` link with the user before calling this without `fresh`.
  */
 export function linkRepo(root: string, link: RepoLink, opts: { name: string; remote?: string | undefined; fresh?: boolean; dryRun?: boolean }): LinkResult {
@@ -195,10 +196,11 @@ export function linkRepo(root: string, link: RepoLink, opts: { name: string; rem
   const changes: string[] = [];
   const base = fresh ? null : link.record;
 
-  const idInFile = readJson<{ id?: unknown }>(root, 'pf.json')?.id;
+  const configName = repoConfigName(root);
+  const idInFile = readJson<{ id?: unknown }>(root, configName)?.id;
   if (idInFile !== id) {
-    if (!opts.dryRun && !writeRepoId(root, id)) return { ok: false, id, changes: ['pf.json is not valid JSON or cannot be written; fix it and run pf rp again'] };
-    changes.push(would(`${idInFile === undefined ? 'add' : 'set'} id ${id} in pf.json`));
+    if (!opts.dryRun && !writeRepoId(root, id)) return { ok: false, id, changes: [`${configName} is not valid JSON or cannot be written; fix it and run pf rp again`] };
+    changes.push(would(`${idInFile === undefined ? 'add' : 'set'} id ${id} in ${configName}`));
   }
 
   const now = new Date().toISOString();

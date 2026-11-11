@@ -1,11 +1,11 @@
 ---
 name: deploy-setup
-description: Teach pf how a repo deploys, so `pf deploy` (`pf d`) works there. Use when the repo has its own helper script for deploying (such as `./tl d` or `./al d`) that pf does not know, or when pf rp --deploy starts you. Reads the helper and writes a `deploy` entry in pf.json. Never runs the deploy.
+description: Teach pf how a repo deploys, so `pf deploy` (`pf d`) works there. Use when the repo has its own helper script for deploying (such as `./tl d` or `./al d`) that pf does not know, or when pf rp --deploy starts you. Reads the helper and writes a `deploy` entry in pulpfixer.json. Never runs the deploy.
 ---
 
 # Wire `pf deploy` to this repo's own deploy
 
-Some repos deploy through a hand-written helper at the root (`./tl d`, `./al d`) instead of a script pf can read. Your job is to find the right command and record it in `pf.json`. Do not run it.
+Some repos deploy through a hand-written helper at the root (`./tl d`, `./al d`) instead of a script pf can read. Your job is to find the right command and record it in `pulpfixer.json`. Do not run it.
 
 ## 1. Read how the repo says it deploys
 
@@ -31,11 +31,11 @@ Describe it in one line for the `description`: what it changes and where it ends
 
 ## 4. Ask which environment it is
 
-If the prompt already names the pf.json key (`deploy`, `deploy:staging` or `deploy:production`), use that key and do not ask. `pf rp` asks before it starts you, then exits when you finish.
+If the prompt already names the pulpfixer.json key (`deploy`, `deploy:staging` or `deploy:production`), use that key and do not ask. `pf rp` asks before it starts you, then exits when you finish.
 
 Otherwise ask the user once: staging, production, or "just deploy". A command the repo does not tie to an environment goes under the plain name.
 
-| Answer | `pf.json` key | What `pf` does |
+| Answer | `pulpfixer.json` key | What `pf` does |
 |---|---|---|
 | not sure, or a push that releases | `deploy` | always asks first, needs `--yes` without a terminal |
 | staging | `deploy:staging` | the usual staging flow (`pf ds`, `pf d`) |
@@ -43,9 +43,9 @@ Otherwise ask the user once: staging, production, or "just deploy". A command th
 
 Default to `deploy`. Never choose production for the user.
 
-## 5. Write `pf.json`
+## 5. Write `pulpfixer.json`
 
-Add the entry under `commands`, keeping everything already in the file, including its `id`, which links the repo to pf's state; never change or add it (create the file at the repo root if missing):
+Add the entry under `commands`, keeping everything already in the file, including its `id`, which links the repo to pf's state; never change or add it (create the file at the repo root if missing). A `pf.json` is the same file under its old name: when the repo has one and no `pulpfixer.json`, rename it to `pulpfixer.json` unchanged, then edit that. Never keep both.
 
 ```json
 {
@@ -66,7 +66,7 @@ Add the entry under `commands`, keeping everything already in the file, includin
 
 ## 6. Check
 
-Do not run the deploy. When the prompt says pf will preview it, stop after writing `pf.json`: pf runs the preview once you exit. Otherwise run `pf deploy --dry-run` (it only prints) and show the user the line it printed. Tell them how to use it:
+Do not run the deploy. When the prompt says pf will preview it, stop after writing `pulpfixer.json`: pf runs the preview once you exit. Otherwise run `pf deploy --dry-run` (it only prints) and show the user the line it printed. Tell them how to use it:
 
 - `pf d` runs it after asking.
 - `pf d "fix login"` passes a commit message when `"message": true` is set.

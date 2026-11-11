@@ -31,7 +31,7 @@ export function noCommandHint(task: string): string {
   const c = err();
   return [
     `${badgeLabel('error', c)} no ${task} command found for this repo.`,
-    `Add one to ${c.bold('pf.json')} (run ${termLine('pf init', c)} to create it):`,
+    `Add one to ${c.bold('pulpfixer.json')} (run ${termLine('pf init', c)} to create it):`,
     `  { "commands": { "${task}": { "run": "<your command>" } } }`,
   ].join('\n');
 }

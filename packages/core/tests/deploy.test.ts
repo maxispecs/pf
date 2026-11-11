@@ -23,8 +23,8 @@ function pf(cwd: string, ...args: string[]) {
 const git = { '.git/HEAD': '' };
 const cfg = (commands: Record<string, unknown>) => json({ commands });
 
-test('detectDeploy: pf.json, a package script, a composer script or ./a deploy; never platform configs', () => {
-  assert.deepEqual(lines(detectDeploy(buildContext(mkRepo({ ...git, 'pf.json': cfg({ deploy: { run: './tl d' } }) }))).steps), ['./tl d']);
+test('detectDeploy: pulpfixer.json, a package script, a composer script or ./a deploy; never platform configs', () => {
+  assert.deepEqual(lines(detectDeploy(buildContext(mkRepo({ ...git, 'pulpfixer.json': cfg({ deploy: { run: './tl d' } }) }))).steps), ['./tl d']);
   assert.deepEqual(lines(detectDeploy(buildContext(mkRepo({ ...git, 'package.json': json({ scripts: { deploy: 'x' } }) }))).steps), ['npm run deploy']);
   assert.deepEqual(lines(detectDeploy(buildContext(mkRepo({ ...git, 'composer.json': json({ scripts: { deploy: 'x' } }) }))).steps), ['composer run deploy']);
   const cli = { a: '', 'cli/run': '', 'cli/commands/deploy.sh': '# usage: ./a deploy [message]\n' };
@@ -34,8 +34,8 @@ test('detectDeploy: pf.json, a package script, a composer script or ./a deploy; 
   assert.deepEqual(detectDeploy(buildContext(mkRepo({ ...git, 'vercel.json': '{}', 'netlify.toml': '' }))).steps, []);
 });
 
-test('pf.json "message": true marks a command that takes a commit message, other values are dropped', () => {
-  const ctx = buildContext(mkRepo({ ...git, 'pf.json': cfg({ deploy: { run: './al d', message: true }, 'deploy:staging': { run: 'x', message: 'yes' } }) }));
+test('pulpfixer.json "message": true marks a command that takes a commit message, other values are dropped', () => {
+  const ctx = buildContext(mkRepo({ ...git, 'pulpfixer.json': cfg({ deploy: { run: './al d', message: true }, 'deploy:staging': { run: 'x', message: 'yes' } }) }));
   assert.equal(ctx.config.commands.deploy!.message, true);
   assert.equal(ctx.config.commands['deploy:staging']!.message, undefined);
   assert.equal(detectDeploy(ctx).steps[0]!.acceptsMessage, true);
@@ -53,7 +53,7 @@ test('parseDeployArgs: environment word, message words, -m and mistyped flags', 
 });
 
 test('applyMessage quotes the message as one argument on the last step, only when it takes one', () => {
-  const take = { cmd: { argv: ['./tl d'], shell: true }, source: 'pf.json', acceptsMessage: true };
+  const take = { cmd: { argv: ['./tl d'], shell: true }, source: 'pulpfixer.json', acceptsMessage: true };
   const plain = { cmd: { argv: ['make'], shell: true }, source: 'x' };
   assert.equal(applyMessage([take], "it's fixed").steps[0]!.cmd.argv[0], `./tl d 'it'\\''s fixed'`);
   assert.equal(applyMessage([take], 'fix').steps[0]!.cmd.argv[0], './tl d fix');
@@ -65,17 +65,17 @@ test('applyMessage quotes the message as one argument on the last step, only whe
 });
 
 test('pf deploy picks staging, then production, then the bare deploy', () => {
-  const all = mkRepo({ ...git, 'pf.json': cfg({ 'deploy:staging': { run: 'echo stg' }, 'deploy:production': { run: 'echo prd' }, deploy: { run: 'echo bare' } }) });
+  const all = mkRepo({ ...git, 'pulpfixer.json': cfg({ 'deploy:staging': { run: 'echo stg' }, 'deploy:production': { run: 'echo prd' }, deploy: { run: 'echo bare' } }) });
   const a = pf(all, 'deploy', '--dry-run');
   assert.equal(a.code, 0, a.err);
   assert.match(a.err, /echo stg/);
   assert.doesNotMatch(a.err, /echo prd|echo bare/);
   assert.match(a.err, /staging is configured/);
-  const prod = mkRepo({ ...git, 'pf.json': cfg({ 'deploy:production': { run: 'echo prd' }, deploy: { run: 'echo bare' } }) });
+  const prod = mkRepo({ ...git, 'pulpfixer.json': cfg({ 'deploy:production': { run: 'echo prd' }, deploy: { run: 'echo bare' } }) });
   const b = pf(prod, 'deploy', '--dry-run');
   assert.match(b.err, /PRODUCTION/);
   assert.match(b.err, /echo prd/);
-  const bare = pf(mkRepo({ ...git, 'pf.json': cfg({ deploy: { run: 'echo bare' } }) }), 'd', '--dry-run');
+  const bare = pf(mkRepo({ ...git, 'pulpfixer.json': cfg({ deploy: { run: 'echo bare' } }) }), 'd', '--dry-run');
   assert.equal(bare.code, 0, bare.err);
   assert.match(bare.err, /echo bare/);
   assert.match(bare.err, /asks first/);
@@ -89,7 +89,7 @@ test('pf deploy with nothing configured fails with a hint', () => {
 });
 
 test('a bare deploy asks first: no terminal needs --yes', () => {
-  const dir = mkRepo({ ...git, 'pf.json': cfg({ deploy: { run: 'echo bare' } }) });
+  const dir = mkRepo({ ...git, 'pulpfixer.json': cfg({ deploy: { run: 'echo bare' } }) });
   const r = pf(dir, 'd');
   assert.equal(r.code, 2);
   assert.match(r.err, /refusing to deploy/);
@@ -97,12 +97,12 @@ test('a bare deploy asks first: no terminal needs --yes', () => {
 });
 
 test('pf d "message" reaches a command that takes one, quoted, and warns for one that does not', () => {
-  const dir = mkRepo({ ...git, 'pf.json': cfg({ deploy: { run: './tl d', message: true } }) });
+  const dir = mkRepo({ ...git, 'pulpfixer.json': cfg({ deploy: { run: './tl d', message: true } }) });
   const a = pf(dir, 'd', '--dry-run', 'fix login');
   assert.match(a.err, /\.\/tl d 'fix login'/);
   assert.doesNotMatch(a.err, /takes no message/);
   assert.match(pf(dir, 'd', '-m', "it's fixed", '--dry-run').err, /\.\/tl d 'it'\\''s fixed'/);
-  const none = mkRepo({ ...git, 'pf.json': cfg({ deploy: { run: 'echo bare' } }) });
+  const none = mkRepo({ ...git, 'pulpfixer.json': cfg({ deploy: { run: 'echo bare' } }) });
   const b = pf(none, 'd', '--dry-run', 'fix');
   assert.equal(b.code, 0);
   assert.match(b.err, /takes no message, ignored: fix/);
@@ -110,7 +110,7 @@ test('pf d "message" reaches a command that takes one, quoted, and warns for one
 });
 
 test('pf ds and pf dp take a message too; the environment word is not part of it', () => {
-  const dir = mkRepo({ ...git, 'pf.json': cfg({ 'deploy:staging': { run: './al d', message: true }, 'deploy:production': { run: './al d', message: true } }) });
+  const dir = mkRepo({ ...git, 'pulpfixer.json': cfg({ 'deploy:staging': { run: './al d', message: true }, 'deploy:production': { run: './al d', message: true } }) });
   assert.match(pf(dir, 'ds', '--dry-run', 'fix', 'login').err, /\.\/al d 'fix login'/);
   const dp = pf(dir, 'dp', '--dry-run', 'release');
   assert.match(dp.err, /PRODUCTION/);
@@ -119,14 +119,14 @@ test('pf ds and pf dp take a message too; the environment word is not part of it
 });
 
 test('a mistyped flag is an error, not a commit message', () => {
-  const dir = mkRepo({ ...git, 'pf.json': cfg({ deploy: { run: 'echo bare', message: true } }) });
+  const dir = mkRepo({ ...git, 'pulpfixer.json': cfg({ deploy: { run: 'echo bare', message: true } }) });
   const r = pf(dir, 'd', '--dryrun');
   assert.equal(r.code, 2);
   assert.match(r.err, /unknown option --dryrun/);
 });
 
 test('the menu list shows the bare deploy and does not run it as a custom command', () => {
-  const dir = mkRepo({ ...git, 'pf.json': cfg({ deploy: { run: 'echo bare' } }) });
+  const dir = mkRepo({ ...git, 'pulpfixer.json': cfg({ deploy: { run: 'echo bare' } }) });
   const r = pf(dir, 'list');
   assert.equal(r.code, 0);
   assert.match(r.out, /pf deploy\s+Deploy \(the repo's own deploy command\)\s+echo bare, asks first/);

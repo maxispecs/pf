@@ -57,7 +57,7 @@ export function helpText(): string {
     `  ${c.green('PF_NO_UPDATE_CHECK=1')}  Skip the daily background update check`,
     `  ${c.green('PF_NO_TRAVOLTA=1')}      Don't draw confused Travolta on unknown commands and errors`,
     '',
-    c.dim('Repo commands come from pf.json, package scripts, Makefile/justfile targets and stack defaults.'),
+    c.dim('Repo commands come from pulpfixer.json, package scripts, Makefile/justfile targets and stack defaults.'),
   );
   return lines.join('\n');
 }

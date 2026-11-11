@@ -3,7 +3,7 @@ import type { MetaRecord } from 'nextra'
 const meta: MetaRecord = {
   'command-resolution': 'Command resolution',
   stacks: 'Stacks',
-  'pf-json': 'pf.json',
+  'pulpfixer-json': 'pulpfixer.json',
   skills: 'Skills',
   'terminal-output': 'Terminal output',
 }

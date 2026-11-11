@@ -10,13 +10,13 @@ export const PUBLISH_STAGING_SCRIPTS = ['publish:staging', 'publish:cellars', 'p
 
 /**
  * Find what `pf publish staging` (`pf ps`) would run: a `publish:staging` / `publish:cellars` script the
- * repo defines (pf.json, package.json, composer, local CLI). Nothing is guessed: no script, no publish.
+ * repo defines (pulpfixer.json, package.json, composer, local CLI). Nothing is guessed: no script, no publish.
  */
 export function detectPublishStaging(ctx: Context): StagingPlan {
   const root = ctx.repo?.root ?? ctx.workdir;
   const override = ctx.config.commands['publish:staging'] ?? ctx.config.commands['publish:cellars'];
   if (override) {
-    return { steps: [{ cmd: shellCmd(override.run, path.resolve(root, override.cwd ?? '.')), source: 'pf.json' }], skipped: [] };
+    return { steps: [{ cmd: shellCmd(override.run, path.resolve(root, override.cwd ?? '.')), source: 'pulpfixer.json' }], skipped: [] };
   }
   const pkg = readJson<{ scripts?: Record<string, unknown> }>(root, 'package.json');
   const name = PUBLISH_STAGING_SCRIPTS.find((s) => typeof pkg?.scripts?.[s] === 'string');

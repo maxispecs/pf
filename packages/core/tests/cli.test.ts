@@ -99,8 +99,8 @@ test('args after -- are passed through', () => {
   assert.match(r.err, /would run pnpm run dev --port 4000/);
 });
 
-test('custom pf.json commands run by name and appear in the list', () => {
-  const dir = mkRepo({ '.git/HEAD': '', 'pf.json': json({ commands: { seed: { run: 'echo seeded', description: 'Load data', group: 'Tools' } } }) });
+test('custom pulpfixer.json commands run by name and appear in the list', () => {
+  const dir = mkRepo({ '.git/HEAD': '', 'pulpfixer.json': json({ commands: { seed: { run: 'echo seeded', description: 'Load data', group: 'Tools' } } }) });
   assert.match(pf(dir, 'list').out, /pf seed\s+Load data/);
   const r = pf(dir, 'seed');
   assert.equal(r.code, 0);
@@ -111,7 +111,7 @@ test('a missing command explains how to add one', () => {
   const r = pf(mkRepo({ '.git/HEAD': '', 'package.json': '{}' }), 'lint');
   assert.equal(r.code, 1);
   assert.match(r.err, /no lint command found/);
-  assert.match(r.err, /pf\.json/);
+  assert.match(r.err, /pulpfixer\.json/);
 });
 
 test('unknown commands exit 2 with a hint', () => {
@@ -140,13 +140,13 @@ test('ver reports when versioning is not set up and lists when it is', () => {
   assert.match(list.out, /stack/);
 });
 
-test('init writes pf.json and picks it up', () => {
+test('init writes pulpfixer.json and picks it up', () => {
   const dir = repo();
   const r = pf(dir, 'init');
   assert.equal(r.code, 0, r.err);
-  const written = JSON.parse(fs.readFileSync(path.join(dir, 'pf.json'), 'utf8')) as { commands: Record<string, { run: string }> };
+  const written = JSON.parse(fs.readFileSync(path.join(dir, 'pulpfixer.json'), 'utf8')) as { commands: Record<string, { run: string }> };
   assert.equal(written.commands.dev!.run, 'pnpm run dev');
-  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'pf.json'), 'utf8')).name, 'demo');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'pulpfixer.json'), 'utf8')).name, 'demo');
 });
 
 test('setup --dry-run changes nothing', () => {

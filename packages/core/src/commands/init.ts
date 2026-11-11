@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { LEGACY_REPO_CONFIG, migrateRepoConfig, REPO_CONFIG, repoConfigPath } from '@pulpfixer/kit/config';
 import type { Context } from '@pulpfixer/kit/context';
 import { detectDocs } from '@pulpfixer/kit/detect/docs';
 import { candidates } from '@pulpfixer/kit/detect/resolve';
@@ -28,7 +29,7 @@ const DESCRIPTIONS: Record<string, { description: string; group: string }> = {
   doc: { description: 'Run the docs site locally', group: 'Docs & deploy' },
 };
 
-/** A command as a pf.json entry: a shell line plus a cwd relative to the repo root when it differs. */
+/** A command as a pulpfixer.json entry: a shell line plus a cwd relative to the repo root when it differs. */
 export function toEntry(cmd: Cmd, root: string, name: string): Entry {
   const run = cmd.shell ? cmd.argv[0]! : cmd.argv.map(quote).join(' ');
   const rel = cmd.cwd ? path.relative(root, cmd.cwd) : '';
@@ -53,7 +54,7 @@ export function detectedEntries(ctx: Context, existing: Record<string, unknown>)
 
 export const initCommand: Command = {
   name: 'init',
-  summary: 'Set up this repo for pf (writes pf.json)',
+  summary: 'Set up this repo for pf (writes pulpfixer.json)',
   group: 'Tools',
   usage: 'pf init [--dry-run] [--ver]',
   async run(ctx, args) {
@@ -66,20 +67,24 @@ export const initCommand: Command = {
       return 1;
     }
     const root = ctx.repo.root;
-    const file = path.join(root, 'pf.json');
-    const existing = readJson<{ name?: string; commands?: Record<string, unknown> }>(root, 'pf.json') ?? {};
+    const migration = migrateRepoConfig(root, { dryRun });
+    if (migration.state === 'converted') process.stderr.write(c.dim(`${dryRun ? 'would convert' : 'converted'} ${LEGACY_REPO_CONFIG} to ${REPO_CONFIG}\n`));
+    else if (migration.state === 'both') process.stderr.write(`${badgeLabel('warning', c)} ${LEGACY_REPO_CONFIG} is ignored next to ${REPO_CONFIG}; move what you need, then delete it\n`);
+    else if (migration.state === 'failed') process.stderr.write(`${badgeLabel('warning', c)} could not rename ${LEGACY_REPO_CONFIG} to ${REPO_CONFIG}: ${migration.error}\n`);
+    const file = dryRun && migration.state === 'converted' ? path.join(root, REPO_CONFIG) : repoConfigPath(root);
+    const existing = readJson<{ name?: string; commands?: Record<string, unknown> }>(repoConfigPath(root)) ?? {};
     const commands = { ...(existing.commands ?? {}) };
     const added = detectedEntries(ctx, commands);
     const next = { ...existing, name: existing.name ?? ctx.repo.name, commands: { ...commands, ...added } };
 
     const names = Object.keys(added);
-    if (names.length === 0) process.stderr.write(c.dim('nothing new detected for pf.json\n'));
+    if (names.length === 0) process.stderr.write(c.dim(`nothing new detected for ${path.basename(file)}\n`));
     for (const n of names) process.stderr.write(`  ${c.green('+')} ${c.bold(n.padEnd(8))} ${added[n]!.run}${added[n]!.cwd ? c.dim(`  (in ${added[n]!.cwd})`) : ''}\n`);
 
     if (dryRun) process.stderr.write(c.dim(`would write ${file}\n`));
     else if (names.length > 0 || !fs.existsSync(file)) {
       fs.writeFileSync(file, JSON.stringify(next, null, 2) + '\n');
-      process.stderr.write(`${c.green('✔')} wrote ${path.relative(ctx.cwd, file) || 'pf.json'} ${c.dim('(edit it to change what pf runs; nothing is committed)')}\n`);
+      process.stderr.write(`${c.green('✔')} wrote ${path.relative(ctx.cwd, file) || path.basename(file)} ${c.dim('(edit it to change what pf runs; nothing is committed)')}\n`);
     }
 
     if (!findVersionsRoot(ctx.cwd)) {

@@ -327,7 +327,7 @@ const linkTool: Tool = {
       'Profiles:',
       ...shown.map((c) => `- ${candidateLabel(c)}: ${candidateDetail(c)}`),
       '',
-      `Linking writes "profile" to ${ctx.repo ? 'pf.json in this repo' : 'nothing (no repo): it applies to this session only'}. A new profile is registered in ~/.pf/config.json with the account pinned when known. Read access still needs its own approval.`,
+      `Linking writes "profile" to ${ctx.repo ? 'pulpfixer.json in this repo' : 'nothing (no repo): it applies to this session only'}. A new profile is registered in ~/.pf/config.json with the account pinned when known. Read access still needs its own approval.`,
     ].join('\n');
     session.audit({ event: 'aws-link-request', candidates: shown.map(candidateLabel), reason });
     let answer;
@@ -351,13 +351,13 @@ const linkTool: Tool = {
 
     const linked = applyLink(ctx, choice);
     if (!linked.ok) return fail(`The user chose a profile, but pf could not link it: ${linked.reason}.`);
-    // This server is one agent session: the linked profile applies to it even when pf.json could not be written.
+    // This server is one agent session: the linked profile applies to it even when pulpfixer.json could not be written.
     process.env.PF_PROFILE = linked.name;
     session.audit({ event: 'aws-link', profile: linked.name, registered: linked.registered, wroteRepo: linked.wroteRepo });
     return {
       ok: true,
       text: [
-        `Linked pf profile "${linked.name}"${linked.registered ? ' (registered just now)' : ''}${linked.wroteRepo ? ' and saved it to this repo\'s pf.json' : ' for this session only (pf.json could not be written)'}.`,
+        `Linked pf profile "${linked.name}"${linked.registered ? ' (registered just now)' : ''}${linked.wroteRepo ? ' and saved it to this repo\'s pulpfixer.json' : ' for this session only (pulpfixer.json could not be written)'}.`,
         'Call pf_aws_profile to see its limits, then pf_aws_request_access.',
       ].join('\n'),
     };

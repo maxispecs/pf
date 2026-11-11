@@ -16,12 +16,12 @@ function withHome<T>(home: string, fn: () => T): T {
   }
 }
 
-test('pf.json: profile name and agent.aws limits are parsed, junk is dropped', () => {
-  const dir = mkRepo({ 'pf.json': json({ profile: ' acme ', agent: { aws: { scopes: ['ec2', 3, ''], regions: 'eu-west-1', maxTtlMinutes: -5 } } }) });
+test('pulpfixer.json: profile name and agent.aws limits are parsed, junk is dropped', () => {
+  const dir = mkRepo({ 'pulpfixer.json': json({ profile: ' acme ', agent: { aws: { scopes: ['ec2', 3, ''], regions: 'eu-west-1', maxTtlMinutes: -5 } } }) });
   const cfg = loadRepoConfig(dir);
   assert.equal(cfg.profile, 'acme');
   assert.deepEqual(cfg.agent, { aws: { scopes: ['ec2'] } });
-  assert.deepEqual(loadRepoConfig(mkRepo({ 'pf.json': json({ commands: {} }) })), { commands: {} });
+  assert.deepEqual(loadRepoConfig(mkRepo({ 'pulpfixer.json': json({ commands: {} }) })), { commands: {} });
 });
 
 test('user config: profiles are parsed and other keys are kept', () => {
@@ -39,7 +39,7 @@ test('user config: profiles are parsed and other keys are kept', () => {
   assert.deepEqual(user.profiles!.bad, {});
 });
 
-test('profile resolution: flag, then PF_PROFILE, then pf.json, then the default', () => {
+test('profile resolution: flag, then PF_PROFILE, then pulpfixer.json, then the default', () => {
   const user: UserConfig = { profiles: { a: {}, b: {}, c: {} }, defaultProfile: 'c' };
   const config: RepoConfig = { commands: {}, profile: 'b' };
   assert.deepEqual(resolveProfile({ config, user }, { flag: 'a', env: 'b' }), { name: 'a', source: 'flag', config: {} });
@@ -59,7 +59,7 @@ test('a repo can only narrow the limits, never widen them', () => {
 });
 
 test('actions: parsed from both layers, off unless the user allows them, and a repo only removes', () => {
-  const dir = mkRepo({ 'pf.json': json({ agent: { aws: { actions: ['ecs update-service', 7, ''] } } }) });
+  const dir = mkRepo({ 'pulpfixer.json': json({ agent: { aws: { actions: ['ecs update-service', 7, ''] } } }) });
   assert.deepEqual(loadRepoConfig(dir).agent, { aws: { actions: ['ecs update-service'] } });
   const home = mkRepo({ 'config.json': json({ profiles: { a: { aws: { profile: 'p' }, agent: { aws: { actions: ['ecs stop-task', 'ec2 reboot-instances'] } } } } }) });
   assert.deepEqual(withHome(home, () => loadUserConfig()).profiles!.a!.agent, { aws: { actions: ['ecs stop-task', 'ec2 reboot-instances'] } });
@@ -72,16 +72,16 @@ test('actions: parsed from both layers, off unless the user allows them, and a r
   assert.equal(narrowLimits(none, { actions: ['ecs stop-task'] }).actions, undefined, 'a repo cannot add an action');
 });
 
-test('linkRepoProfile sets "profile" in pf.json, keeps other keys, and never overwrites broken JSON', () => {
-  const dir = mkRepo({ 'pf.json': json({ name: 'api', commands: { x: 'y' } }) });
+test('linkRepoProfile sets "profile" in pulpfixer.json, keeps other keys, and never overwrites broken JSON', () => {
+  const dir = mkRepo({ 'pulpfixer.json': json({ name: 'api', commands: { x: 'y' } }) });
   assert.equal(linkRepoProfile(dir, 'acme'), true);
-  assert.deepEqual(JSON.parse(fs.readFileSync(`${dir}/pf.json`, 'utf8')), { name: 'api', commands: { x: 'y' }, profile: 'acme' });
+  assert.deepEqual(JSON.parse(fs.readFileSync(`${dir}/pulpfixer.json`, 'utf8')), { name: 'api', commands: { x: 'y' }, profile: 'acme' });
   const fresh = mkRepo();
   assert.equal(linkRepoProfile(fresh, 'acme'), true);
-  assert.deepEqual(JSON.parse(fs.readFileSync(`${fresh}/pf.json`, 'utf8')), { profile: 'acme' });
-  const broken = mkRepo({ 'pf.json': '{ nope' });
+  assert.deepEqual(JSON.parse(fs.readFileSync(`${fresh}/pulpfixer.json`, 'utf8')), { profile: 'acme' });
+  const broken = mkRepo({ 'pulpfixer.json': '{ nope' });
   assert.equal(linkRepoProfile(broken, 'acme'), false);
-  assert.equal(fs.readFileSync(`${broken}/pf.json`, 'utf8'), '{ nope');
+  assert.equal(fs.readFileSync(`${broken}/pulpfixer.json`, 'utf8'), '{ nope');
 });
 
 test('saveProfile, setDefaultProfile and removeProfile keep the rest of the config', () => {

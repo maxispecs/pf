@@ -69,7 +69,7 @@ test('a standalone pf is bold red in every style, paths and files are left alone
   const pf = '\x1b[1;31mpf\x1b[0m';
   assert.equal(c.dim('run pf update'), `\x1b[2mrun ${pf}\x1b[2m update\x1b[0m`);
   assert.equal(c.bold('pf'), `\x1b[1m${pf}\x1b[1m\x1b[0m`);
-  assert.equal(c.cyan('./pf ~/.pf/skills pf.json @pf-plugins/x pf_deploy'), '\x1b[36m./pf ~/.pf/skills pf.json @pf-plugins/x pf_deploy\x1b[0m');
+  assert.equal(c.cyan('./pf ~/.pf/skills pulpfixer.json @pf-plugins/x pf_deploy'), '\x1b[36m./pf ~/.pf/skills pulpfixer.json @pf-plugins/x pf_deploy\x1b[0m');
   assert.equal(c.bold(c.red('pf')), '\x1b[1m\x1b[31mpf\x1b[0m\x1b[0m');
   assert.equal(redPf('(pf)', '', true), `(${pf})`);
   assert.equal(redPf('pf', '', false), 'pf');
@@ -127,6 +127,15 @@ test('logo carries the version, fits its width, and is plain without color', () 
   assert.ok(logo.includes(LOGO_ART[8]!), 'the dotted figure is drawn');
   assert.doesNotMatch(logo, /\x1b/);
   for (const line of logo.split('\n')) assert.ok(stripAnsi(line).length <= 99, `too wide: ${line}`);
+});
+
+test('logo puts extra lines (a success message) below the info line, beside the art', () => {
+  const rows = renderLogo({ version: '2.1.0', repo: 'web' }, off, 100, ['✔ web is set up', 'nothing is committed']).split('\n');
+  const info = rows.findIndex((r) => r.includes('pf v2.1'));
+  assert.ok(info > 0);
+  assert.match(rows[info + 2]!, /✔ web is set up$/);
+  assert.match(rows[info + 3]!, /nothing is committed$/);
+  assert.ok(rows[info + 3]!.includes(LOGO_ART[info + 2]!), 'the message sits beside the figure');
 });
 
 test('logo gives the update hint its own row and is colored when color is on', () => {

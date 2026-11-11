@@ -53,16 +53,16 @@ test('pf repo --dry-run writes nothing', () => {
   assert.equal(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'), before);
   assert.ok(!fs.existsSync(path.join(dir, 'scripts')));
   assert.ok(!fs.existsSync(path.join(dir, 'versions.json')));
-  assert.ok(!fs.existsSync(path.join(dir, 'pf.json')));
+  assert.ok(!fs.existsSync(path.join(dir, 'pulpfixer.json')));
   assert.match(r.out, /would add id demo-/);
 });
 
-test('pf rp links pf.json to a record in the pf home, then reports it linked; --list shows it', () => {
+test('pf rp links pulpfixer.json to a record in the pf home, then reports it linked; --list shows it', () => {
   const home = mkRepo({});
   const dir = demo();
   const r = pfHome(home, dir, 'rp', '--no-pnpm', '--no-ver', '--no-deploy');
   assert.equal(r.code, 0, r.out);
-  const id = JSON.parse(fs.readFileSync(path.join(dir, 'pf.json'), 'utf8')).id as string;
+  const id = JSON.parse(fs.readFileSync(path.join(dir, 'pulpfixer.json'), 'utf8')).id as string;
   assert.match(id, /^demo-[0-9a-f]{8}$/);
   const rec = JSON.parse(fs.readFileSync(path.join(home, 'repos', `${id}.json`), 'utf8'));
   assert.deepEqual(rec.paths, [fs.realpathSync(dir)]);
@@ -76,13 +76,38 @@ test('pf rp without a terminal leaves a foreign id alone and says how to choose'
   const home = mkRepo({});
   const first = demo();
   assert.equal(pfHome(home, first, 'rp', '--no-pnpm', '--no-ver', '--no-deploy').code, 0);
-  const id = JSON.parse(fs.readFileSync(path.join(first, 'pf.json'), 'utf8')).id as string;
-  const copy = mkRepo({ 'pf.json': json({ id }), 'package.json': json({ name: 'demo' }) });
+  const id = JSON.parse(fs.readFileSync(path.join(first, 'pulpfixer.json'), 'utf8')).id as string;
+  const copy = mkRepo({ 'pulpfixer.json': json({ id }), 'package.json': json({ name: 'demo' }) });
   const r = pfHome(home, copy, 'rp', '--no-pnpm', '--no-ver', '--no-deploy');
   assert.equal(r.code, 0, r.out);
   assert.match(r.out, /run pf rp in a terminal to choose/);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(copy, 'pf.json'), 'utf8')).id, id);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(copy, 'pulpfixer.json'), 'utf8')).id, id);
   assert.equal(JSON.parse(fs.readFileSync(path.join(home, 'repos', `${id}.json`), 'utf8')).paths.length, 1);
+});
+
+test('pf rp converts a legacy pf.json to pulpfixer.json, keeping its commands, and links it', () => {
+  const home = mkRepo({});
+  const dir = mkRepo({ '.git/HEAD': '', 'package.json': json({ name: 'demo' }), 'pf.json': json({ commands: { seed: './seed.sh' } }) });
+  const dry = pfHome(home, dir, 'rp', '--dry-run', '--no-pnpm', '--no-ver', '--no-deploy');
+  assert.match(dry.out, /would rename pf\.json to pulpfixer\.json/);
+  assert.ok(fs.existsSync(path.join(dir, 'pf.json')));
+
+  const r = pfHome(home, dir, 'rp', '--no-pnpm', '--no-ver', '--no-deploy');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /renamed pf\.json to pulpfixer\.json/);
+  assert.match(r.out, /demo is set up for pulpfixer/);
+  assert.ok(!fs.existsSync(path.join(dir, 'pf.json')));
+  const cfg = JSON.parse(fs.readFileSync(path.join(dir, 'pulpfixer.json'), 'utf8'));
+  assert.equal(cfg.commands.seed, './seed.sh');
+  assert.match(cfg.id, /^demo-[0-9a-f]{8}$/);
+});
+
+test('pf rp leaves a pf.json that differs from pulpfixer.json and warns', () => {
+  const dir = mkRepo({ '.git/HEAD': '', 'package.json': json({ name: 'demo' }), 'pf.json': json({ name: 'a' }), 'pulpfixer.json': json({ name: 'b' }) });
+  const r = pf(dir, 'rp', '--no-pnpm', '--no-ver', '--no-deploy');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /pf reads only pulpfixer\.json/);
+  assert.ok(fs.existsSync(path.join(dir, 'pf.json')));
 });
 
 test('pf rp updates an older ver CLI copy and leaves a newer one', () => {

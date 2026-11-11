@@ -18,7 +18,7 @@ pf profile add acme --aws-profile acme-readonly --account 123456789012 --region 
 pf profile check acme            # do the credentials resolve to the pinned account?
 
 # 2. Once per repo: say which profile it uses (commit this)
-echo '{ "profile": "acme" }' > pf.json        # or merge "profile" into your existing pf.json
+echo '{ "profile": "acme" }' > pulpfixer.json        # or merge "profile" into your existing pulpfixer.json
 
 # 3. Work with the agent
 pf agent "the api service returns 502 since the last deploy, find out why"
@@ -28,7 +28,7 @@ The agent calls `pf_aws_profile`, then asks for access with a reason. A dialog o
 
 ```text
 The agent asks pulpfixer for read-only AWS access.
-Profile: acme (from pf.json), AWS profile acme-readonly, account 123456789012
+Profile: acme (from pulpfixer.json), AWS profile acme-readonly, account 123456789012
 Scopes: identity, ecs
 Regions: eu-west-1
 For: 20 minutes
@@ -108,7 +108,7 @@ Claude's `--allowedTools` and `--mcp-config` take every following argument, so t
 
 | Tool | What it does | Read-only | Approval |
 |------|--------------|-----------|----------|
-| `pf_commands` | Stacks, the resolved dev/build/test/lint/install commands, pf.json commands, docs, staging, versioning and the pf link (`linked`, or what `pf rp` would refresh) | yes | none |
+| `pf_commands` | Stacks, the resolved dev/build/test/lint/install commands, pulpfixer.json commands, docs, staging, versioning and the pf link (`linked`, or what `pf rp` would refresh) | yes | none |
 | `pf_run` | Run `build`, `test`, `lint` or `install` and return the exit code and the end of the output | no | the agent CLI's prompt |
 | `pf_versions` | List module and stack versions (`versions.json`) | yes | none |
 | `pf_bump` | Bump a module's minor or major version | no | the agent CLI's prompt |
@@ -134,6 +134,6 @@ pf agent "is i-0abc123 healthy behind the alb? check eu-west-1"   # elb + ec2 sc
 pf agent "find errors in /ecs/api logs from the last hour"        # logs scope (only if the profile allows it)
 ```
 
-A staging deploy returns the plan until the call passes `confirm`, and the agent CLI asks before running it. Production is never targeted, and neither is a repo's bare `deploy` (the `deploy` entry in `pf.json`): only you run `pf deploy`.
+A staging deploy returns the plan until the call passes `confirm`, and the agent CLI asks before running it. Production is never targeted, and neither is a repo's bare `deploy` (the `deploy` entry in `pulpfixer.json`): only you run `pf deploy`.
 
-The agent also sets up deploys for repos that deploy through their own helper script (`./tl d`, `./al d`). `pf rp` asks which `pf.json` key to write, then starts the agent with the bundled `deploy-setup` skill (`packages/core/assets/skills/deploy-setup/SKILL.md`) in print mode, so Claude exits when the file is written and pf previews `pf d`. The agent reads the repo's deploy notes and helper, prefers the dev-machine command over a server-only one, and writes the entry (with `"message": true` when the command commits). It never runs the deploy. See [Tools and repo setup](/commands/tools-and-repo).
+The agent also sets up deploys for repos that deploy through their own helper script (`./tl d`, `./al d`). `pf rp` asks which `pulpfixer.json` key to write, then starts the agent with the bundled `deploy-setup` skill (`packages/core/assets/skills/deploy-setup/SKILL.md`) in print mode, so Claude exits when the file is written and pf previews `pf d`. pf streams the run as it goes: what the agent says, each tool it calls and anything that fails. The agent reads the repo's deploy notes and helper, prefers the dev-machine command over a server-only one, and writes the entry (with `"message": true` when the command commits). It never runs the deploy. See [Tools and repo setup](/commands/tools-and-repo).

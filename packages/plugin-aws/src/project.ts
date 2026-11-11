@@ -15,7 +15,7 @@ export function projectAws(ctx: Context, flag?: string): ProjectAws {
     return {
       ok: false,
       profile: null,
-      problem: 'No pf profile applies here. Add one with `pf profile add <name>`, then name it in pf.json ("profile": "<name>") or make it the default with `pf profile use <name>`.',
+      problem: 'No pf profile applies here. Add one with `pf profile add <name>`, then name it in pulpfixer.json ("profile": "<name>") or make it the default with `pf profile use <name>`.',
     };
   }
   if (!profile.config) {

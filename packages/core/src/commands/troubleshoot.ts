@@ -1,3 +1,4 @@
+import { repoConfigPath } from '@pulpfixer/kit/config';
 import type { Context } from '@pulpfixer/kit/context';
 import { formatCmd, runCmd } from '@pulpfixer/kit/exec';
 import { ACCOUNT_ID } from '@pulpfixer/kit/profiles';
@@ -63,7 +64,7 @@ export function linkHelp(choices: LinkChoices): string[] {
     `  ${termLine('pf t --link', c)}`,
     'Or by hand:',
     `  ${termLine(`pf profile add <name> --aws-profile ${top?.awsProfile ?? '<aws-profile>'}${top?.account ? ` --account ${top.account}` : ' --account <id>'}${top?.region ? ` --region ${top.region}` : ''}`, c)}`,
-    `  ${c.dim('then in this repo\'s pf.json:')} ${termLine('"profile": "<name>"', c)}`,
+    `  ${c.dim('then in this repo\'s pulpfixer.json:')} ${termLine('"profile": "<name>"', c)}`,
   );
   return lines;
 }
@@ -131,14 +132,14 @@ async function linkWizard(ctx: Context, d: AwsDeployment): Promise<Linked> {
     if (list.length) extra = { ...extra, scopes: list };
   }
   const root = ctx.repo?.root ?? ctx.workdir;
-  const yes = await confirm(`Link ${candidateLabel(chosen)} to ${root}/pf.json?`, true);
+  const yes = await confirm(`Link ${candidateLabel(chosen)} to ${repoConfigPath(root)}?`, true);
   if (!yes) return null;
   const linked = applyLink(ctx, chosen, extra);
   if (!linked.ok) {
     process.stderr.write(`${badgeLabel('error', c)} ${linked.reason}\n`);
     return null;
   }
-  process.stderr.write(`${c.green('✓')} ${linked.registered ? `registered ${linked.name}, and ` : ''}${linked.wroteRepo ? `saved "profile": "${linked.name}" in pf.json` : `using ${linked.name} for this session (pf.json could not be written)`}\n`);
+  process.stderr.write(`${c.green('✓')} ${linked.registered ? `registered ${linked.name}, and ` : ''}${linked.wroteRepo ? `saved "profile": "${linked.name}" in pulpfixer.json` : `using ${linked.name} for this session (pulpfixer.json could not be written)`}\n`);
   if (linked.registered) {
     process.stderr.write(`${c.dim('Let the agent propose fixes (each approved one at a time) with')} ${termLine(`pf profile add ${linked.name} --actions "ecs update-service"`, c)}\n`);
   }
@@ -203,7 +204,7 @@ export const troubleshootCommand: Command = {
     if (!p.ok || linkOnly) {
       if (!p.ok) process.stderr.write(`${badgeLabel('info', c)} ${p.problem}\n`);
       if (dryRun) {
-        process.stderr.write(`${c.dim('would ask which AWS profile this repo uses and link it (pf.json)')}\n`);
+        process.stderr.write(`${c.dim('would ask which AWS profile this repo uses and link it (pulpfixer.json)')}\n`);
       } else if (!interactive()) {
         process.stderr.write(linkHelp(linkChoices(ctx, deployment.hints)).join('\n') + '\n');
         return 2;

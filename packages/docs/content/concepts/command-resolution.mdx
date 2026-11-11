@@ -6,7 +6,7 @@ title: Command resolution
 
 For `dev`, `build`, `test`, `lint` and `install`, pf picks the command in this order:
 
-1. **`pf.json`** `commands.<name>`: an explicit override always wins.
+1. **`pulpfixer.json`** `commands.<name>`: an explicit override always wins.
 2. **A script or target the repo already has**: `package.json` scripts, `composer.json` scripts, Makefile and justfile targets, and the repo's own `./a` tools.
 3. **A stack default**: what is normal for the detected language and tools. See [Stacks](/concepts/stacks).
 

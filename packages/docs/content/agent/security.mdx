@@ -19,14 +19,14 @@ Limits to keep in mind:
 
 - Read-only metadata can still be sensitive: resource names, IPs, tags, and log lines with the `logs` scope.
 - Redaction catches common patterns only.
-- A repo's `pf.json` chooses which of your profiles applies. The dialog always names the profile, its source and the account, so read it before approving.
+- A repo's `pulpfixer.json` chooses which of your profiles applies. The dialog always names the profile, its source and the account, so read it before approving.
 
 # Troubleshooting
 
 | Symptom | Cause and fix |
 |---------|---------------|
-| `No pf profile applies here` | Add one (`pf profile add`) and name it in `pf.json`, or set a default with `pf profile use` |
-| `The profile "x" ... is not configured` | `pf.json` names a profile this machine does not have: `pf profile add x ...` |
+| `No pf profile applies here` | Add one (`pf profile add`) and name it in `pulpfixer.json`, or set a default with `pf profile use` |
+| `The profile "x" ... is not configured` | `pulpfixer.json` names a profile this machine does not have: `pf profile add x ...` |
 | `has no AWS profile` | `pf profile add x --aws-profile <name>` |
 | The dialog never shows; the grant says `could not ask the user` | the agent CLI lacks MCP elicitation, or this is `claude -p`. Update the CLI, or run the agent interactively |
 | `aws ... is not enabled for this profile` | the action is off for this profile: `pf profile add <name> --actions "<service> <operation>"`, or run the change yourself |
@@ -36,5 +36,5 @@ Limits to keep in mind:
 | `aws ... failed: ... ExpiredToken` or `SSO session expired` | `aws sso login --profile <aws-profile>` |
 | `aws CLI not found on PATH` | install the aws CLI v2 |
 | Output cut | narrow the call with `query`, `filters`, `max-items` or a shorter time range |
-| The agent keeps the old profile | the server re-reads `~/.pf/config.json` and `pf.json` before each tool call, so an edit applies on the next call. `--profile` and `PF_PROFILE` still win over `pf.json` for that session |
+| The agent keeps the old profile | the server re-reads `~/.pf/config.json` and `pulpfixer.json` before each tool call, so an edit applies on the next call. `--profile` and `PF_PROFILE` still win over `pulpfixer.json` for that session |
 | Check what the agent did | list `~/.pf/agent/audit/` newest first, then read the latest log |

@@ -60,14 +60,14 @@ const ecsRepo = (extra: Record<string, string> = {}) => mkRepo({ '.git/HEAD': ''
 
 test('pf t --dry-run: reads the deployment, resolves the profile, shows the check and the troubleshooting persona', () => {
   const e = env();
-  const dir = ecsRepo({ 'pf.json': json({ profile: 'acme' }) });
+  const dir = ecsRepo({ 'pulpfixer.json': json({ profile: 'acme' }) });
   for (const name of ['t', 'troubleshoot']) {
     const r = pf(dir, e, name, '--agent', 'claude', '--dry-run');
     assert.equal(r.code, 0, r.err);
     assert.match(r.err, /Deployment \(read from this repo's files\)/);
     assert.match(r.err, /AWS accounts in the repo: 123456789012/);
     assert.match(r.err, /ECS clusters: web/);
-    assert.match(r.err, /profile acme \(from pf\.json\) AWS profile acme-ro, account 123456789012, region eu-west-1/);
+    assert.match(r.err, /profile acme \(from pulpfixer\.json\) AWS profile acme-ro, account 123456789012, region eu-west-1/);
     assert.match(r.err, /would run aws sts get-caller-identity --output json --profile acme-ro --region eu-west-1/);
     assert.match(r.err, /Troubleshooting mode \(pf t\)/);
     assert.match(r.err, /Call pf_aws_context first/);
@@ -97,7 +97,7 @@ test('pf t with no profile: dry-run says it would ask, and without a terminal it
   assert.match(r.err, /corp-ro \(new, from ~\/\.aws\/config\)/);
   assert.match(r.err, /pf t --link/);
   assert.match(r.err, /pf profile add <name> --aws-profile acme-ro --account 123456789012 --region eu-west-1/);
-  assert.equal(fs.existsSync(path.join(dir, 'pf.json')), false, 'nothing was linked');
+  assert.equal(fs.existsSync(path.join(dir, 'pulpfixer.json')), false, 'nothing was linked');
 
   const link = pf(dir, e, 't', '--link');
   assert.equal(link.code, 2, 'the wizard needs a terminal');
@@ -112,9 +112,9 @@ test('pf t refuses outside a repo and for a profile pf does not support', () => 
   assert.equal(ghost.code, 2);
   assert.match(ghost.err, /no profile named "ghost"/);
   assert.match(ghost.err, /only registered profiles/);
-  const unregistered = pf(ecsRepo({ 'pf.json': json({ profile: 'unregistered' }) }), e, 't', '--agent', 'claude');
+  const unregistered = pf(ecsRepo({ 'pulpfixer.json': json({ profile: 'unregistered' }) }), e, 't', '--agent', 'claude');
   assert.equal(unregistered.code, 2, 'a repo naming an unregistered profile is treated as unlinked');
-  assert.match(unregistered.err, /"unregistered" \(from pf\.json\) is not configured/);
+  assert.match(unregistered.err, /"unregistered" \(from pulpfixer\.json\) is not configured/);
 });
 
 test('the troubleshooting persona carries the deployment and the bridge rules, and only in pf t', () => {
@@ -169,10 +169,10 @@ test('the mcp server reloads config, so a profile linked mid-session applies to 
     const before = await call();
     assert.equal(before.isError, true);
     assert.match(before.content[0]!.text, /No pf profile applies here/);
-    fs.writeFileSync(path.join(dir, 'pf.json'), json({ profile: 'acme' }));
+    fs.writeFileSync(path.join(dir, 'pulpfixer.json'), json({ profile: 'acme' }));
     const after = await call();
     assert.equal(after.isError, false, after.content[0]!.text);
-    assert.match(after.content[0]!.text, /pf profile: acme \(from pf\.json\)/);
+    assert.match(after.content[0]!.text, /pf profile: acme \(from pulpfixer\.json\)/);
   } finally {
     if (prevHome === undefined) delete process.env.PF_HOME;
     else process.env.PF_HOME = prevHome;

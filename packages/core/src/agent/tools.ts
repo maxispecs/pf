@@ -67,7 +67,7 @@ export function commandsText(ctx: Context): string {
   }
   const custom = Object.entries(ctx.config.commands).filter(([n]) => !(TASKS as string[]).includes(n));
   if (custom.length) {
-    lines.push('', 'pf.json commands:');
+    lines.push('', 'pulpfixer.json commands:');
     for (const [n, c] of custom) lines.push(`- ${n}: ${c.run}${c.description ? ` (${c.description})` : ''}`);
   }
   const docs = detectDocs(ctx);
@@ -80,18 +80,18 @@ export function commandsText(ctx: Context): string {
   return lines.join('\n');
 }
 
-/** The pf.json `id` <-> `~/.pf/repos` link, with what to tell the user when it needs `pf rp`. */
+/** The pulpfixer.json `id` <-> `~/.pf/repos` link, with what to tell the user when it needs `pf rp`. */
 export function linkText(link: RepoLink): string {
   const id = link.id ? ` (id ${link.id})` : '';
   if (link.state === 'linked') return `pf link: linked${id}`;
-  return `pf link: ${link.state}${id}: ${link.reasons.join('; ')}. Ask the user to run \`pf rp\` to refresh it; do not edit the pf.json id yourself.`;
+  return `pf link: ${link.state}${id}: ${link.reasons.join('; ')}. Ask the user to run \`pf rp\` to refresh it; do not edit the pulpfixer.json id yourself.`;
 }
 
 export const TOOLS: Tool[] = [
   {
     name: 'pf_commands',
     description:
-      'List what pf resolved for this repo: stacks, the dev/build/test/lint/install commands, pf.json commands, docs site, staging deploy, versioning and the pf link. Call this first instead of guessing commands.',
+      'List what pf resolved for this repo: stacks, the dev/build/test/lint/install commands, pulpfixer.json commands, docs site, staging deploy, versioning and the pf link. Call this first instead of guessing commands.',
     inputSchema: obj(),
     readOnly: true,
     run: async (ctx) => ({ ok: true, text: commandsText(ctx) }),
@@ -113,7 +113,7 @@ export const TOOLS: Tool[] = [
       const task = str(input, 'task') as Task | undefined;
       if (!task || !RUNNABLE_TASKS.includes(task)) return fail(`task must be one of: ${RUNNABLE_TASKS.join(', ')}`);
       const list = candidates(task, ctx);
-      if (list.length === 0) return fail(`No ${task} command found in this repo. The user can add one to pf.json: { "commands": { "${task}": { "run": "..." } } }`);
+      if (list.length === 0) return fail(`No ${task} command found in this repo. The user can add one to pulpfixer.json: { "commands": { "${task}": { "run": "..." } } }`);
       const args = Array.isArray(input.args) ? input.args.filter((a): a is string => typeof a === 'string') : [];
       const cmd = withArgs(list[0]!.cmd, args);
       const r = await runCaptured({ ...cmd, cwd: cmd.cwd ?? ctx.workdir }, ctx.workdir);
@@ -167,7 +167,7 @@ export const TOOLS: Tool[] = [
       const plan = detectStaging(ctx);
       const skipped = plan.skipped.map((s) => `skipped ${s}`);
       if (plan.steps.length === 0) {
-        return fail([...skipped, 'No staging target found. The user can add one to pf.json: { "commands": { "deploy:staging": { "run": "..." } } }'].join('\n'));
+        return fail([...skipped, 'No staging target found. The user can add one to pulpfixer.json: { "commands": { "deploy:staging": { "run": "..." } } }'].join('\n'));
       }
       const steps = plan.steps.map((s, i) => `${i + 1}. ${formatCmd(s.cmd, root)}  (${s.source})`);
       if (input.confirm !== true) {
