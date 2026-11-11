@@ -32,7 +32,9 @@ const die = (s) => {
 // token saved by `npm login` is shadowed. When NPM_TOKEN is unset, load it from the user .npmrc into this
 // process's environment (child processes inherit it). The value is never printed.
 const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: root, stdio: 'inherit', ...opts });
-const ORDER = ['kit', 'plugin-aws', 'plugin-yubikey', 'core'];
+const ORDER = ['kit', 'plugin-aws', 'plugin-system', 'plugin-yubikey', 'preset-cursor', 'core'];
+// Presets are data that `pf sys apply` fetches at their latest version, so core does not pin them.
+const isPreset = (p) => p.name.startsWith('@pulpfixer/preset-');
 const capture = (cmd, args) => spawnSync(cmd, args, { cwd: root, encoding: 'utf8' });
 
 function userNpmrcToken() {
@@ -104,9 +106,10 @@ for (const p of pkgs) {
   }
 }
 // core pins kit and the plugins to exact versions, and users only update `pulpfixer` itself, so a
-// dependency published without a new core would never reach anyone.
-if (todo.length && !todo.some((p) => p.name === 'pulpfixer')) {
-  const msg = `${todo.map((p) => p.name).join(', ')} changed but pulpfixer (core) did not: users update core, which pins its dependencies. Bump it too: pnpm ver bump packages/core minor`;
+// dependency published without a new core would never reach anyone. Presets are not pinned: they reach users alone.
+const pinned = todo.filter((p) => !isPreset(p));
+if (pinned.length && !todo.some((p) => p.name === 'pulpfixer')) {
+  const msg = `${pinned.map((p) => p.name).join(', ')} changed but pulpfixer (core) did not: users update core, which pins its dependencies. Bump it too: pnpm ver bump packages/core minor`;
   if (publish) die(msg);
   warn(msg);
 }

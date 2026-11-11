@@ -10,7 +10,9 @@ pf is a pnpm workspace. The shipped packages are versioned together by `versions
 |---------|------|------|
 | `packages/kit` | `@pulpfixer/kit` | Shared foundation: detect, exec, ui, config, util, context and the `Command` / `Plugin` types. Depends on nothing |
 | `packages/plugin-aws` | `@pulpfixer/plugin-aws` | The AWS plugin. Depends only on kit |
+| `packages/plugin-system` | `@pulpfixer/plugin-system` | The system plugin (`pf sys`). Depends only on kit |
 | `packages/plugin-yubikey` | `@pulpfixer/plugin-yubikey` | The YubiKey plugin. Depends only on kit |
+| `packages/preset-cursor` | `@pulpfixer/preset-cursor` | Data only: the standard Cursor extensions and settings. Published alone, not a dependency of core: `pf sys apply cursor` fetches its latest version |
 | `packages/core` | `pulpfixer` | The `pf` binary: built-in commands, agent, host mode, skills, install and update. Depends on kit and every plugin |
 | `packages/docs` | `@pulpfixer/docs` | This documentation site (Nextra). Private, never published |
 
@@ -18,9 +20,11 @@ pf is a pnpm workspace. The shipped packages are versioned together by `versions
 flowchart LR
   core["core (pulpfixer)"] --> awsPlugin[plugin-aws]
   core --> ykPlugin[plugin-yubikey]
+  core --> sysPlugin[plugin-system]
   core --> kit
   awsPlugin --> kit
   ykPlugin --> kit
+  sysPlugin --> kit
 ```
 
 Dependencies point one way: core to plugins to kit. A plugin never imports core. Anything a plugin needs from core moves into kit.
@@ -61,7 +65,8 @@ cd ~/some/repo && ~/dev/agents/pulpfixer/pf dev --dry-run
 | `packages/core/src/install/`, `update/` | Machine setup and update check |
 | `packages/kit/src/detect/` | Repo, stack, docs and staging detection, command resolution |
 | `packages/kit/src/ui/` | Palette, picker, prompts, text helpers |
-| `packages/plugin-aws/src/`, `plugin-yubikey/src/` | The built-in plugins |
+| `packages/plugin-aws/src/`, `plugin-system/src/`, `plugin-yubikey/src/` | The built-in plugins |
+| `packages/preset-cursor/preset.json` | The Cursor standard that `pf sys apply cursor` applies |
 | `packages/docs/content/` | This site's pages |
 | `scripts/` | Cross-package commands: build, test, release, ver, logo, ask |
 

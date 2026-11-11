@@ -29,6 +29,9 @@ importers:
       '@pulpfixer/plugin-aws':
         specifier: workspace:*
         version: link:../plugin-aws
+      '@pulpfixer/plugin-system':
+        specifier: workspace:*
+        version: link:../plugin-system
       '@pulpfixer/plugin-yubikey':
         specifier: workspace:*
         version: link:../plugin-yubikey
@@ -75,11 +78,19 @@ importers:
         specifier: workspace:*
         version: link:../kit
 
+  packages/plugin-system:
+    dependencies:
+      '@pulpfixer/kit':
+        specifier: workspace:*
+        version: link:../kit
+
   packages/plugin-yubikey:
     dependencies:
       '@pulpfixer/kit':
         specifier: workspace:*
         version: link:../kit
+
+  packages/preset-cursor: {}
 
 packages:
 

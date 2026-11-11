@@ -2,13 +2,14 @@ import type { Tool } from '@pulpfixer/kit/agent-tool';
 import type { Command, Entry } from '@pulpfixer/kit/types';
 import type { Context } from '@pulpfixer/kit/context';
 import { awsPlugin } from '@pulpfixer/plugin-aws';
+import { systemPlugin } from '@pulpfixer/plugin-system';
 import { yubikeyPlugin } from '@pulpfixer/plugin-yubikey';
 import type { Plugin } from '@pulpfixer/kit/plugin';
 import { TOOLS } from '../agent/tools.js';
 import { loadedPlugins } from './loader.js';
 
 /** Plugins that ship inside pf. A new one is one import and one line here. */
-export const BUILTIN_PLUGINS: Plugin[] = [awsPlugin, yubikeyPlugin];
+export const BUILTIN_PLUGINS: Plugin[] = [awsPlugin, yubikeyPlugin, systemPlugin];
 
 /** Built-in plugins, then the ones installed from the registry (loaded at startup). */
 export function activePlugins(): Plugin[] {

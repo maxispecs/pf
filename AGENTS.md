@@ -4,12 +4,14 @@
 
 ## Monorepo
 
-pnpm workspace, four published packages (versioned together by `versions.json`, published to cellars) and one private docs site:
+pnpm workspace, six published packages (versioned together by `versions.json`, published to cellars) and one private docs site:
 
 - `packages/kit` (`@pulpfixer/kit`): shared foundation. detect, exec, ui, config, util, context and the `Command` / `Plugin` types. Import it by subpath (`@pulpfixer/kit/ui/text`). Depends on nothing.
 - `packages/plugin-aws` (`@pulpfixer/plugin-aws`): the AWS plugin. Depends only on kit.
 - `packages/plugin-yubikey` (`@pulpfixer/plugin-yubikey`): the YubiKey plugin (`pf otp`, `pf yk`, wrapping `ykman`). Depends only on kit.
-- `packages/core` (`pulpfixer`): the `pf` binary, built-in commands, agent, host mode, skills, install and update. Depends on kit and every plugin.
+- `packages/plugin-system` (`@pulpfixer/plugin-system`): the system plugin (`pf sys`: apply configuration presets to apps on this machine, Cursor first). Depends only on kit.
+- `packages/preset-cursor` (`@pulpfixer/preset-cursor`): data only (`preset.json`: the standard Cursor extensions and settings). **Not** a dependency of core: `pf sys apply cursor` installs its latest version from cellars into `~/.pf/sys/presets` each time, so it is bumped and published alone (`planBumps` and `scripts/release.mjs` do not drag core along for an `@pulpfixer/preset-*` package). Another preset is another `packages/preset-<name>` plus an `ORDER` entry in `scripts/release.mjs`.
+- `packages/core` (`pulpfixer`): the `pf` binary, built-in commands, agent, host mode, skills, install and update. Depends on kit and every plugin (not the presets).
 
 - `packages/docs` (`@pulpfixer/docs`): the documentation site (Nextra on Next.js, port 4400). Private, never published, not part of `scripts/build.mjs`, `scripts/release.mjs` or the core dependencies. `pf docs` (a shortcut for `pf doc`) or `pnpm docs:dev` runs it, `pnpm docs:build` builds it. Pages are MDX in `packages/docs/content/` with a `_meta.ts` per folder. **When you change a command, plugin, the agent or host mode, update the matching page.** `core/docs/agent.md` and the agent pages under `content/agent/` and `content/plugins/writing-a-plugin.mdx` cover the same material, so change both.
 
@@ -42,6 +44,7 @@ New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json 
 | `kit/src/ui/prompt.ts` | `confirm` (yes/no) and `ask` (single-line text input with default, placeholder and `validate`). Use `ask` for any input field; it returns null without a TTY or on cancel, so give commands flags too |
 | `kit/src/ui/text.ts` | text helpers: colored command samples (`termLine`, `promptLine`), badges, headings, lists, tables. Return strings, take a `Palette`. Use these instead of hand-coloring messages |
 | `plugin-yubikey/src/` | YubiKey plugin (`ykman`): `ykman.ts` argv builders, clipboard and runner, `audit.ts` pure parsers and findings, `commands/otp.ts` (`pf otp`), `commands/yk.ts` (`pf yk`); never reads secrets, ykman owns the password and touch prompts, and nothing here changes the key |
+| `plugin-system/src/`, `preset-cursor/preset.json` | System plugin: `commands/sys.ts` (`pf sys list|diff|apply|capture`), `presets.ts` (a preset is the data package `@pulpfixer/preset-<name>`; `fetchPreset` installs `@latest` into `~/.pf/sys/presets`, falls back to the cached copy offline; `validatePreset`), `plan.ts` (pure `planPreset`: additive, installs missing extensions and sets differing settings, never uninstalls), `jsonc.ts` (read settings.json, `setTopLevelKeys` edits in place so comments survive), `apps/` (`AppAdapter` per app; `editor.ts` is the VS Code family one, `cursor.ts` configures it; a new app is a file plus a line in `APPS`). Apply always shows the plan, confirms (`--yes` without a TTY), and backs up `settings.json` first. A preset never holds code |
 | `core/src/local.ts`, `core/src/devcycle.ts` | the `./pf` checkout menu; its `cycle` entry (`./pf cycle [--message m] [--yes] [--dry-run]`) is the dev cycle: bump changed packages (`planBumps`, core goes along), commit, `pnpm run publish:cellars`, then `pf u --yes` so the global pf updates itself |
 | `core/src/commands/` | built-in commands |
 | `core/src/agent/` | coding agent: persona, tool registry, MCP server, launchers for claude, codex and cursor; `stream.ts` shows a one-shot (`once`) run live from the CLI's stream-json events |
@@ -77,6 +80,6 @@ New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json 
 
 When a change is made in a module (package), bump that module's minor version before finishing:
 `pnpm ver bump <module> minor`. This also bumps the stack minor. Use `major` only for breaking changes.
-Never edit versions in manifests by hand. Modules are the packages: `pnpm ver bump packages/core minor`, `pnpm ver bump packages/kit minor`, `pnpm ver bump packages/plugin-aws minor`, `pnpm ver bump packages/plugin-yubikey minor`, `pnpm ver bump packages/docs minor` (several targets may share one command; the stack minor rises once). Bump a package only when its own files changed; a core change that depends on a new kit change bumps both.
+Never edit versions in manifests by hand. Modules are the packages: `pnpm ver bump packages/core minor`, `pnpm ver bump packages/kit minor`, `pnpm ver bump packages/plugin-aws minor`, `pnpm ver bump packages/plugin-yubikey minor`, `pnpm ver bump packages/plugin-system minor`, `pnpm ver bump packages/preset-cursor minor` (alone: core is not bumped for a preset), `pnpm ver bump packages/docs minor` (several targets may share one command; the stack minor rises once). Bump a package only when its own files changed; a core change that depends on a new kit change bumps both.
 
 Publishing: `pnpm release` is always a dry run and publishes every package whose version the registry lacks, in dependency order. `pnpm publish:cellars` publishes without a confirmation prompt. Never publish without the user asking.

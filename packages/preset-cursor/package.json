@@ -1,0 +1,19 @@
+{
+  "name": "@pulpfixer/preset-cursor",
+  "version": "1.0.0",
+  "description": "pf preset: the standard Cursor setup (extensions and settings) applied by pf sys apply cursor",
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    "./preset.json": "./preset.json"
+  },
+  "files": [
+    "preset.json"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  }
+}

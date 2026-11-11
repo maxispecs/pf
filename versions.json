@@ -1,16 +1,16 @@
 {
   "stack": {
-    "version": "2.31",
+    "version": "2.32",
     "since": "2026-11-10"
   },
   "packages": {
     "packages/core": {
-      "version": "5.6",
+      "version": "5.7",
       "since": "2026-11-10",
       "type": "node"
     },
     "packages/docs": {
-      "version": "1.5",
+      "version": "1.6",
       "since": "2026-11-10",
       "type": "node"
     },
@@ -24,9 +24,19 @@
       "since": "2026-11-10",
       "type": "node"
     },
+    "packages/plugin-system": {
+      "version": "1.0",
+      "since": "2026-11-10",
+      "type": "node"
+    },
     "packages/plugin-yubikey": {
       "version": "1.0",
       "since": "2026-11-03",
+      "type": "node"
+    },
+    "packages/preset-cursor": {
+      "version": "1.0",
+      "since": "2026-11-10",
       "type": "node"
     }
   }

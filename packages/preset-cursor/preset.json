@@ -1,0 +1,25 @@
+{
+  "app": "cursor",
+  "summary": "Standard Cursor setup",
+  "extensions": [
+    "bradlc.vscode-tailwindcss",
+    "eamodio.gitlens",
+    "esbenp.prettier-vscode",
+    "mechatroner.rainbow-csv",
+    "mhutchie.git-graph",
+    "ms-azuretools.vscode-docker",
+    "ms-python.python",
+    "tomoki1207.pdf",
+    "unifiedjs.vscode-mdx",
+    "vscode-icons-team.vscode-icons"
+  ],
+  "settings": {
+    "editor.formatOnSave": true,
+    "files.autoSave": "afterDelay",
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "git.autofetch": true,
+    "git.confirmSync": false,
+    "workbench.iconTheme": "vscode-icons"
+  }
+}

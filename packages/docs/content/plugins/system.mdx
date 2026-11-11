@@ -1,0 +1,68 @@
+---
+title: System plugin
+---
+
+# System plugin
+
+The built-in `system` plugin adds `pf sys`: it puts apps on this machine into a standard configuration, called a **preset**. The first app is Cursor (extensions and `settings.json`).
+
+Two kinds of package are involved:
+
+| Package | Ships | What |
+|---------|-------|------|
+| `@pulpfixer/plugin-system` | inside pf (pinned by core) | `pf sys` and the app adapters (how to read and change Cursor) |
+| `@pulpfixer/preset-<name>` | on its own, never pinned | The standard: one `preset.json`, data only |
+
+A preset holds no code, so it can never run anything on your machine. pf installs the **latest** version of the preset package from the registry into `~/.pf/sys/presets` every time you apply it, so changing the standard means publishing a new preset version and needs no new pf. With no network, `pf sys apply` says so and uses the copy fetched last time (`--offline` skips the registry on purpose).
+
+## Commands
+
+```bash
+pf sys                              # list presets (cached and on the registry) and the apps pf can configure
+pf sys diff cursor                  # fetch the latest Cursor preset, show what would change, change nothing
+pf sys apply cursor                 # the same, then ask, then apply
+pf sys apply cursor --yes           # no question (required without a terminal)
+pf sys apply cursor --dry-run       # show the plan and the commands, change nothing
+pf sys apply cursor --offline       # use the cached preset
+pf sys capture cursor --setting editor.fontSize   # print a preset.json built from this machine
+```
+
+Applying is **additive**:
+
+- extensions in the preset that are not installed are installed with `cursor --install-extension`; nothing is ever uninstalled
+- settings in the preset are set to the preset's value; every other setting stays as it is
+- `settings.json` is edited in place, so comments and formatting survive, and the old file is kept as `settings.json.pf-backup-<timestamp>` first
+- a settings file that is not a JSON object is never overwritten
+
+`pf sys diff` and `--dry-run` still fetch the preset (into pf's own folder), because the plan needs it.
+
+pf finds Cursor's `cursor` command on PATH, or inside `/Applications/Cursor.app` on macOS. If it cannot, settings are still applied and extensions are reported as skipped.
+
+## The preset format
+
+`packages/preset-cursor/preset.json`:
+
+```json
+{
+  "app": "cursor",
+  "summary": "Standard Cursor setup",
+  "extensions": ["esbenp.prettier-vscode", "eamodio.gitlens"],
+  "settings": { "editor.formatOnSave": true, "files.trimTrailingWhitespace": true }
+}
+```
+
+`app` picks the adapter, `extensions` are `publisher.name` ids, and `settings` are top-level `settings.json` keys with the value they must have.
+
+## Changing the Cursor standard
+
+1. Edit `packages/preset-cursor/preset.json` (`pf sys capture cursor` prints one from your own machine to start from).
+2. `pnpm ver bump packages/preset-cursor minor`.
+3. Publish (`pnpm publish:cellars`). Core is not bumped along, because presets are not pinned.
+
+The next `pf sys apply cursor` on any machine picks the new version up.
+
+## Adding an app or a preset
+
+- **A preset for an app pf already knows:** a new `packages/preset-<name>` package (copy `preset-cursor`) and add it to `ORDER` in `scripts/release.mjs`.
+- **A VS Code family editor:** add an `editorAdapter({...})` file under `packages/plugin-system/src/apps/` and list it in `APPS` in `apps/index.ts`.
+- **Another kind of app:** implement `AppAdapter` (`detect`, `readState`, `installArgv`) the same way; `plan.ts` compares extensions and settings only, so a different kind of state needs its own plan.

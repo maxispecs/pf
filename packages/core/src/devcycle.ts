@@ -35,6 +35,9 @@ export function shipsChange(file: string): boolean {
   return !/(^|\/)tests?\//.test(file) && !/\.test\.[cm]?[jt]s$/.test(file) && !/\.md$/i.test(file);
 }
 
+/** A preset package: data fetched live by `pf sys`, not pinned by core. */
+export const isPreset = (p: Pick<CyclePackage, 'name'>): boolean => p.name.startsWith('@pulpfixer/preset-');
+
 /** True when the package has a published version that is current with its package.json and changed since. */
 function needsBump(p: CyclePackage): boolean {
   return p.published !== null && compareVersions(p.local, p.published) === 0 && p.changes.some(shipsChange);
@@ -48,13 +51,16 @@ export function isAhead(p: CyclePackage): boolean {
 /**
  * Which packages need a minor bump before publishing: the ones with shipped changes since their last
  * published version. core pins its dependencies to exact versions and users only update core, so it
- * goes along with any bumped dependency unless it is already ahead of the registry.
+ * goes along with any bumped dependency unless it is already ahead of the registry. Presets
+ * (`@pulpfixer/preset-*`) are data that `pf sys apply` fetches at its latest version, so core does not
+ * pin them and a preset change never drags core along.
  */
 export function planBumps(pkgs: CyclePackage[]): PlannedBump[] {
   const plan: PlannedBump[] = pkgs.filter(needsBump).map((pkg) => ({ pkg, reason: 'changed since its last published version' }));
   const core = pkgs.find((p) => p.name === PACKAGE_NAME);
-  const anyAhead = pkgs.some((p) => p !== core && isAhead(p));
-  const depChanged = plan.some((b) => b.pkg !== core) || anyAhead;
+  const pinned = (p: CyclePackage) => p !== core && !isPreset(p);
+  const anyAhead = pkgs.some((p) => pinned(p) && isAhead(p));
+  const depChanged = plan.some((b) => pinned(b.pkg)) || anyAhead;
   if (core && depChanged && !plan.some((b) => b.pkg === core) && !isAhead(core) && core.published !== null) {
     plan.push({ pkg: core, reason: 'pins the packages that change, and users only update core' });
   }

@@ -31,6 +31,13 @@ test('a changed, already published package is bumped together with core', () => 
   assert.deepEqual(plan.map((b) => b.pkg.name), ['@pulpfixer/kit', 'pulpfixer']);
 });
 
+test('a preset is bumped alone: core does not pin presets', () => {
+  const plan = planBumps([pkg('@pulpfixer/preset-cursor', { changes: ['packages/preset-cursor/preset.json'] }), pkg('pulpfixer')]);
+  assert.deepEqual(plan.map((b) => b.pkg.name), ['@pulpfixer/preset-cursor']);
+  const ahead = planBumps([pkg('@pulpfixer/preset-cursor', { local: '1.1.0' }), pkg('pulpfixer')]);
+  assert.deepEqual(ahead, []);
+});
+
 test('core alone changing bumps only core', () => {
   const plan = planBumps([pkg('@pulpfixer/kit'), pkg('pulpfixer', { changes: ['packages/core/src/x.ts'] })]);
   assert.deepEqual(plan.map((b) => b.pkg.name), ['pulpfixer']);

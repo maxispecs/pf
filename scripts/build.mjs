@@ -7,7 +7,7 @@ import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tsc = path.join(root, 'node_modules', '.bin', 'tsc');
-const PACKAGES = ['kit', 'plugin-aws', 'plugin-yubikey', 'core'];
+const PACKAGES = ['kit', 'plugin-aws', 'plugin-system', 'plugin-yubikey', 'core'];
 
 for (const name of PACKAGES) {
   const dir = path.join(root, 'packages', name);
