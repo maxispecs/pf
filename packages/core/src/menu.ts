@@ -6,6 +6,7 @@ import { runDeployAuto, runDeployStaging, runPublishStaging } from './commands/d
 import { runDoc } from './commands/doc.js';
 import { doctorCommand } from './commands/doctor.js';
 import { initCommand } from './commands/init.js';
+import { installCommand, runInstall } from './commands/install.js';
 import { setupCommand } from './commands/setup.js';
 import { skillCommand } from './commands/skill.js';
 import { runTask, TASK_COMMANDS } from './commands/tasks.js';
@@ -20,6 +21,7 @@ import { verCommand } from './commands/ver.js';
 import type { Context } from '@pulpfixer/kit/context';
 import { detectDocs } from '@pulpfixer/kit/detect/docs';
 import { detectDeploy, detectProduction, detectStaging } from '@pulpfixer/kit/detect/deploy';
+import { findInstallTargets, installTargetOf } from '@pulpfixer/kit/detect/install';
 import { detectPublishStaging } from '@pulpfixer/kit/detect/publish';
 import { candidates } from '@pulpfixer/kit/detect/resolve';
 import type { Task } from '@pulpfixer/kit/detect/stacks';
@@ -95,6 +97,30 @@ export function entriesFor(ctx: Context): Entry[] {
         run: () => runTask(ctx, t.name as Task, { pick: true }),
       });
     }
+    // Install: one entry per install target the repo defines, else the dependency install.
+    const installs = findInstallTargets(ctx);
+    if (installs.size) {
+      for (const [target, cand] of installs) {
+        fromRepo.push({
+          name: `install ${target}`,
+          summary: target === 'local' ? 'Install locally' : `Install to ${target}`,
+          group: 'Develop',
+          detail: formatCmd(cand.cmd, ctx.workdir),
+          run: () => runInstall(ctx, target),
+        });
+      }
+    } else {
+      const deps = candidates('install', ctx);
+      if (deps.length) {
+        fromRepo.push({
+          name: 'install',
+          summary: installCommand.summary,
+          group: 'Develop',
+          detail: formatCmd(deps[0]!.cmd, ctx.workdir) + (deps.length > 1 ? `  (+${deps.length - 1} more)` : ''),
+          run: () => runTask(ctx, 'install', { pick: true }),
+        });
+      }
+    }
     const docs = detectDocs(ctx);
     if (docs.length) {
       fromRepo.push({
@@ -140,7 +166,7 @@ export function entriesFor(ctx: Context): Entry[] {
       });
     }
     for (const [name, cfg] of Object.entries(ctx.config.commands)) {
-      if (BUILTIN_NAMES.has(name)) continue;
+      if (BUILTIN_NAMES.has(name) || installTargetOf(name)) continue;
       fromRepo.push({
         name,
         summary: cfg.description ?? cfg.run,

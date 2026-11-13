@@ -8,6 +8,7 @@ import { docCommand } from './doc.js';
 import { doctorCommand } from './doctor.js';
 import { hostCommand } from './host.js';
 import { initCommand } from './init.js';
+import { installCommand } from './install.js';
 import { setupCommand } from './setup.js';
 import { shortcutsCommand } from './shortcutlist.js';
 import { SHORTCUTS, shortcutCommands } from './shortcuts.js';
@@ -33,6 +34,7 @@ export function allCommands(): Command[] {
     artCommand,
     mcpCommand,
     ...TASK_COMMANDS,
+    installCommand,
     docCommand,
     deployCommand,
     publishCommand,

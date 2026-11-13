@@ -9,7 +9,7 @@ pf dev          # run the app locally
 pf build        # build it
 pf test         # run the tests
 pf lint         # lint
-pf install      # install dependencies
+pf install      # install the repo (install:local), else its dependencies
 pf docs         # run the docs site
 ```
 
@@ -30,6 +30,40 @@ pf dev --pick
 ```
 
 When several candidates exist and you do not pass `--pick`, pf uses the first and tells you how many others there were.
+
+## pf install
+
+`pf install` is the repo's install action, next to deploy and publish. It can mean installing the repo's own build on this machine (a Cursor extension, a CLI), not only its dependencies.
+
+```bash
+pf install local     # run install:local            (pf il, pf install-local)
+pf install cursor    # run install:cursor           (install:<to>)
+pf install           # pick the target (below)      (pf i)
+pf install --deps    # always install dependencies
+```
+
+A target is a script named `install:<to>` or `install-<to>` (`local:install` also counts as `install:local`). pf looks in this order and uses the first one it finds:
+
+1. An `install:<to>` entry in `pulpfixer.json`
+2. A package.json script, in the repo root and then its workspace packages
+3. A composer script
+4. A command of the repo's local `./a` CLI (pf never adds `-y`, because it did not ask)
+
+With no target, `pf install` runs:
+
+1. A plain `install` entry in `pulpfixer.json`, if there is one
+2. `install:local`
+3. The only `install:*` target, when the repo has exactly one
+4. Several targets and no `local`: a picker in a terminal. Without a terminal it lists the names and exits with 2.
+5. No target at all: the dependency install of the stack (`pnpm install`, `pip install`, ...), as before
+
+`pf install local` and `pf install <to>` never fall back to dependencies. If the repo has no such target they say so and show how to add one. The plain package.json `install` script is not a target, because the package manager runs it as a lifecycle hook.
+
+It does not ask for confirmation. `--dry-run` previews, `--pick` chooses between dependency candidates, and `-- <args>` passes the rest on.
+
+```json
+{ "commands": { "install:local": { "run": "pnpm build && code --install-extension out/ext.vsix" } } }
+```
 
 ## pf docs
 

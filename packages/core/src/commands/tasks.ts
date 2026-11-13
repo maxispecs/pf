@@ -107,4 +107,5 @@ export function taskCommand(task: Task): Command {
   };
 }
 
-export const TASK_COMMANDS: Command[] = (['dev', 'build', 'test', 'lint', 'install'] as Task[]).map(taskCommand);
+/** `pf install` is not here: it runs the repo's install targets first (`commands/install.ts`). */
+export const TASK_COMMANDS: Command[] = (['dev', 'build', 'test', 'lint'] as Task[]).map(taskCommand);

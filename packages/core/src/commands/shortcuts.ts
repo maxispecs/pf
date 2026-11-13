@@ -19,6 +19,8 @@ export const SHORTCUTS: Shortcut[] = [
   { names: ['dp'], target: ['deploy', 'production'], summary: 'Deploy to production', group: 'Docs & deploy' },
   { names: ['ps'], target: ['publish', 'staging'], summary: 'Publish to the staging registry, cellars', group: 'Docs & deploy' },
   { names: ['r'], target: ['dev'], summary: 'Run the repo', group: 'Develop' },
+  { names: ['i'], target: ['install'], summary: 'Install: the repo\'s install target, else dependencies', group: 'Develop' },
+  { names: ['il', 'install-local'], target: ['install', 'local'], summary: 'Install locally (the repo\'s install:local)', group: 'Develop' },
   { names: ['rp'], target: ['repo'], summary: 'Hook pf tools into this repo or update them', group: 'Tools' },
   { names: ['u'], target: ['update'], summary: 'Update pf, its plugins and skills', group: 'Tools' },
   { names: ['v'], target: ['ver'], summary: 'List versions and bump them', group: 'Tools' },

@@ -51,7 +51,7 @@ export function repoDeployScript(root: string, names: string[]): Candidate | nul
 }
 
 /** The step for a `pulpfixer.json` deploy entry; `"message": true` marks one that takes a commit message. */
-function configStep(ctx: Context, key: string): Candidate | null {
+export function configStep(ctx: Context, key: string): Candidate | null {
   const entry = ctx.config.commands[key];
   if (!entry) return null;
   const root = ctx.repo?.root ?? ctx.workdir;
@@ -78,7 +78,7 @@ export function toolCmd(dir: string, root: string, bin: string, args: string[]):
   return { argv: [bin, ...args], cwd: dir };
 }
 
-function workspaceDirs(root: string): string[] {
+export function workspaceDirs(root: string): string[] {
   const dirs = [root];
   for (const group of ['apps', 'packages', 'services']) {
     for (const d of listDir(path.join(root, group))) {

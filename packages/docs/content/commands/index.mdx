@@ -10,7 +10,7 @@ Run `pf list` for the list that applies in the current directory, and `pf help` 
 |---------|--------------|
 | `pf` | Menu: this repo's own commands first (run, build, deploy, ...), then pf's tools including the agent; the fallback menu outside a repo |
 | `pf list` | The same list, static (for scripts and agents) |
-| `pf dev`, `build`, `test`, `lint`, `install` | Resolved per repo. `--dry-run` prints, `--pick` chooses when several exist, `-- <args>` passes args on. See [Run, build and docs](/commands/run-and-build) |
+| `pf dev`, `build`, `test`, `lint`, `install` | Resolved per repo. `--dry-run` prints, `--pick` chooses when several exist, `-- <args>` passes args on. See [Run, build and docs](/commands/run-and-build). `pf install [local\|<to>]` (`pf i`, `pf il`) runs the repo's `install:local` / `install:<to>` target, else installs dependencies |
 | `pf doc` (`pf docs`) | Run the docs site (Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo) |
 | `pf ver [list\|bump\|init\|sync]` | Major.minor versioning with the bundled `/ver` CLI. See [Versioning](/commands/ver) |
 | `pf deploy` (`pf d`) | Deploy: staging if configured, else production, else the repo's own deploy, else the publish of a repo that only publishes. Optional commit message. See [Deploy and publish](/commands/deploy) |
