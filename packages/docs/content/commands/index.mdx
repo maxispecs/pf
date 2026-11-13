@@ -13,10 +13,10 @@ Run `pf list` for the list that applies in the current directory, and `pf help` 
 | `pf dev`, `build`, `test`, `lint`, `install` | Resolved per repo. `--dry-run` prints, `--pick` chooses when several exist, `-- <args>` passes args on. See [Run, build and docs](/commands/run-and-build) |
 | `pf doc` (`pf docs`) | Run the docs site (Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo) |
 | `pf ver [list\|bump\|init\|sync]` | Major.minor versioning with the bundled `/ver` CLI. See [Versioning](/commands/ver) |
-| `pf deploy` (`pf d`) | Deploy: staging if configured, else production, else the repo's own deploy. Optional commit message. See [Deploy and publish](/commands/deploy) |
+| `pf deploy` (`pf d`) | Deploy: staging if configured, else production, else the repo's own deploy, else the publish of a repo that only publishes. Optional commit message. See [Deploy and publish](/commands/deploy) |
 | `pf deploy staging` | Deploy to staging. `--dry-run`, `--yes`. See [Deploy and publish](/commands/deploy) |
 | `pf deploy production` | Only a `deploy:production` script or `pulpfixer.json` entry; always confirms |
-| `pf publish staging` | Run the repo's `publish:cellars` script; always confirms |
+| `pf publish staging` | Run the repo's `publish:cellars` script (else its staging deploy); always confirms |
 | `pf tools [name] [args]` | List and run the repo's own `./a` tools. See [Tools and repo setup](/commands/tools-and-repo) |
 | `pf init` | Write `pulpfixer.json` for this repo from what was detected |
 | `pf repo` | Hook pf's tools into this repo, or update them |

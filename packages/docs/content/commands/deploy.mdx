@@ -20,6 +20,7 @@ With no environment, pf picks the first target the repo has:
 1. **Staging**, when pf finds one (see below).
 2. **Production**, when that is the only target.
 3. **A bare `deploy`**: a `deploy` entry in `pulpfixer.json`, a `deploy` script in `package.json` or `composer.json`, or the repo's own `./a deploy`. A bare deploy does not name an environment, so pf treats it like production: it always asks first and needs `--yes` without a terminal. pf never guesses it from platform configs.
+4. **The publish**, in a repo that only publishes (see [Deploy means publish](#deploy-means-publish-and-back)).
 
 pf says which one it picked. `pf deploy staging` and `pf deploy production` (or `pf ds`, `pf dp`) pick one yourself. The coding agent and the MCP tools never run a bare deploy.
 
@@ -80,4 +81,12 @@ The coding agent and the MCP tools deploy to staging only. Production is never t
 pf publish staging           # same as pf ps
 ```
 
-Runs the repo's `publish:cellars` script (or `publish:staging`), or the matching `pulpfixer.json` entry, and always confirms (`--yes` without a terminal, `--dry-run` to preview). A repo with neither fails with exit code 1.
+Runs the repo's `publish:cellars` script (or `publish:staging`), or the matching `pulpfixer.json` entry, and always confirms (`--yes` without a terminal, `--dry-run` to preview). A repo with neither (and no staging deploy, see below) fails with exit code 1.
+
+## Deploy means publish, and back
+
+Some repos ship by publishing packages (a `publish:cellars` script) and have no deploy at all. In such a repo `pf d`, `pf ds` and `pf dp` run the publish instead, and say so: `Staging publish (cellars registry) (the repo has no deploy target, so pf deploy publishes)`. pf only does this when the repo shows no sign of deploying: no staging, production or bare deploy target, and no platform config it skipped (a `firebase.json` without a staging alias, for example). A repo with only a production deploy still fails `pf ds` instead of publishing.
+
+The other way round, `pf ps` in a repo with no publish target runs the staging deploy. It never falls back to a production or bare deploy.
+
+Either way the plan prints first and pf asks before it runs (`--yes` without a terminal). The coding agent and the MCP tools never publish.

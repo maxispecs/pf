@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { LEGACY_REPO_CONFIG, migrateRepoConfig, REPO_CONFIG, repoConfigName } from '@pulpfixer/kit/config';
 import { buildContext, type Context } from '@pulpfixer/kit/context';
-import { detectDeploy, detectProduction, detectStaging } from '@pulpfixer/kit/detect/deploy';
 import { findDeployHelpers, type DeployHelper } from '@pulpfixer/kit/detect/helpers';
 import { capture, formatCmd, runCmd } from '@pulpfixer/kit/exec';
 import { linkRepo, listRepoRecords, REPO_LINK_REVISION, repoLink, repoRemote } from '@pulpfixer/kit/repo-link';
@@ -16,7 +15,7 @@ import { packageRoot } from '@pulpfixer/kit/version';
 import type { Command } from '@pulpfixer/kit/types';
 import { startAgent } from '../agent/launch.js';
 import { homeSkillFile } from '../skills/stack.js';
-import { runDeployAuto } from './deploy.js';
+import { pickDeploy, runDeployAuto } from './deploy.js';
 import { cliRevision, resolveVerCli } from './ver.js';
 
 /** Path of the /pnpm skill helper bundled with pf (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`); the offline fallback. */
@@ -219,22 +218,23 @@ interface DeployStep {
  */
 async function planDeploy(ctx: Context, opts: { force: boolean; dryRun: boolean }, done: string[]): Promise<DeployStep> {
   const root = ctx.repo!.root;
-  const found = (['staging', 'production', 'repo'] as const)
-    .map((env) => ({ env, step: (env === 'staging' ? detectStaging(ctx) : env === 'production' ? detectProduction(ctx) : detectDeploy(ctx)).steps[0] }))
-    .find((x) => x.step);
-  const resolved = found ? `pf d runs ${formatCmd(found.step!.cmd, root)} (${found.step!.source}, ${found.env === 'repo' ? 'bare deploy' : found.env})` : null;
-  if (resolved && !opts.force) {
+  const found = pickDeploy(ctx);
+  const step = found?.plan.steps[0];
+  const label = found?.env === 'repo' ? 'bare deploy' : found?.env === 'publish' ? 'publish, the repo has no deploy' : found?.env;
+  const resolved = step ? `pf d runs ${formatCmd(step.cmd, root)} (${step.source}, ${label})` : null;
+  // A publish stand-in still lets an unwired deploy helper be found.
+  if (resolved && !opts.force && found!.env !== 'publish') {
     done.push(`deploy: ${resolved}`);
     return { resolved, helpers: [], agent: false };
   }
   const helpers = findDeployHelpers(root);
   const names = helpers.map((h) => `${h.file}${h.serverOnly ? ' (server only)' : ''}`).join(', ');
   if (opts.dryRun) {
-    done.push(helpers.length || opts.force ? `deploy: would start the agent to wire pf d${names ? ` (candidates: ${names})` : ''}` : 'deploy: nothing found for pf d');
+    done.push(helpers.length || opts.force ? `deploy: would start the agent to wire pf d${names ? ` (candidates: ${names})` : ''}` : resolved ? `deploy: ${resolved}` : 'deploy: nothing found for pf d');
     return { resolved, helpers, agent: false };
   }
   if (helpers.length === 0 && !opts.force) {
-    done.push('deploy: nothing found for pf d, run pf rp --deploy to let the agent look');
+    done.push(resolved ? `deploy: ${resolved}` : 'deploy: nothing found for pf d, run pf rp --deploy to let the agent look');
     return { resolved, helpers, agent: false };
   }
   if (!opts.force && !interactive()) {

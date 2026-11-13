@@ -2,7 +2,7 @@ import path from 'node:path';
 import { resolveAgent } from './agent/agents.js';
 import { aboutCommand } from './commands/about.js';
 import { agentCommand } from './commands/agent.js';
-import { runDeployAuto, runDeployStaging } from './commands/deploy.js';
+import { runDeployAuto, runDeployStaging, runPublishStaging } from './commands/deploy.js';
 import { runDoc } from './commands/doc.js';
 import { doctorCommand } from './commands/doctor.js';
 import { initCommand } from './commands/init.js';
@@ -20,6 +20,7 @@ import { verCommand } from './commands/ver.js';
 import type { Context } from '@pulpfixer/kit/context';
 import { detectDocs } from '@pulpfixer/kit/detect/docs';
 import { detectDeploy, detectProduction, detectStaging } from '@pulpfixer/kit/detect/deploy';
+import { detectPublishStaging } from '@pulpfixer/kit/detect/publish';
 import { candidates } from '@pulpfixer/kit/detect/resolve';
 import type { Task } from '@pulpfixer/kit/detect/stacks';
 import { formatCmd, runCmd, shellCmd, withArgs } from '@pulpfixer/kit/exec';
@@ -32,7 +33,7 @@ import { pluginEntries } from './plugins/index.js';
 import { interactive } from '@pulpfixer/kit/util';
 import { resolveProfile } from '@pulpfixer/kit/profiles';
 
-const BUILTIN_NAMES = new Set(['dev', 'build', 'test', 'lint', 'install', 'doc', 'docs', 'deploy:staging', 'deploy:production', 'deploy']);
+const BUILTIN_NAMES = new Set(['dev', 'build', 'test', 'lint', 'install', 'doc', 'docs', 'deploy:staging', 'deploy:production', 'deploy', 'publish:staging', 'publish:cellars']);
 
 function agentEntry(ctx: Context): Entry {
   const choice = resolveAgent({ env: process.env.PF_AGENT, configured: ctx.user.agent });
@@ -127,6 +128,16 @@ export function entriesFor(ctx: Context): Entry[] {
           run: () => runDeployAuto(ctx),
         });
       }
+    }
+    const publish = detectPublishStaging(ctx);
+    if (publish.steps.length) {
+      fromRepo.push({
+        name: 'publish staging',
+        summary: 'Publish to the staging registry (cellars)',
+        group: 'Docs & deploy',
+        detail: formatCmd(publish.steps[0]!.cmd, ctx.workdir) + ', asks first',
+        run: () => runPublishStaging(ctx),
+      });
     }
     for (const [name, cfg] of Object.entries(ctx.config.commands)) {
       if (BUILTIN_NAMES.has(name)) continue;

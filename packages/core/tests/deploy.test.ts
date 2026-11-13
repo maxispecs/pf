@@ -88,6 +88,51 @@ test('pf deploy with nothing configured fails with a hint', () => {
   assert.match(r.err, /pf rp --deploy/);
 });
 
+test('a repo that only publishes: pf d, pf ds and pf dp run the publish, and it still asks first', () => {
+  const dir = mkRepo({ ...git, 'package.json': json({ scripts: { 'publish:cellars': 'x' } }), 'pnpm-lock.yaml': '' });
+  for (const args of [['d'], ['ds'], ['dp'], ['deploy', 'production']]) {
+    const r = pf(dir, ...args, '--dry-run');
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.err, /Staging publish/);
+    assert.match(r.err, /no deploy target, so pf deploy publishes/);
+    assert.match(r.err, /pnpm run publish:cellars/);
+    assert.doesNotMatch(r.err, /PRODUCTION/);
+  }
+  const r = pf(dir, 'ds');
+  assert.equal(r.code, 2);
+  assert.match(r.err, /refusing to publish/);
+});
+
+test('deploy runs the publish only when the repo shows no sign of deploying', () => {
+  const pub = { 'publish:cellars': { run: 'echo pub' } };
+  const prod = pf(mkRepo({ ...git, 'pulpfixer.json': cfg({ ...pub, 'deploy:production': { run: 'echo prd' } }) }), 'ds', '--dry-run');
+  assert.equal(prod.code, 1);
+  assert.match(prod.err, /no staging target found/);
+  assert.doesNotMatch(prod.err, /echo pub/);
+  const fb = pf(mkRepo({ ...git, 'pulpfixer.json': cfg(pub), 'firebase.json': '{}' }), 'd', '--dry-run');
+  assert.equal(fb.code, 1);
+  assert.match(fb.err, /skipped firebase/);
+  assert.doesNotMatch(fb.err, /echo pub/);
+});
+
+test('a repo with no publish target: pf ps runs the staging deploy, never production', () => {
+  const stg = pf(mkRepo({ ...git, 'pulpfixer.json': cfg({ 'deploy:staging': { run: 'echo stg' } }) }), 'ps', '--dry-run');
+  assert.equal(stg.code, 0, stg.err);
+  assert.match(stg.err, /Staging deploy/);
+  assert.match(stg.err, /no publish target, so pf publish deploys to staging/);
+  assert.match(stg.err, /echo stg/);
+  const prd = pf(mkRepo({ ...git, 'pulpfixer.json': cfg({ 'deploy:production': { run: 'echo prd' }, deploy: { run: 'echo bare' } }) }), 'ps', '--dry-run');
+  assert.equal(prd.code, 1);
+  assert.match(prd.err, /no publish target found/);
+});
+
+test('the menu list shows the publish target', () => {
+  const r = pf(mkRepo({ ...git, 'pulpfixer.json': cfg({ 'publish:cellars': { run: 'echo pub' } }) }), 'list');
+  assert.equal(r.code, 0);
+  assert.match(r.out, /pf publish staging\s+Publish to the staging registry \(cellars\)\s+echo pub, asks first/);
+  assert.doesNotMatch(r.out, /pf publish:cellars/);
+});
+
 test('a bare deploy asks first: no terminal needs --yes', () => {
   const dir = mkRepo({ ...git, 'pulpfixer.json': cfg({ deploy: { run: 'echo bare' } }) });
   const r = pf(dir, 'd');
