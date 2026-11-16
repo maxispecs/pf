@@ -91,7 +91,7 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 				// Only an id comes from the page; what runs is looked up in pf's own list.
 				this.actions.runAction(m.id);
 			} else if (m?.type === 'editActions') {
-				void vscode.commands.executeCommand('bgTone.editActions');
+				void vscode.commands.executeCommand('bgTone.openSettings', 'actions');
 			}
 		}, null, this.disposables);
 	}

@@ -73,8 +73,12 @@ icons, live in the repo's `pulpfixer.json` (not in the `bgTone` section; pf owns
 }
 ```
 
-The pencil at the end of the row opens a picker over every action (it runs `pf actions feature` / `unfeature`).
-Run `pf actions --all` to see the ids.
+The pencil at the end of the row opens the **Actions** tab of Repo Settings: every action pf offers in the repo (what
+its menu runs), each with a checkbox; ticked ones become buttons (it runs `pf actions feature` / `unfeature`). The
+command *Choose Featured Repo Actions...* does the same from a picker. Run `pf actions --all` to see the ids.
+
+In the pulpfixer checkout itself, `cycle` (`pf c`, the dev cycle) is an action too, featured in its `pulpfixer.json`
+along with `doc`.
 
 ## Repo logo
 

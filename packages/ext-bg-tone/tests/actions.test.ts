@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { commandLine, diffFeatured, parseAction, parseActions, quoteArg } from '../src/actions.ts';
+import { commandLine, diffFeatured, parseAction, parseActions, quoteArg, statusNotice } from '../src/actions.ts';
 
 const doc = (actions: unknown[], over: Record<string, unknown> = {}) =>
 	JSON.stringify({ schema: 1, repo: 'arbiter', actions, ...over });
@@ -78,4 +78,13 @@ test('diffFeatured lists what the picker turned on and off', () => {
 	assert.deepEqual(diffFeatured(all, ['dev', 'build']), { feature: ['build'], unfeature: ['doc'] });
 	assert.deepEqual(diffFeatured(all, ['dev', 'doc']), { feature: [], unfeature: [] });
 	assert.deepEqual(diffFeatured(all, []), { feature: [], unfeature: ['dev', 'doc'] });
+});
+
+test('statusNotice explains what stops the list and is empty when it is usable', () => {
+	assert.equal(statusNotice({ type: 'ready' }), '');
+	assert.equal(statusNotice({ type: 'loading' }), '');
+	assert.match(statusNotice({ type: 'no-pf' }), /pf was not found/);
+	assert.match(statusNotice({ type: 'old-pf' }), /pf update/);
+	assert.match(statusNotice({ type: 'unavailable', reason: 'workspace not trusted' }), /workspace not trusted/);
+	assert.match(statusNotice({ type: 'error', reason: 'boom' }), /boom/);
 });

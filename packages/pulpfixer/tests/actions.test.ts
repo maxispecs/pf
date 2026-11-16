@@ -145,3 +145,20 @@ test('setFeatured refuses a pulpfixer.json that is not valid JSON', () => {
   assert.equal(setFeatured(buildContext(dir), ['dev'], false), 1);
   assert.equal(fs.readFileSync(path.join(dir, 'pulpfixer.json'), 'utf8'), before);
 });
+
+test('the pulpfixer checkout gets a cycle action (pf c), featured only where the repo says so', () => {
+  const files = {
+    '.git/HEAD': '',
+    'pf': '',
+    'scripts/release.mjs': '',
+    'package.json': json({ name: 'pulpfixer-monorepo', scripts: { dev: 'node app.js' } }),
+    'packages/pulpfixer/package.json': json({ name: 'pulpfixer' }),
+  };
+  const plain = Object.fromEntries(listActions(buildContext(mkRepo(files))).map((a) => [a.id, a]));
+  assert.deepEqual(plain.cycle?.argv, ['c']);
+  assert.equal(plain.cycle?.icon, 'sync');
+  assert.equal(plain.cycle?.featured, false);
+  const featured = Object.fromEntries(listActions(buildContext(mkRepo({ ...files, 'pulpfixer.json': json({ actions: { cycle: { featured: true } } }) }))).map((a) => [a.id, a]));
+  assert.equal(featured.cycle?.featured, true);
+  assert.equal(listActions(buildContext(repo())).some((a) => a.id === 'cycle'), false);
+});

@@ -113,6 +113,27 @@ export function commandLine(pf: string, argv: string[], platform: string = proce
 	return [pf, ...argv].map(a => quoteArg(a, platform)).join(' ');
 }
 
+/** Where the action list stands (`ActionsService.status` has this shape). */
+export type ActionsStatusInfo =
+	| { type: 'ready' | 'loading' | 'no-pf' | 'old-pf' }
+	| { type: 'unavailable' | 'error'; reason: string };
+
+/** The sentence the settings page shows when the list cannot be used (empty while it can). */
+export function statusNotice(status: ActionsStatusInfo): string {
+	switch (status.type) {
+		case 'no-pf':
+			return 'pf was not found. Install pf (or set bgTone.pfPath) to choose repo action buttons.';
+		case 'old-pf':
+			return 'This pf has no actions command yet. Run pf update, then refresh.';
+		case 'unavailable':
+			return `Repo actions are not available here (${status.reason}).`;
+		case 'error':
+			return `Could not read the repo actions: ${status.reason}`;
+		default:
+			return '';
+	}
+}
+
 /** What the "edit featured" picker changed: ids to feature and ids to unfeature. */
 export function diffFeatured(all: readonly RepoAction[], selectedIds: string[]): { feature: string[]; unfeature: string[] } {
 	const selected = new Set(selectedIds);

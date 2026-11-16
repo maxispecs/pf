@@ -80,6 +80,9 @@
 	// ---------- structure (built once) ----------
 
 	function build() {
+		buildTabs();
+		ui.actionsNotice = h('p', { class: 'banner hidden' });
+		ui.actionsList = h('div', { class: 'actions-list' });
 		ui.logoBox = h('div', { class: 'logo-box' });
 		ui.repoTitle = h('h1');
 		ui.enabled = h('input', { type: 'checkbox', onchange: e => setSetting('enabled', e.target.checked) });
@@ -158,6 +161,21 @@
 				h('label', { class: 'check' }, ui.enabled, h('span', { text: 'Tone on' }))),
 			ui.noWorkspace,
 			ui.banner,
+			ui.tabBar,
+
+			h('div', { class: 'tab-panel', role: 'tabpanel', 'data-tab': 'actions' },
+				h('section', { class: 'card' },
+					h('h2', { text: 'Repo actions' }),
+					h('p', { class: 'hint muted small' },
+						'The actions pf offers in this repo (its menu). Tick the ones to show as buttons on the Repo Identity card. ',
+						'The choice is saved in the ', h('code', { text: 'actions' }), ' section of ', h('code', { text: 'pulpfixer.json' }), ', so it is committed.'),
+					ui.actionsNotice,
+					ui.actionsList,
+					h('div', { class: 'row' },
+						h('button', { text: 'Refresh', title: 'Ask pf for the list again', onclick: () => post({ type: 'refreshActions' }) }),
+						h('button', { text: 'Open pulpfixer.json', onclick: () => post({ type: 'openSettingsJson' }) })))),
+
+			h('div', { class: 'tab-panel', role: 'tabpanel', 'data-tab': 'appearance' },
 
 			h('section', { class: 'card' },
 				h('h2', { text: 'Color' }),
@@ -209,8 +227,99 @@
 
 			h('div', { class: 'row', style: { 'margin-top': '16px' } },
 				h('button', { text: 'Open pulpfixer.json', onclick: () => post({ type: 'openSettingsJson' }) }),
-				h('button', { class: 'danger', text: 'Reset all for this repo', onclick: () => post({ type: 'reset' }) })),
+				h('button', { class: 'danger', text: 'Reset all for this repo', onclick: () => post({ type: 'reset' }) }))),
 		);
+	}
+
+	// ---------- tabs ----------
+
+	const TABS = [
+		['appearance', 'Appearance'],
+		['actions', 'Actions'],
+	];
+
+	function showTab(tab, remember) {
+		if (!TABS.some(t => t[0] === tab)) {
+			tab = 'appearance';
+		}
+		for (const button of ui.tabBar.querySelectorAll('[role="tab"]')) {
+			const active = button.dataset.tab === tab;
+			button.classList.toggle('active', active);
+			button.setAttribute('aria-selected', String(active));
+			button.tabIndex = active ? 0 : -1;
+		}
+		for (const panel of app.querySelectorAll('.tab-panel')) {
+			panel.classList.toggle('hidden', panel.dataset.tab !== tab);
+		}
+		if (remember) {
+			vscode.setState({ tab });
+		}
+	}
+
+	function buildTabs() {
+		ui.tabBar = h('div', { class: 'tabs-bar', role: 'tablist', 'aria-label': 'Repo settings' }, TABS.map(([id, label]) =>
+			h('button', {
+				type: 'button',
+				role: 'tab',
+				class: 'tab',
+				'data-tab': id,
+				text: label,
+				onclick: () => showTab(id, true),
+				onkeydown: e => {
+					const i = TABS.findIndex(t => t[0] === id);
+					const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : -1;
+					if (next >= 0 && next < TABS.length) {
+						showTab(TABS[next][0], true);
+						ui.tabBar.querySelector('[data-tab="' + TABS[next][0] + '"]').focus();
+					}
+				},
+			})));
+	}
+
+	// ---------- actions tab ----------
+
+	const ICON_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+	let actionsKey = null;
+
+	function renderActions() {
+		const a = state.actions || { status: 'loading', notice: '', items: [] };
+		const key = JSON.stringify(a);
+		if (key === actionsKey) {
+			return;
+		}
+		actionsKey = key;
+		const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.actionId : undefined;
+
+		ui.actionsNotice.textContent = a.notice;
+		ui.actionsNotice.classList.toggle('hidden', !a.notice);
+
+		const rows = a.items.map(item => {
+			const box = h('input', {
+				type: 'checkbox',
+				'data-action-id': item.id,
+				onchange: e => {
+					actionsKey = null; // a refused change re-renders from the stored state
+					post({ type: 'setFeatured', id: item.id, featured: e.target.checked });
+				},
+			});
+			box.checked = item.featured;
+			return h('label', { class: 'check action-row' }, box,
+				h('span', { class: 'codicon codicon-' + (ICON_NAME.test(item.icon) ? item.icon : 'terminal'), 'aria-hidden': 'true' }),
+				h('span', { class: 'text' }, item.label, h('span', { class: 'muted small' }, h('code', { text: item.command }), '  ' + item.id)));
+		});
+		if (!rows.length) {
+			rows.push(h('p', {
+				class: 'muted',
+				text: a.status === 'loading' ? 'Loading the repo actions...' : a.notice ? '' : 'pf found no actions in this repo.',
+			}));
+		}
+		ui.actionsList.replaceChildren(...rows);
+		if (focused) {
+			const again = ui.actionsList.querySelector('[data-action-id="' + CSS.escape(focused) + '"]');
+			if (again) {
+				again.focus();
+			}
+		}
 	}
 
 	function commitHex(value) {
@@ -457,6 +566,7 @@
 		renderLocations();
 		renderLogo();
 		renderMock(state.preview);
+		renderActions();
 	}
 
 	// ---------- messaging ----------
@@ -469,6 +579,9 @@
 		if (message.type === 'state') {
 			state = message.state;
 			update();
+			if (state.requestTab) {
+				showTab(state.requestTab, true);
+			}
 		} else if (message.type === 'preview' && state) {
 			state.preview = message.preview;
 			renderMock(message.preview);
@@ -476,5 +589,7 @@
 	});
 
 	build();
+	const saved = vscode.getState();
+	showTab(saved && saved.tab, false);
 	post({ type: 'ready' });
 })();

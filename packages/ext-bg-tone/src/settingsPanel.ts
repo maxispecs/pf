@@ -4,6 +4,8 @@ import { themeKindName } from './apply.ts';
 import { mergePalette, normalizeHex, parsePalette } from './presets.ts';
 import { LogoService, pickLogoPath, webviewLogoSrc } from './logoService.ts';
 import { readConfig, repoName, resetBgTone, updateBgTone } from './settings.ts';
+import { statusNotice } from './actions.ts';
+import type { ActionsService } from './actionsService.ts';
 import { configFilePath, onDidChangeRepoConfig } from './store.ts';
 import { SURFACE_LABELS, computePreview, isWritableKey, sanitizeSetting } from './settingsModel.ts';
 import type { PreviewInput } from './settingsModel.ts';
@@ -21,7 +23,11 @@ type InboundMessage =
 	| { type: 'randomize' }
 	| { type: 'clearTone' }
 	| { type: 'reset' }
+	| { type: 'setFeatured'; id: unknown; featured: unknown }
+	| { type: 'refreshActions' }
 	| { type: 'openSettingsJson' };
+
+export type SettingsTab = 'appearance' | 'actions';
 
 function nonce(): string {
 	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -37,10 +43,16 @@ export class SettingsPanel implements vscode.Disposable {
 	private static instance: SettingsPanel | undefined;
 
 	private readonly disposables: vscode.Disposable[] = [];
+	/** A tab the page should switch to with its next state (set before the page has loaded, too). */
+	private requestedTab: SettingsTab | undefined;
+	private ready = false;
 
-	static show(context: vscode.ExtensionContext, logos: LogoService): void {
+	static show(context: vscode.ExtensionContext, logos: LogoService, actions: ActionsService, tab?: SettingsTab): void {
 		if (SettingsPanel.instance) {
 			SettingsPanel.instance.panel.reveal(undefined, false);
+			if (tab) {
+				SettingsPanel.instance.showTab(tab);
+			}
 			return;
 		}
 		const panel = vscode.window.createWebviewPanel(
@@ -49,16 +61,19 @@ export class SettingsPanel implements vscode.Disposable {
 			vscode.ViewColumn.Active,
 			SettingsPanel.options(context),
 		);
-		SettingsPanel.instance = new SettingsPanel(panel, context, logos);
+		SettingsPanel.instance = new SettingsPanel(panel, context, logos, actions);
+		if (tab) {
+			SettingsPanel.instance.showTab(tab);
+		}
 	}
 
 	/** Re-attaches a panel restored by VS Code after a reload. */
-	static restore(panel: vscode.WebviewPanel, context: vscode.ExtensionContext, logos: LogoService): void {
+	static restore(panel: vscode.WebviewPanel, context: vscode.ExtensionContext, logos: LogoService, actions: ActionsService): void {
 		if (SettingsPanel.instance) {
 			panel.dispose();
 			return;
 		}
-		SettingsPanel.instance = new SettingsPanel(panel, context, logos);
+		SettingsPanel.instance = new SettingsPanel(panel, context, logos, actions);
 	}
 
 	private static options(context: vscode.ExtensionContext): vscode.WebviewPanelOptions & vscode.WebviewOptions {
@@ -75,6 +90,7 @@ export class SettingsPanel implements vscode.Disposable {
 		private readonly panel: vscode.WebviewPanel,
 		private readonly context: vscode.ExtensionContext,
 		private readonly logos: LogoService,
+		private readonly actions: ActionsService,
 	) {
 		panel.webview.options = SettingsPanel.options(context);
 		panel.webview.html = this.html();
@@ -88,6 +104,7 @@ export class SettingsPanel implements vscode.Disposable {
 				});
 			}),
 			onDidChangeRepoConfig(() => this.postState()),
+			actions.onDidChange(() => this.postState()),
 			vscode.window.onDidChangeActiveColorTheme(() => this.postState()),
 			vscode.workspace.onDidChangeWorkspaceFolders(() => this.postState()),
 			logos.onDidChange(() => {
@@ -106,8 +123,9 @@ export class SettingsPanel implements vscode.Disposable {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; script-src 'nonce-${n}';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${n}';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="${media('codicon.css')}">
 <link rel="stylesheet" href="${media('settings.css')}">
 <title>Repo Settings</title>
 </head>
@@ -138,6 +156,7 @@ export class SettingsPanel implements vscode.Disposable {
 			logo = { status: 'none', relPath: '' };
 		}
 		return {
+			requestTab: this.requestedTab,
 			repoName: repoName(),
 			hasWorkspace: !!vscode.workspace.workspaceFolders?.length,
 			kind,
@@ -155,16 +174,37 @@ export class SettingsPanel implements vscode.Disposable {
 			surfaceMeta: ALL_SURFACES.map(id => ({ id, ...SURFACE_LABELS[id], defaultBase: defaultBaseFor(kind, id) ?? '#808080' })),
 			logo,
 			preview: computePreview(config, kind),
+			actions: {
+				status: this.actions.status.type,
+				notice: statusNotice(this.actions.status),
+				items: this.actions.actions.map(({ id, label, icon, featured, argv }) => ({
+					id,
+					label,
+					icon,
+					featured,
+					command: `pf ${argv.join(' ')}`,
+				})),
+			},
 		};
+	}
+
+	/** Switches the page to a tab (the Repo Identity card's edit button opens the actions one). */
+	showTab(tab: SettingsTab): void {
+		this.requestedTab = tab;
+		this.postState();
 	}
 
 	private postState(): void {
 		void this.panel.webview.postMessage({ type: 'state', state: this.state() });
+		if (this.ready) {
+			this.requestedTab = undefined; // delivered; before the page loads it waits for the first state
+		}
 	}
 
 	private async onMessage(message: InboundMessage): Promise<void> {
 		switch (message.type) {
 			case 'ready':
+				this.ready = true;
 				this.postState();
 				return;
 			case 'preview': {
@@ -221,6 +261,23 @@ export class SettingsPanel implements vscode.Disposable {
 				);
 				return;
 			}
+			case 'setFeatured': {
+				// Only an id and a flag come from the page; pf's own list decides whether the id exists.
+				const id = message.id;
+				if (typeof id !== 'string' || typeof message.featured !== 'boolean' || !this.actions.actions.some(a => a.id === id)) {
+					this.postState();
+					return;
+				}
+				const failure = await this.actions.setFeatured([id], message.featured);
+				if (failure) {
+					void vscode.window.showErrorMessage(`Background Tone: could not save the featured actions. ${failure}`);
+					this.postState(); // snap the checkbox back
+				}
+				return;
+			}
+			case 'refreshActions':
+				await this.actions.refresh();
+				return;
 			case 'randomize':
 				await updateBgTone(this.context, 'color', colorFromName(repoName()));
 				return;

@@ -77,6 +77,7 @@ export class ActionsService implements vscode.Disposable {
 	private generation = 0;
 	private timer: ReturnType<typeof setTimeout> | undefined;
 	private resolvedPf: string | undefined;
+	private writes: Promise<void> = Promise.resolve();
 	private watcher: vscode.FileSystemWatcher | undefined;
 	private readonly busy = new Set<vscode.Terminal>();
 	private readonly emitter = new vscode.EventEmitter<void>();
@@ -205,7 +206,14 @@ export class ActionsService implements vscode.Disposable {
 	}
 
 	/** Runs `pf actions feature|unfeature <ids>` (pf owns the pulpfixer.json section), then reloads. */
-	async setFeatured(ids: string[], featured: boolean): Promise<string | undefined> {
+	setFeatured(ids: string[], featured: boolean): Promise<string | undefined> {
+		// One write at a time: two pf processes editing pulpfixer.json together could drop a change.
+		const result = this.writes.then(() => this.writeFeatured(ids, featured));
+		this.writes = result.then(() => undefined);
+		return result;
+	}
+
+	private async writeFeatured(ids: string[], featured: boolean): Promise<string | undefined> {
 		const folder = primaryFolder();
 		if (!folder || ids.length === 0) {
 			return undefined;

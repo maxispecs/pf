@@ -60,7 +60,7 @@ The list comes from [`pf actions --json`](/commands/tools-and-repo#pf-actions), 
 }
 ```
 
-The pencil at the end of the row (or the command *Background Tone: Choose Featured Repo Actions...*) opens a picker over every action; the ticked ones become buttons. It runs `pf actions feature` and `unfeature`, so pf writes the file. Icons are [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) names; the font ships inside the extension.
+The pencil at the end of the row opens the **Actions** tab of Repo Settings, which lists every action pf offers in the repo (what its menu runs) with a checkbox each; the ticked ones become buttons. The command *Background Tone: Choose Featured Repo Actions...* does the same from a picker. Both run `pf actions feature` and `unfeature`, so pf writes the file. In the pulpfixer checkout itself, `cycle` (`pf c`, the dev cycle) is an action too, featured in its `pulpfixer.json` along with `doc`. Icons are [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) names; the font ships inside the extension.
 
 | Setting | Default | |
 |---------|---------|---|

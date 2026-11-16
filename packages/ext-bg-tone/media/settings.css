@@ -197,3 +197,29 @@ label.check .text { display: flex; flex-direction: column; }
 .mock .editor .line { height: 6px; border-radius: 3px; background: currentColor; opacity: 0.2; }
 .mock .panel { height: 52px; flex: none; padding: 6px 10px; border-top: 1px solid rgba(128, 128, 128, 0.35); }
 .mock .statusbar { height: 20px; display: flex; align-items: center; padding: 0 10px; flex: none; }
+
+/* Tabs */
+.tabs-bar {
+	display: flex;
+	gap: 2px;
+	margin-top: var(--gap);
+	border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+}
+.tabs-bar .tab {
+	color: var(--vscode-foreground);
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
+	padding: 6px 14px;
+	opacity: 0.7;
+}
+.tabs-bar .tab:hover { opacity: 1; background: none; }
+.tabs-bar .tab.active { opacity: 1; border-bottom-color: var(--vscode-focusBorder); }
+
+/* Actions tab */
+.actions-list { display: flex; flex-direction: column; }
+.action-row { align-items: center; padding: 6px 0; border-top: 1px solid var(--vscode-widget-border, transparent); }
+.action-row:first-child { border-top: none; }
+.action-row .codicon { font-size: 16px; flex: none; }
+.action-row .text { flex: 1; min-width: 0; }

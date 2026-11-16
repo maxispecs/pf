@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { defaultMeta } from './actionmeta.js';
+import { findCheckout, runDevCycle } from './devcycle.js';
 import { resolveAgent } from './agent/agents.js';
 import { aboutCommand } from './commands/about.js';
 import { agentCommand } from './commands/agent.js';
@@ -177,6 +178,18 @@ export function entriesFor(ctx: Context): Entry[] {
         ...action('publish:staging', ['publish', 'staging']),
         detail: formatCmd(publish.steps[0]!.cmd, ctx.workdir) + ', asks first',
         run: () => runPublishStaging(ctx),
+      });
+    }
+    // The pulpfixer checkout's own dev cycle (`pf c`): bump, commit, publish to staging, update pf.
+    const checkout = findCheckout(ctx.repo.root);
+    if (checkout && checkout === path.resolve(ctx.repo.root)) {
+      fromRepo.push({
+        name: 'cycle',
+        summary: 'Dev cycle (bump, commit, publish, update pf)',
+        group: 'Develop',
+        ...action('cycle', ['c']),
+        detail: 'pf c, asks first',
+        run: () => runDevCycle(checkout),
       });
     }
     for (const [name, cfg] of Object.entries(ctx.config.commands)) {

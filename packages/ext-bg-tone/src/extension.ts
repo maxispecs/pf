@@ -6,6 +6,7 @@ import { LogoService, pickLogoPath } from './logoService.ts';
 import { readConfig, updateBgTone } from './settings.ts';
 import { onDidChangeRepoConfig, watchRepoConfig } from './store.ts';
 import { SettingsPanel, SETTINGS_PANEL_TYPE } from './settingsPanel.ts';
+import type { SettingsTab } from './settingsPanel.ts';
 import {
 	IDENTITY_CARD_VIEW,
 	IDENTITY_ITEM_VIEW,
@@ -88,12 +89,12 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.window.registerTreeDataProvider(IDENTITY_ITEM_VIEW, item),
 		vscode.window.registerWebviewPanelSerializer(SETTINGS_PANEL_TYPE, {
 			async deserializeWebviewPanel(panel) {
-				SettingsPanel.restore(panel, context, logos);
+				SettingsPanel.restore(panel, context, logos, actions);
 			},
 		}),
 
 		vscode.commands.registerCommand('bgTone.setColor', () => setColor(context)),
-		vscode.commands.registerCommand('bgTone.openSettings', () => openSettings(context, logos)),
+		vscode.commands.registerCommand('bgTone.openSettings', (tab?: unknown) => openSettings(context, logos, actions, tab === 'actions' ? 'actions' : undefined)),
 		vscode.commands.registerCommand('bgTone.pickLogo', () => pickLogo(context)),
 		vscode.commands.registerCommand('bgTone.clearLogo', () => clearLogo(context)),
 		vscode.commands.registerCommand('bgTone.randomize', () => randomize(context)),
@@ -118,8 +119,8 @@ function ensureWorkspace(): boolean {
 	return true;
 }
 
-function openSettings(context: vscode.ExtensionContext, logos: LogoService): void {
-	SettingsPanel.show(context, logos);
+function openSettings(context: vscode.ExtensionContext, logos: LogoService, actions: ActionsService, tab?: SettingsTab): void {
+	SettingsPanel.show(context, logos, actions, tab);
 }
 
 async function writeColor(context: vscode.ExtensionContext, color: string | undefined): Promise<void> {

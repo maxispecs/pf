@@ -2,5 +2,13 @@
   "bgTone": {
     "color": "#eab308",
     "logo": "packages/pulpfixer/assets/pulpfixer-small.png"
+  },
+  "actions": {
+    "cycle": {
+      "featured": true
+    },
+    "doc": {
+      "featured": true
+    }
   }
 }
