@@ -35,6 +35,7 @@ See [pulpfixer.json](/concepts/pulpfixer-json) for the format.
 - **link**: gives `pulpfixer.json` an `id` and remembers the repo in pf's state folder (below);
 - the `/pnpm` root commands: `pnpm ask` (every root script, grouped), `pnpm doc` (the docs site) and `pnpm deploy:staging`, adding the last two only where a docs site or a staging target exists;
 - `/ver` versioning: `versions.json` and `pnpm ver`;
+- **background tone**: sets `bgTone.logo` in `pulpfixer.json` from an image in the repo (`logo.svg`, `assets/logo.png`, `public/icon.svg`, else the first local image in the README) when it has none, never replacing one that is set, and offers to install the Background Tone extension into Cursor when it is missing (below);
 - **deploy**: tells you what `pf d` runs, or, when the repo has none, wires one (below).
 
 ```bash
@@ -43,11 +44,19 @@ pf repo --list        # every repo pf remembers
 pf repo --no-link     # skip the link
 pf repo --no-pnpm     # skip the pnpm commands
 pf repo --no-ver      # skip versioning
+pf repo --no-tone     # skip the background tone step
 pf repo --no-deploy   # skip the deploy step
 pf repo --deploy      # run the deploy setup even when pf d already resolves
 ```
 
 It updates every older copy of the ver CLI, prints what it did and never commits. When everything succeeds it closes with the pulpfixer logo and a success message (just the message without a terminal). Run it again after `pf update`.
+
+### Background tone
+
+The Background Tone extension (`@pulpfixer/ext-bg-tone`, part of the [pulpfixer suite](/plugins/bg-tone)) tints a window and shows the repo's logo so you can tell Cursor windows apart. It keeps its settings in the `bgTone` section of `pulpfixer.json`, which is committed with the repo. `pf rp` takes care of the repo side:
+
+- the logo: if `bgTone.logo` is empty, `pf rp` finds the repo's image and writes it (`pf rp --dry-run` says what it would write). A logo you set yourself is never replaced, and one that points to a missing file is reported;
+- the extension: when Cursor does not have it, `pf rp` asks whether to run `pf sys apply suite` (default yes). Without a terminal it prints the command instead. When it is installed, `pf rp` reports its version and `pf update` keeps it current.
 
 ### The link
 

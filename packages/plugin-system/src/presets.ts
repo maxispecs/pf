@@ -18,15 +18,23 @@ export interface Preset {
   extensions: string[];
   /** Settings keys to set, with the values they must have. */
   settings: Record<string, unknown>;
+  /**
+   * Extension packages (`@pulpfixer/ext-<name>`): each ships a `.vsix` that pf installs (or updates)
+   * from the registry. Only this scope is accepted, so a preset still names nothing outside pf's own suite.
+   */
+  packages: string[];
 }
 
 export const PRESET_SCOPE = '@pulpfixer';
 const NAME = '[a-z0-9]+(?:-[a-z0-9]+)*';
 const NAME_RE = new RegExp(`^${NAME}$`);
 const PACKAGE_RE = new RegExp(`^${PRESET_SCOPE}/preset-(${NAME})$`);
+export const EXTENSION_SCOPE = '@pulpfixer';
+const EXT_PACKAGE_RE = new RegExp(`^${EXTENSION_SCOPE}/ext-${NAME}$`);
 const EXTENSION_RE = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9._-]*$/i;
 
 export const isPresetName = (name: string): boolean => NAME_RE.test(name);
+export const isExtensionPackage = (pkg: string): boolean => EXT_PACKAGE_RE.test(pkg);
 export const presetPackage = (name: string): string => `${PRESET_SCOPE}/preset-${name}`;
 
 /** `@pulpfixer/preset-cursor` -> `cursor`. */
@@ -48,6 +56,14 @@ export function validatePreset(value: unknown): Preset | string {
       if (!extensions.some((x) => x.toLowerCase() === e.toLowerCase())) extensions.push(e);
     }
   }
+  const packages: string[] = [];
+  if (o.packages !== undefined) {
+    if (!Array.isArray(o.packages)) return '"packages" must be an array of @pulpfixer/ext-<name> package names';
+    for (const p of o.packages) {
+      if (typeof p !== 'string' || !EXT_PACKAGE_RE.test(p)) return `"${String(p)}" is not an extension package (@pulpfixer/ext-<name>)`;
+      if (!packages.includes(p)) packages.push(p);
+    }
+  }
   const settings: Record<string, unknown> = {};
   if (o.settings !== undefined) {
     if (!o.settings || typeof o.settings !== 'object' || Array.isArray(o.settings)) return '"settings" must be an object';
@@ -56,13 +72,13 @@ export function validatePreset(value: unknown): Preset | string {
       settings[k] = v;
     }
   }
-  return { app: o.app, summary: typeof o.summary === 'string' ? o.summary : '', extensions, settings };
+  return { app: o.app, summary: typeof o.summary === 'string' ? o.summary : '', extensions, settings, packages };
 }
 
 /** The npm prefix presets are installed into. */
 export const presetsDir = (): string => path.join(pfHome(), 'sys', 'presets');
 
-function ensurePresetsDir(): string {
+export function ensurePresetsDir(): string {
   const dir = presetsDir();
   fs.mkdirSync(dir, { recursive: true });
   const manifest = path.join(dir, 'package.json');
@@ -75,7 +91,7 @@ export function installArgv(pkg: string, version = 'latest'): string[] {
   return ['npm', 'install', `${pkg}@${version}`, '--prefix', presetsDir(), '--registry', REGISTRY_URL, '--no-audit', '--no-fund', '--loglevel', 'error'];
 }
 
-function npmError(stderr: string): string {
+export function npmError(stderr: string): string {
   const m = stderr.match(/npm (?:error|ERR!) (?:code )?(E\w+|\d{3}[^\n]*)/)?.[1];
   return (m ?? stderr.trim().split('\n')[0] ?? '').trim() || 'registry unreachable';
 }

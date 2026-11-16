@@ -16,6 +16,7 @@ import type { Command } from '@pulpfixer/kit/types';
 import { startAgent } from '../agent/launch.js';
 import { homeSkillFile } from '../skills/stack.js';
 import { pickDeploy, runDeployAuto } from './deploy.js';
+import { setupTone } from './tone.js';
 import { cliRevision, resolveVerCli } from './ver.js';
 
 /** Path of the /pnpm skill helper bundled with pf (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`); the offline fallback. */
@@ -315,9 +316,9 @@ function listLinks(): number {
 
 export const repoCommand: Command = {
   name: 'repo',
-  summary: 'Hook pf tools into this repo (link, pnpm commands, versioning, deploy), or update them',
+  summary: 'Hook pf tools into this repo (link, pnpm commands, versioning, background tone, deploy), or update them',
   group: 'Tools',
-  usage: 'pf repo [--dry-run] [--no-link] [--no-pnpm] [--no-ver] [--no-deploy] [--deploy] | pf repo --list',
+  usage: 'pf repo [--dry-run] [--no-link] [--no-pnpm] [--no-ver] [--no-tone] [--no-deploy] [--deploy] | pf repo --list',
   async run(ctx: Context, args: string[]) {
     const c = err();
     const rest = [...args];
@@ -326,6 +327,7 @@ export const repoCommand: Command = {
     const noLink = takeFlag(rest, '--no-link');
     const noPnpm = takeFlag(rest, '--no-pnpm');
     const noVer = takeFlag(rest, '--no-ver');
+    const noTone = takeFlag(rest, '--no-tone');
     const noDeploy = takeFlag(rest, '--no-deploy');
     const forceDeploy = takeFlag(rest, '--deploy');
     if (!ctx.repo) {
@@ -351,6 +353,12 @@ export const repoCommand: Command = {
     if (!noVer) {
       process.stderr.write(`\n${h2('Versioning', c)}\n`);
       const code = await setupVer(root, dryRun, done);
+      if (code !== 0) return code;
+    }
+
+    if (!noTone) {
+      process.stderr.write(`\n${h2('Background tone', c)}\n`);
+      const code = await setupTone(root, dryRun, done);
       if (code !== 0) return code;
     }
 

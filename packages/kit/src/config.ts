@@ -96,6 +96,11 @@ export interface RepoConfig {
   profile?: string;
   /** What the repo asks for. It can only narrow the profile's limits, never widen them. */
   agent?: { aws?: AgentAwsScope };
+  /**
+   * Settings of the Background Tone extension (`@pulpfixer/ext-bg-tone`): `color`, `logo`, ... The extension
+   * reads and writes this section itself; `pf rp` sets `logo`. Kept as a plain object, pf does not interpret it.
+   */
+  bgTone?: Record<string, unknown>;
 }
 
 /** User config: `~/.pf/config.json`. */
@@ -136,7 +141,7 @@ export function parseProfile(v: unknown): ProfileConfig {
 }
 
 export function loadRepoConfig(root: string): RepoConfig {
-  const raw = readJson<{ id?: unknown; name?: unknown; commands?: unknown; profile?: unknown; agent?: unknown }>(repoConfigPath(root));
+  const raw = readJson<{ id?: unknown; name?: unknown; commands?: unknown; profile?: unknown; agent?: unknown; bgTone?: unknown }>(repoConfigPath(root));
   const commands: Record<string, CustomCommand> = {};
   if (raw && raw.commands && typeof raw.commands === 'object') {
     for (const [name, v] of Object.entries(raw.commands as Record<string, unknown>)) {
@@ -161,7 +166,50 @@ export function loadRepoConfig(root: string): RepoConfig {
     commands,
     ...(typeof raw?.profile === 'string' && raw.profile.trim() ? { profile: raw.profile.trim() } : {}),
     ...(scope ? { agent: { aws: scope } } : {}),
+    ...(isObj(raw?.bgTone) ? { bgTone: raw.bgTone } : {}),
   };
+}
+
+export type SectionWrite = { ok: true; changed: boolean } | { ok: false; error: string };
+
+/**
+ * Merge `values` into an object section of the repo config (`bgTone`), creating the file when there is none.
+ * Keeps every other key, the indentation and the trailing newline. A file that is not a JSON object (or a section
+ * that is not an object) is never overwritten. With `dryRun` nothing is written, `changed` says whether it would be.
+ */
+export function setRepoConfigSection(root: string, section: string, values: Record<string, unknown>, opts: { dryRun?: boolean } = {}): SectionWrite {
+  const file = repoConfigPath(root);
+  const name = path.basename(file);
+  const text = readText(file);
+  let doc: Record<string, unknown> = {};
+  if (text !== null && text.trim() !== '') {
+    try {
+      const parsed: unknown = JSON.parse(text);
+      if (!isObj(parsed)) return { ok: false, error: `${name} is not a JSON object` };
+      doc = parsed;
+    } catch {
+      return { ok: false, error: `${name} is not valid JSON` };
+    }
+  }
+  const current = doc[section];
+  if (current !== undefined && !isObj(current)) return { ok: false, error: `"${section}" in ${name} is not an object` };
+  const next = { ...(current ?? {}) } as Record<string, unknown>;
+  let changed = false;
+  for (const [k, v] of Object.entries(values)) {
+    if (k === '__proto__' || JSON.stringify(next[k]) === JSON.stringify(v)) continue;
+    next[k] = v;
+    changed = true;
+  }
+  if (!changed) return { ok: true, changed: false };
+  if (opts.dryRun) return { ok: true, changed: true };
+  doc[section] = next;
+  const indent = text ? (/^([ \t]+)"/m.exec(text)?.[1] ?? 2) : 2;
+  try {
+    fs.writeFileSync(file, JSON.stringify(doc, null, indent) + (text === null || text.trim() === '' || text.endsWith('\n') ? '\n' : ''));
+    return { ok: true, changed: true };
+  } catch (e) {
+    return { ok: false, error: `could not write ${name}: ${(e as Error).message}` };
+  }
 }
 
 export function userConfigPath(): string {

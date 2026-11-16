@@ -1,7 +1,7 @@
 {
   "name": "pulpfixer-monorepo",
   "private": true,
-  "version": "2.36.0",
+  "version": "2.37.0",
   "type": "module",
   "description": "pf: unified developer CLI for any repo, any language (monorepo root)",
   "license": "UNLICENSED",
@@ -12,7 +12,7 @@
   "scripts": {
     "dev": "tsx --conditions=source packages/core/src/bin/pf.ts",
     "build": "node scripts/build.mjs",
-    "typecheck": "tsc -p tsconfig.check.json",
+    "typecheck": "tsc -p tsconfig.check.json && pnpm --filter @pulpfixer/ext-bg-tone typecheck",
     "test": "node scripts/test.mjs",
     "pf": "node packages/core/dist/bin/pf.js",
     "docs:dev": "pnpm --filter @pulpfixer/docs dev",

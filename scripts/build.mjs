@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Clean dist and compile every package with tsc, in dependency order (kit, plugins, core).
+// Clean dist and compile every package with tsc, in dependency order (kit, plugins, core), then bundle the
+// suite extension and package its .vsix (`pf sys apply suite` installs that file).
 import { rmSync, chmodSync, existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -22,3 +23,7 @@ if (!existsSync(bin)) {
   process.exit(1);
 }
 chmodSync(bin, 0o755);
+
+const pkg = spawnSync(process.execPath, [path.join(root, 'packages', 'ext-bg-tone', 'scripts', 'package.mjs')], { cwd: root, stdio: 'inherit' });
+if (pkg.status !== 0) process.exit(pkg.status ?? 1);
+console.log('built packages/ext-bg-tone (bg-tone.vsix)');

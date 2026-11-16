@@ -1,0 +1,58 @@
+---
+title: Background Tone (pulpfixer suite)
+---
+
+# Background Tone
+
+Background Tone is a Cursor and VS Code extension that tints the side bar, title bar and more per repo, and shows a repo logo (a card at the top of the Explorer, an Explorer item, the tab icon of its settings page, an optional emoji in the window title). With several windows open you can tell which repo is which.
+
+It is the first extension of the **pulpfixer suite**: the extensions that go with pf, installed and kept current by the [system plugin](/plugins/system).
+
+| Package | Ships | What |
+|---------|-------|------|
+| `@pulpfixer/ext-bg-tone` | on its own, never pinned by core | One `bg-tone.vsix` (extension id `local.bg-tone`) |
+| `@pulpfixer/preset-suite` | on its own, never pinned by core | `preset.json` listing the extension packages of the suite |
+
+## Install and update
+
+```bash
+pf sys apply suite            # install the suite extensions Cursor lacks, update older ones
+pf sys diff suite             # show what would change
+pf sys update                 # update only the suite extensions already installed (--check, --dry-run)
+pf update                     # does the same as a step ("Cursor extensions")
+pf rp                         # offers the install for a repo that is set up for pf
+```
+
+pf fetches the latest `@pulpfixer/preset-suite` and each extension package it lists from the registry into `~/.pf/sys/presets`, compares the version in the package with what `cursor --list-extensions --show-versions` reports, and runs `cursor --install-extension <file>.vsix --force`. A newer installed version is left alone. `pf update` never installs a missing extension (that is `pf sys apply suite` or the question in `pf rp`), it only updates the ones you have. Reload the Cursor window afterwards.
+
+## Settings live in the repo
+
+The extension writes its settings to the `bgTone` section of the repo's `pulpfixer.json`, so they are committed and everyone who opens the repo gets the same tone and logo:
+
+```json
+{
+  "id": "my-repo-1a2b3c4d",
+  "bgTone": {
+    "color": "#3b82f6",
+    "strength": 0.08,
+    "surfaces": ["sideBar", "titleBar"],
+    "logo": "assets/logo.svg"
+  }
+}
+```
+
+Keys: `enabled`, `color`, `strength` (0 to 0.3), `surfaces`, `baseColors`, `accentBorder`, `logo`, `logoLocations`, `titleEmoji`, `palette`. The picker, the Repo Settings page (gear icon in the Explorer header) and the commands all write there, keeping every other key and the file's indentation. A `pulpfixer.json` that is not valid JSON is never overwritten. A repo that has not been converted yet and only has a `pf.json` is edited in place.
+
+A repo that still keeps `bgTone.*` values in `.vscode/settings.json` keeps working: they are read until the first change moves them into `pulpfixer.json`. `bgTone.showLastAgent` (the last Cursor chats on the identity card) is personal, so it stays a normal VS Code user setting.
+
+The colors the extension derives from these values (`workbench.colorCustomizations`, an optional `window.title`) are written to the workspace's `.vscode/settings.json`, as before. They are recomputed from `pulpfixer.json` on every machine, so there is nothing to commit there.
+
+## pf repo
+
+`pf rp` sets `bgTone.logo` when it is empty, from the best image it finds (`logo.*`, `icon.*` or `favicon.*` at the root or in `assets`, `public`, `static`, `media`, `images`, `docs` and similar, then the first local image in the README). It skips ignored files and `node_modules`, accepts only png, svg, jpg, jpeg, webp, gif and ico inside the repo, and never replaces a logo you set. See [Tools and repo setup](/commands/tools-and-repo).
+
+## Developing it
+
+`packages/ext-bg-tone` has two manifests: `package.json` is the npm package (its version is the one `pnpm ver` bumps) and `extension/package.json` is the VS Code manifest. `pnpm --filter @pulpfixer/ext-bg-tone package` builds `bg-tone.vsix`, stamping the npm version into the extension manifest. The npm package's `pf.extension` block (`{ "id", "vsix" }`) tells `pf sys` which extension the file is and which file to install; the file name must be plain, inside the package.
+
+Change the extension, then `pnpm ver bump packages/ext-bg-tone minor` and publish. Core is not bumped along. The next `pf update` installs the new version into Cursor. A new suite extension is another `packages/ext-<name>` package with a `pf.extension` block, listed in `packages/preset-suite/preset.json` `packages` and in `ORDER` in `scripts/release.mjs`.

@@ -1,0 +1,104 @@
+# Background Tone
+
+Tint the window chrome per repo/window and show a repo-local logo, so you can tell VS Code / Cursor windows apart.
+
+## Usage
+
+The settings live in the repo's `pulpfixer.json` (the file `pf` keeps at the repo root), in a `bgTone` section, so the
+tone and the logo are committed and everyone who opens the repo sees the same thing:
+
+```json
+{
+  "bgTone": {
+    "color": "#3b82f6",
+    "strength": 0.08,
+    "logo": "assets/logo.svg"
+  }
+}
+```
+
+Every key below goes in that section without the `bgTone.` prefix (`"color"`, not `"bgTone.color"`). `pf rp` sets
+`logo` from an image it finds in the repo. A repo that still has `bgTone.*` values in `.vscode/settings.json` keeps
+working: they are read until the first save moves them into `pulpfixer.json`. `bgTone.showLastAgent` is personal, so it
+stays a normal VS Code setting.
+
+By default the extension tints the gray chrome (side bar and title bar) and leaves the editor
+background untouched. It blends the tone into a base color and writes the result to the workspace's
+`workbench.colorCustomizations` (derived values, recomputed from `pulpfixer.json` on every machine). Other
+customization keys are left alone.
+
+## Ways to change the tone
+
+- **Quick pick**: the color-palette icon in the Explorer header (or the status bar item at the bottom left)
+  opens a list of about 40 colors plus your own palette, and a link to the full settings page.
+- **Repo Settings page**: the gear icon in the Explorer header, or **Background Tone: Open Repo Settings**.
+  It has the full palette, a hex input, an intensity slider, per-area toggles and base colors, the logo
+  picker and a live preview. Everything it saves lands in the repo's `pulpfixer.json`.
+
+## Settings
+
+| Key (`bgTone.*` in the legacy settings) | Default | Description |
+| --- | --- | --- |
+| `bgTone.enabled` | `true` | Turn the tone on/off. |
+| `bgTone.color` | `""` | Hex tone color. Empty removes the tone. |
+| `bgTone.strength` | `0.08` | Mix amount, 0 to 0.3. |
+| `bgTone.surfaces` | `["sideBar", "titleBar"]` | Areas to tint: `sideBar`, `titleBar`, `editor`, `activityBar`, `statusBar`, `tabBar`, `panel`. |
+| `bgTone.baseColors` | `{}` | Optional hex base per surface, e.g. `{ "sideBar": "#f3f3f3" }`. Defaults match VS Code Dark+/Light+. High contrast themes are not tinted unless a base is set. |
+| `bgTone.accentBorder` | `false` | Paint the raw color on the title bar bottom border and the active tab border. |
+| `bgTone.palette` | `[]` | Extra picker colors, e.g. `[{ "label": "Brand", "color": "#ff6600" }]`. |
+| `bgTone.logo` | `""` | Image inside the repo, relative to the repo root (png, svg, jpg, jpeg, webp, gif, ico). |
+| `bgTone.logoLocations` | `["identityCard", "explorerItem"]` | Where to show the identity: `identityCard`, `explorerItem`, `windowTitle`. |
+| `bgTone.titleEmoji` | `""` | Emoji or short text (max 8 characters) used as the window title prefix. |
+| `bgTone.showLastAgent` | `true` | Show the last 3 Cursor agent chats (title, status, time since) on the Repo Identity card. |
+
+Commands: **Set Tone Color**, **Open Repo Settings**, **Choose Repo Logo...**, **Clear Repo Logo**,
+**Randomize Tone** (stable color from the folder name), **Clear Tone**.
+
+## Repo logo
+
+Choose an image that lives inside the repo (the picker refuses files outside it, and `..` or absolute paths in
+`bgTone.logo` are ignored), so the reference stays valid for everyone who clones the repo. The logo shows in:
+
+- the **Repo Identity** card at the top of the Explorer (logo, a large repo name, and a list with the
+  last 3 Cursor agent chats for this repo: each one's agent tab title and how long ago it was active ("running" while it works). Chats are found in
+  `~/.cursor/projects/<repo>/agent-transcripts` and titles are read (read-only) from Cursor's global state database
+  with the system `sqlite3` command; if that is unavailable the chat's first request is shown instead. Local
+  windows only, turn off with `bgTone.showLastAgent`),
+- an **Explorer item** that uses the logo as its icon,
+- the **tab icon** of the Repo Settings page,
+- the **window title**, as an emoji or text prefix (`bgTone.titleEmoji`).
+
+VS Code and Cursor do not let extensions draw images in the native title bar or in the window's top-left
+corner, and the title bar accepts text only. That is why the window title uses an emoji or short text prefix
+instead of the image itself. The prefix is added to the workspace `window.title`; a `window.title` you wrote
+yourself in the workspace is never overwritten.
+
+## Notes
+
+- The extension cannot read the active theme's real colors, so it blends onto the per-surface default for the
+  theme kind. Set `bgTone.baseColors` to your theme's actual `sideBar.background` etc. for an exact result.
+- The status bar starts out saturated blue, so it is blended at 5x the normal strength to be visible. Its text
+  color is not adjusted, so very light tones may reduce contrast.
+- Applied values are theme-dependent hex values stored in workspace settings; they are recomputed when the theme changes.
+- A theme-specific override such as `"[My Theme]": { "sideBar.background": ... }` in `colorCustomizations` wins over the tone.
+
+## Install and update
+
+This package is part of the pulpfixer suite and ships as `@pulpfixer/ext-bg-tone` (a `.vsix`) on the cellars registry.
+`pf sys apply suite` installs it into Cursor, `pf update` keeps it current and `pf rp` offers it for a repo. Reload
+the Cursor window after an install or update.
+
+## Development
+
+Run from the pulpfixer checkout:
+
+```sh
+pnpm --filter @pulpfixer/ext-bg-tone typecheck
+pnpm --filter @pulpfixer/ext-bg-tone package   # builds bg-tone.vsix
+pnpm test                                      # runs this package's tests with the rest
+cursor --install-extension packages/ext-bg-tone/bg-tone.vsix --force
+```
+
+The package has two manifests: `package.json` is the npm package (its version is the one `pnpm ver` bumps) and
+`extension/package.json` is the VS Code manifest; the packaging script stamps the npm version into it.
+Press F5 with `--extensionDevelopmentPath` pointing at this folder's built `dist` for an Extension Development Host.

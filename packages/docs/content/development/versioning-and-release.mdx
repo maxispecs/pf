@@ -22,7 +22,7 @@ pnpm ver bump packages/kit packages/core minor   # several targets; the stack mi
 - Bump a package only when its own files changed. A core change that depends on a new kit change bumps both.
 - After adding or removing a package, run `pnpm ver init` (`--prune` for removals).
 
-The packages that get versions are `packages/core`, `packages/kit`, `packages/plugin-aws`, `packages/plugin-system`, `packages/plugin-yubikey`, `packages/preset-cursor` and `packages/docs`.
+The packages that get versions are `packages/core`, `packages/kit`, `packages/plugin-aws`, `packages/plugin-system`, `packages/plugin-yubikey`, `packages/preset-cursor`, `packages/preset-suite`, `packages/ext-bg-tone` and `packages/docs`.
 
 ## Release
 
@@ -31,9 +31,9 @@ pnpm release         # typecheck, test, build, npm publish --dry-run for every u
 pnpm publish:cellars # the real publish
 ```
 
-`pnpm release` is always a dry run. It publishes nothing, and it lists every package whose version the registry lacks, in dependency order (kit, plugins, core). `pnpm publish:cellars` publishes without a confirmation prompt. A published version can never be reused, so bump first.
+`pnpm release` is always a dry run. It publishes nothing, and it lists every package whose version the registry lacks, in dependency order (kit, plugins, extensions and presets, core). `pnpm publish:cellars` publishes without a confirmation prompt. A published version can never be reused, so bump first.
 
-Core pins kit and the built-in plugins to exact versions, and users only update `pulpfixer`, so the release script refuses to publish a dependency without a new core. The exception is a preset (`@pulpfixer/preset-*`): `pf sys apply` fetches its latest version, so it is published alone and never drags core along.
+Core pins kit and the built-in plugins to exact versions, and users only update `pulpfixer`, so the release script refuses to publish a dependency without a new core. The exceptions are a preset (`@pulpfixer/preset-*`) and a suite extension (`@pulpfixer/ext-*`): `pf sys apply` and `pf update` fetch their latest version, so they are published alone and never drag core along. The extension's `.vsix` is built by its `prepack` script (and by `pnpm build`), and the `.vsix` version is the package version.
 
 `packages/docs` is private and is never published.
 

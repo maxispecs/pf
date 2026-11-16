@@ -35,8 +35,11 @@ export function shipsChange(file: string): boolean {
   return !/(^|\/)tests?\//.test(file) && !/\.test\.[cm]?[jt]s$/.test(file) && !/\.md$/i.test(file);
 }
 
-/** A preset package: data fetched live by `pf sys`, not pinned by core. */
-export const isPreset = (p: Pick<CyclePackage, 'name'>): boolean => p.name.startsWith('@pulpfixer/preset-');
+/**
+ * A package `pf sys` fetches live at its latest version, so core does not pin it: a preset
+ * (`@pulpfixer/preset-<name>`, data) or a suite extension (`@pulpfixer/ext-<name>`, a `.vsix`).
+ */
+export const isPreset = (p: Pick<CyclePackage, 'name'>): boolean => p.name.startsWith('@pulpfixer/preset-') || p.name.startsWith('@pulpfixer/ext-');
 
 /** True when the package has a published version that is current with its package.json and changed since. */
 function needsBump(p: CyclePackage): boolean {
@@ -52,8 +55,8 @@ export function isAhead(p: CyclePackage): boolean {
  * Which packages need a minor bump before publishing: the ones with shipped changes since their last
  * published version. core pins its dependencies to exact versions and users only update core, so it
  * goes along with any bumped dependency unless it is already ahead of the registry. Presets
- * (`@pulpfixer/preset-*`) are data that `pf sys apply` fetches at its latest version, so core does not
- * pin them and a preset change never drags core along.
+ * (`@pulpfixer/preset-*`) and suite extensions (`@pulpfixer/ext-*`) are fetched by `pf sys` at their latest
+ * version, so core does not pin them and a change to one never drags core along.
  */
 export function planBumps(pkgs: CyclePackage[]): PlannedBump[] {
   const plan: PlannedBump[] = pkgs.filter(needsBump).map((pkg) => ({ pkg, reason: 'changed since its last published version' }));

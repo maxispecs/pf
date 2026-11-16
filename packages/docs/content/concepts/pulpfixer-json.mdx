@@ -46,6 +46,14 @@ Built-in names (`dev`, `build`, `test`, `lint`, `install`) override detection. `
 
 `profile` names one of your user profiles. `agent.aws` may only **narrow** what that profile allows, never widen it, because a cloned repo is not trusted. See [Profiles](/agent/profiles).
 
+## bgTone
+
+```json
+{ "bgTone": { "color": "#3b82f6", "logo": "assets/logo.svg" } }
+```
+
+The settings of the [Background Tone extension](/plugins/bg-tone): the window tint and the repo logo. The extension reads and writes this section (committed with the repo), and `pf rp` sets `logo` from an image it finds in the repo. pf does not interpret the other keys.
+
 ## Production
 
 A `deploy:production` entry is one of the three ways a repo can define production (with a script or the repo's own CLI). pf never guesses it. See [Deploy and publish](/commands/deploy).

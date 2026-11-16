@@ -5,7 +5,7 @@
 //   node scripts/release.mjs --publish   the same, then a real publish
 //
 // Publishes every package under packages/ whose version the registry does not have yet, in dependency
-// order (kit, plugins, core). Versions come from each package.json, which `pnpm ver bump <package> minor`
+// order (kit, plugins, extensions and presets, core). Versions come from each package.json, which `pnpm ver bump <package> minor`
 // keeps in step with versions.json. A published version can never be reused, so bump first.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -32,9 +32,9 @@ const die = (s) => {
 // token saved by `npm login` is shadowed. When NPM_TOKEN is unset, load it from the user .npmrc into this
 // process's environment (child processes inherit it). The value is never printed.
 const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: root, stdio: 'inherit', ...opts });
-const ORDER = ['kit', 'plugin-aws', 'plugin-system', 'plugin-yubikey', 'preset-cursor', 'core'];
-// Presets are data that `pf sys apply` fetches at their latest version, so core does not pin them.
-const isPreset = (p) => p.name.startsWith('@pulpfixer/preset-');
+const ORDER = ['kit', 'plugin-aws', 'plugin-system', 'plugin-yubikey', 'ext-bg-tone', 'preset-cursor', 'preset-suite', 'core'];
+// Presets (data) and suite extensions (a .vsix) are fetched by `pf sys` at their latest version, so core does not pin them.
+const isPreset = (p) => p.name.startsWith('@pulpfixer/preset-') || p.name.startsWith('@pulpfixer/ext-');
 const capture = (cmd, args) => spawnSync(cmd, args, { cwd: root, encoding: 'utf8' });
 
 function userNpmrcToken() {

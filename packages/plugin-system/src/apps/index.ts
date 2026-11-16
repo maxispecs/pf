@@ -6,6 +6,8 @@ export interface AppState {
   cli: string | null;
   /** Installed extension ids; null when they could not be read. */
   extensions: string[] | null;
+  /** Installed versions by lowercased id (`--show-versions`); null when the extensions could not be read. */
+  extensionVersions: Record<string, string> | null;
   settingsPath: string;
   /** Raw settings file; null when it does not exist. */
   settingsText: string | null;
@@ -25,6 +27,8 @@ export interface AppAdapter {
   readState(): AppState;
   /** The command that installs one extension; null when the app has no launcher. */
   installArgv(state: AppState, id: string): string[] | null;
+  /** The command that installs (or replaces) an extension from a `.vsix` file; null when the app has no launcher. */
+  installVsixArgv(state: AppState, file: string): string[] | null;
 }
 
 export const APPS: AppAdapter[] = [cursorApp];

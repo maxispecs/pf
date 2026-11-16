@@ -1,0 +1,45 @@
+* { box-sizing: border-box; }
+
+body {
+	margin: 0;
+	padding: 4px 12px 6px;
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	color: var(--vscode-foreground);
+}
+
+.card { display: flex; align-items: center; gap: 8px; }
+
+.logo {
+	width: 32px;
+	height: 32px;
+	flex: none;
+	border-radius: 6px;
+	border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+	background: var(--vscode-input-background);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	font-size: 1.1em;
+	font-weight: 600;
+}
+.logo img { width: 100%; height: 100%; object-fit: contain; }
+
+.info { min-width: 0; flex: 1; line-height: 1.3; }
+.name { font-size: 1.5em; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agents {
+	margin-top: 6px;
+	padding-top: 4px;
+	border-top: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+}
+.agent {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 0;
+	font-size: 1.05em;
+	color: var(--vscode-descriptionForeground);
+}
+.agent-title { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-time { flex: none; font-size: 0.8em; opacity: 0.8; }

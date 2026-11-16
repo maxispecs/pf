@@ -1,0 +1,196 @@
+{
+  "name": "bg-tone",
+  "displayName": "Background Tone",
+  "description": "Tint the side bar, title bar and more per repo/window, and show a repo-local logo. Settings live in the repo's pulpfixer.json (bgTone), so they are committed.",
+  "version": "0.0.0",
+  "publisher": "local",
+  "license": "MIT",
+  "icon": "media/logo.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Themes",
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "configuration": {
+      "title": "Background Tone",
+      "properties": {
+        "bgTone.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "markdownDescription": "Apply the background tone. Legacy: read only when pulpfixer.json has no `bgTone` section; new values are written to pulpfixer.json."
+        },
+        "bgTone.color": {
+          "type": "string",
+          "default": "",
+          "scope": "window",
+          "markdownDescription": "Tone color as a hex value (e.g. #3b82f6). Empty disables the tone. Legacy: read only when pulpfixer.json has no `bgTone` section; new values are written to pulpfixer.json."
+        },
+        "bgTone.strength": {
+          "type": "number",
+          "default": 0.08,
+          "minimum": 0,
+          "maximum": 0.3,
+          "scope": "window",
+          "markdownDescription": "How much of the tone is mixed into the base background (0 to 0.3). Legacy: read only when pulpfixer.json has no `bgTone` section; new values are written to pulpfixer.json."
+        },
+        "bgTone.surfaces": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "sideBar",
+              "titleBar",
+              "editor",
+              "activityBar",
+              "statusBar",
+              "tabBar",
+              "panel"
+            ]
+          },
+          "uniqueItems": true,
+          "default": [
+            "sideBar",
+            "titleBar"
+          ],
+          "scope": "window",
+          "markdownDescription": "Which areas to tint. The default tints the gray chrome (side bar, title bar) and leaves the white editor alone. Add \"editor\", \"activityBar\", \"statusBar\", \"tabBar\" or \"panel\" to tint those too. Legacy: read only when pulpfixer.json has no `bgTone` section; new values are written to pulpfixer.json."
+        },
+        "bgTone.accentBorder": {
+          "type": "boolean",
+          "default": false,
+          "scope": "window",
+          "markdownDescription": "Also paint the title bar bottom border and the active tab border with the raw tone color. Legacy: read only when pulpfixer.json has no `bgTone` section; new values are written to pulpfixer.json."
+        },
+        "bgTone.logo": {
+          "type": "string",
+          "default": "",
+          "scope": "window",
+          "markdownDescription": "Path to an image inside this repo, relative to the repo root (e.g. `assets/logo.svg`). Supported: png, svg, jpg, jpeg, webp, gif, ico. Empty disables the logo. Legacy: read only when pulpfixer.json has no `bgTone` section; new values are written to pulpfixer.json."
+        },
+        "bgTone.logoLocations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "identityCard",
+              "explorerItem",
+              "windowTitle"
+            ]
+          },
+          "uniqueItems": true,
+          "default": [
+            "identityCard",
+            "explorerItem"
+          ],
+          "scope": "window",
+          "markdownDescription": "Where to show the repo identity. `identityCard`: the Repo Identity view in the Explorer. `explorerItem`: a tree item using the logo as its icon. `windowTitle`: prefixes the window title with `bgTone.titleEmoji` (the native title bar cannot show an image). Legacy: read only when pulpfixer.json has no `bgTone` section; new values are written to pulpfixer.json."
+        },
+        "bgTone.titleEmoji": {
+          "type": "string",
+          "default": "",
+          "scope": "window",
+          "markdownDescription": "Short emoji or text (max 8 characters) prepended to the window title when `windowTitle` is in `bgTone.logoLocations`. Legacy: read only when pulpfixer.json has no `bgTone` section; new values are written to pulpfixer.json."
+        },
+        "bgTone.showLastAgent": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "markdownDescription": "Show the last 3 Cursor agent chats for this repo (title, status and how long ago) on the Repo Identity card. Chats come from `~/.cursor/projects/.../agent-transcripts` and tab titles are read from Cursor's state database via the system `sqlite3` command; local windows only."
+        },
+        "bgTone.palette": {
+          "type": "array",
+          "default": [],
+          "scope": "window",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "color": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "color"
+            ]
+          },
+          "markdownDescription": "Extra colors for the picker, e.g. `[{ \"label\": \"Brand\", \"color\": \"#ff6600\" }]`. Legacy: read only when pulpfixer.json has no `bgTone` section; new values are written to pulpfixer.json."
+        },
+        "bgTone.baseColors": {
+          "type": "object",
+          "default": {},
+          "scope": "window",
+          "markdownDescription": "Optional hex base per surface to blend onto, e.g. { \"sideBar\": \"#f3f3f3\", \"titleBar\": \"#dddddd\", \"editor\": \"#ffffff\" }. Defaults match VS Code Dark+/Light+. Legacy: read only when pulpfixer.json has no `bgTone` section; new values are written to pulpfixer.json."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "bgTone.setColor",
+        "title": "Background Tone: Set Tone Color",
+        "icon": "$(symbol-color)"
+      },
+      {
+        "command": "bgTone.openSettings",
+        "title": "Background Tone: Open Repo Settings",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "bgTone.pickLogo",
+        "title": "Background Tone: Choose Repo Logo..."
+      },
+      {
+        "command": "bgTone.clearLogo",
+        "title": "Background Tone: Clear Repo Logo"
+      },
+      {
+        "command": "bgTone.randomize",
+        "title": "Background Tone: Randomize Tone (from workspace name)"
+      },
+      {
+        "command": "bgTone.clear",
+        "title": "Background Tone: Clear Tone"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "bgTone.setColor",
+          "when": "view == workbench.explorer.fileView",
+          "group": "navigation@0"
+        },
+        {
+          "command": "bgTone.openSettings",
+          "when": "view == workbench.explorer.fileView",
+          "group": "navigation@1"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "bgTone.identityCard",
+          "name": "Repo Identity",
+          "type": "webview",
+          "when": "bgTone.cardVisible",
+          "visibility": "collapsed",
+          "contextualTitle": "Repo Identity"
+        },
+        {
+          "id": "bgTone.identityItem",
+          "name": "Repo",
+          "when": "bgTone.itemVisible"
+        }
+      ]
+    }
+  }
+}

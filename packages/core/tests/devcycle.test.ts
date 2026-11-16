@@ -38,6 +38,13 @@ test('a preset is bumped alone: core does not pin presets', () => {
   assert.deepEqual(ahead, []);
 });
 
+test('a suite extension is bumped alone too: core does not pin @pulpfixer/ext-*', () => {
+  const plan = planBumps([pkg('@pulpfixer/ext-bg-tone', { changes: ['packages/ext-bg-tone/src/apply.ts'] }), pkg('pulpfixer')]);
+  assert.deepEqual(plan.map((b) => b.pkg.name), ['@pulpfixer/ext-bg-tone']);
+  assert.deepEqual(planBumps([pkg('@pulpfixer/ext-bg-tone', { local: '1.1.0' }), pkg('pulpfixer')]), []);
+  assert.deepEqual(planBumps([pkg('@pulpfixer/preset-suite', { changes: ['packages/preset-suite/preset.json'] }), pkg('pulpfixer')]).map((b) => b.pkg.name), ['@pulpfixer/preset-suite']);
+});
+
 test('core alone changing bumps only core', () => {
   const plan = planBumps([pkg('@pulpfixer/kit'), pkg('pulpfixer', { changes: ['packages/core/src/x.ts'] })]);
   assert.deepEqual(plan.map((b) => b.pkg.name), ['pulpfixer']);

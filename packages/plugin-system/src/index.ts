@@ -2,6 +2,8 @@ import type { Entry } from '@pulpfixer/kit/types';
 import type { Plugin } from '@pulpfixer/kit/plugin';
 import { sysCommand } from './commands/sys.js';
 
+export { BG_TONE_EXTENSION, SUITE_PRESET, bgToneStatus, installSuite, updateSuiteExtensions, type BgToneStatus } from './suite.js';
+
 /**
  * `pf sys`: apply standard configuration presets to apps on this machine, starting with Cursor
  * (extensions and settings). The app adapters live here (`apps/`); the presets themselves are

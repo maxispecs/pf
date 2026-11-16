@@ -19,7 +19,7 @@ Run `pf list` for the list that applies in the current directory, and `pf help` 
 | `pf publish staging` | Run the repo's `publish:cellars` script (else its staging deploy); always confirms |
 | `pf tools [name] [args]` | List and run the repo's own `./a` tools. See [Tools and repo setup](/commands/tools-and-repo) |
 | `pf init` | Write `pulpfixer.json` for this repo from what was detected |
-| `pf repo` | Hook pf's tools into this repo, or update them |
+| `pf repo` | Hook pf's tools into this repo (link, pnpm commands, versioning, background tone logo and extension, deploy), or update them |
 | `pf agent [prompt]` | Open the coding agent (Claude Code, Codex or Cursor). See [Agent](/agent) |
 | `pf troubleshoot [prompt]` (`pf t`) | Find out what is wrong with this repo's deployment on AWS: pf reads how it deploys, links the AWS profile, then starts the agent with scoped AWS access. See [Troubleshoot](/agent/troubleshoot) |
 | `pf profile [...]` | Project profiles: which AWS account a repo uses and what the agent may read there |
@@ -42,6 +42,6 @@ Commands that run something support `--dry-run`. Short names such as `pf r` and 
 | Command | Notes |
 |---------|-------|
 | `pf setup` | Registry, completions and legacy cleanup. `--dry-run`, `--yes`, `--no-completions` |
-| `pf update` (`pf u`) | Update pf, installed plugins, the `ver` and `pnpm` skills and registry skills, then this repo's copies of their helpers. `--check`, `--yes`, `--dry-run` |
+| `pf update` (`pf u`) | Update pf, installed plugins, the suite extensions installed in Cursor (Background Tone), the `ver` and `pnpm` skills and registry skills, then this repo's copies of their helpers. `--check`, `--yes`, `--dry-run` |
 | `pf uninstall` | Remove pf. `--purge`, `--no-package`, `--no-shell`, `--yes`, `--dry-run` |
 | `pf doctor` | Check this machine and repo for problems. `--offline` |

@@ -4,7 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { listExtensionsArgv, parseExtensions, settingsPathFor } from '../src/apps/editor.js';
+import { installVsixArgv, listExtensionsArgv, parseExtensionVersions, parseExtensions, settingsPathFor } from '../src/apps/editor.js';
+import { cachedExtension, fetchExtension, validateExtensionManifest } from '../src/extensions.js';
 import { findApp } from '../src/apps/index.js';
 import { parseJsonc, sameJson, setTopLevelKeys } from '../src/jsonc.js';
 import { capturePreset, describePlan, isEmptyPlan, planPreset, settingsToWrite } from '../src/plan.js';
@@ -76,8 +77,8 @@ test('sameJson compares deeply', () => {
 
 test('validatePreset accepts a good preset and says what is wrong with a bad one', () => {
   const ok = validatePreset({ app: 'cursor', summary: 's', extensions: ['a.b', 'A.B', 'c.d-e'], settings: { 'x.y': 1 } });
-  assert.deepEqual(ok, { app: 'cursor', summary: 's', extensions: ['a.b', 'c.d-e'], settings: { 'x.y': 1 } });
-  assert.deepEqual(validatePreset({ app: 'cursor' }), { app: 'cursor', summary: '', extensions: [], settings: {} });
+  assert.deepEqual(ok, { app: 'cursor', summary: 's', extensions: ['a.b', 'c.d-e'], settings: { 'x.y': 1 }, packages: [] });
+  assert.deepEqual(validatePreset({ app: 'cursor' }), { app: 'cursor', summary: '', extensions: [], settings: {}, packages: [] });
   assert.equal(typeof validatePreset(null), 'string');
   assert.equal(typeof validatePreset({}), 'string');
   assert.match(validatePreset({ app: 'cursor', extensions: ['nodot'] }) as string, /not an extension id/);
@@ -178,7 +179,7 @@ test('parseExtensions keeps ids and drops the editor log noise', () => {
 
 test('the cursor adapter installs through the cursor launcher', () => {
   const app = findApp('cursor')!;
-  const state = { cli: '/x/cursor', extensions: [], settingsPath: '', settingsText: null, settings: {}, problems: [] };
+  const state = { cli: '/x/cursor', extensions: [], extensionVersions: {}, settingsPath: '', settingsText: null, settings: {}, problems: [] };
   assert.deepEqual(app.installArgv(state, 'a.b'), ['/x/cursor', '--install-extension', 'a.b']);
   assert.equal(app.installArgv({ ...state, cli: null }, 'a.b'), null);
   assert.equal(findApp('nope'), undefined);
@@ -186,7 +187,7 @@ test('the cursor adapter installs through the cursor launcher', () => {
 
 // ---- plan ----
 
-const preset = { app: 'cursor', summary: '', extensions: ['A.One', 'b.two', 'c.three'], settings: { 'editor.formatOnSave': true, 'editor.fontSize': 14, 'files.exclude': { x: 1 } } };
+const preset = { app: 'cursor', summary: '', extensions: ['A.One', 'b.two', 'c.three'], settings: { 'editor.formatOnSave': true, 'editor.fontSize': 14, 'files.exclude': { x: 1 } }, packages: [] };
 
 test('planPreset installs what is missing and sets what differs, leaving the rest alone', () => {
   const plan = planPreset(preset, { extensions: ['a.one', 'z.other'], settings: { 'editor.fontSize': 13, 'files.exclude': { x: 1 }, 'unrelated': 1 } });
@@ -226,7 +227,106 @@ test('describePlan lists installs and changes in plain text without a palette', 
 
 test('capturePreset builds a sorted preset and reports settings that are not set', () => {
   const { preset: p, missing } = capturePreset('cursor', 'Cursor', { extensions: ['b.two', 'A.one'], settings: { 'editor.fontSize': 13 } }, ['editor.fontSize', 'nope']);
-  assert.deepEqual(p, { app: 'cursor', summary: 'Standard Cursor setup', extensions: ['A.one', 'b.two'], settings: { 'editor.fontSize': 13 } });
+  assert.deepEqual(p, { app: 'cursor', summary: 'Standard Cursor setup', extensions: ['A.one', 'b.two'], settings: { 'editor.fontSize': 13 }, packages: [] });
   assert.deepEqual(missing, ['nope']);
   assert.equal(typeof validatePreset(JSON.parse(JSON.stringify(p))), 'object');
+});
+
+// ---- the suite: extension packages ----
+
+test('validatePreset accepts only @pulpfixer/ext-<name> packages', () => {
+  const ok = validatePreset({ app: 'cursor', packages: ['@pulpfixer/ext-bg-tone', '@pulpfixer/ext-bg-tone', '@pulpfixer/ext-x1'] });
+  assert.deepEqual((ok as { packages: string[] }).packages, ['@pulpfixer/ext-bg-tone', '@pulpfixer/ext-x1']);
+  assert.match(validatePreset({ app: 'cursor', packages: ['left-pad'] }) as string, /not an extension package/);
+  assert.match(validatePreset({ app: 'cursor', packages: ['@other/ext-x'] }) as string, /not an extension package/);
+  assert.match(validatePreset({ app: 'cursor', packages: ['@pulpfixer/preset-cursor'] }) as string, /not an extension package/);
+  assert.match(validatePreset({ app: 'cursor', packages: 'x' }) as string, /array/);
+});
+
+test('the suite preset ships the Background Tone extension package', () => {
+  const raw = JSON.parse(fs.readFileSync(path.join(root, '..', 'preset-suite', 'preset.json'), 'utf8'));
+  const suite = validatePreset(raw);
+  assert.equal(typeof suite, 'object');
+  assert.deepEqual((suite as { packages: string[] }).packages, ['@pulpfixer/ext-bg-tone']);
+});
+
+test('--show-versions output gives ids and versions, and parseExtensions still reads it', () => {
+  const stdout = '[1110/1:ERROR:noise] x\nlocal.bg-tone@0.10.0\nEsbenp.Prettier-VSCode@11.0.0\nplain.id\nms-python.python@2026.1.0-pre.2\n';
+  assert.deepEqual(parseExtensionVersions(stdout), { 'local.bg-tone': '0.10.0', 'esbenp.prettier-vscode': '11.0.0', 'ms-python.python': '2026.1.0-pre.2' });
+  assert.deepEqual(parseExtensions(stdout), ['local.bg-tone', 'Esbenp.Prettier-VSCode', 'plain.id', 'ms-python.python']);
+  assert.deepEqual(listExtensionsArgv('/x/cursor', true), ['/x/cursor', '--list-extensions', '--show-versions']);
+  assert.deepEqual(installVsixArgv('/x/cursor', '/p/bg-tone.vsix'), ['/x/cursor', '--install-extension', '/p/bg-tone.vsix', '--force']);
+  const app = findApp('cursor')!;
+  const state = { cli: '/x/cursor', extensions: [], extensionVersions: {}, settingsPath: '', settingsText: null, settings: {}, problems: [] };
+  assert.deepEqual(app.installVsixArgv(state, '/p/a.vsix'), ['/x/cursor', '--install-extension', '/p/a.vsix', '--force']);
+  assert.equal(app.installVsixArgv({ ...state, cli: null }, '/p/a.vsix'), null);
+});
+
+test('validateExtensionManifest wants an id and a plain .vsix file name', () => {
+  assert.deepEqual(validateExtensionManifest({ pf: { extension: { id: 'local.bg-tone', vsix: 'bg-tone.vsix' } } }), { id: 'local.bg-tone', vsix: 'bg-tone.vsix' });
+  assert.match(validateExtensionManifest({}) as string, /pf\.extension/);
+  assert.match(validateExtensionManifest({ pf: { extension: { id: 'nodot', vsix: 'a.vsix' } } }) as string, /extension id/);
+  for (const vsix of ['../a.vsix', '/etc/a.vsix', 'sub/a.vsix', 'a.zip', '']) {
+    assert.match(validateExtensionManifest({ pf: { extension: { id: 'a.b', vsix } } }) as string, /\.vsix/, vsix);
+  }
+});
+
+test('an extension package is read from the cache, and a missing .vsix makes it unusable', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-sys-'));
+  const prev = process.env.PF_HOME;
+  process.env.PF_HOME = home;
+  try {
+    const pkg = '@pulpfixer/ext-bg-tone';
+    assert.equal(cachedExtension(pkg), null);
+    assert.match((fetchExtension(pkg, { offline: true }) as { error: string }).error, /not cached yet/);
+    assert.match((fetchExtension('@pulpfixer/preset-cursor') as { error: string }).error, /not an extension package/);
+
+    const dir = path.join(home, 'sys', 'presets', 'node_modules', '@pulpfixer', 'ext-bg-tone');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: pkg, version: '1.2.0', pf: { extension: { id: 'local.bg-tone', vsix: 'bg-tone.vsix' } } }));
+    assert.match(cachedExtension(pkg)!.problem!, /missing/);
+    fs.writeFileSync(path.join(dir, 'bg-tone.vsix'), 'x');
+    const got = fetchExtension(pkg, { offline: true });
+    assert.ok(!('error' in got));
+    if ('error' in got) return;
+    assert.deepEqual(got.info, { pkg, version: '1.2.0', id: 'local.bg-tone', file: path.join(dir, 'bg-tone.vsix') });
+    assert.equal(got.source, 'cache');
+  } finally {
+    if (prev === undefined) delete process.env.PF_HOME;
+    else process.env.PF_HOME = prev;
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+const bgTone = { pkg: '@pulpfixer/ext-bg-tone', version: '1.2.0', id: 'local.bg-tone', file: '/p/bg-tone.vsix' };
+const suitePreset = { app: 'cursor', summary: '', extensions: [], settings: {}, packages: [bgTone.pkg] };
+
+test('planPreset installs a missing suite extension and updates an older one', () => {
+  const missing = planPreset(suitePreset, { extensions: ['a.b'], extensionVersions: { 'a.b': '1.0.0' }, settings: {} }, [bgTone]);
+  assert.deepEqual(missing.vsix, [{ pkg: bgTone.pkg, id: 'local.bg-tone', installed: null, latest: '1.2.0', file: '/p/bg-tone.vsix' }]);
+  assert.ok(!isEmptyPlan(missing));
+
+  const older = planPreset(suitePreset, { extensions: ['Local.Bg-Tone'], extensionVersions: { 'local.bg-tone': '0.10.0' }, settings: {} }, [bgTone]);
+  assert.equal(older.vsix[0]?.installed, '0.10.0');
+  assert.equal(older.vsixOk, 0);
+});
+
+test('planPreset leaves a current, newer or unversioned suite extension alone', () => {
+  for (const versions of [{ 'local.bg-tone': '1.2.0' }, { 'local.bg-tone': '2.0.0' }, {}] as Record<string, string>[]) {
+    const plan = planPreset(suitePreset, { extensions: ['local.bg-tone'], extensionVersions: versions, settings: {} }, [bgTone]);
+    assert.deepEqual(plan.vsix, []);
+    assert.equal(plan.vsixOk, 1);
+    assert.ok(isEmptyPlan(plan));
+  }
+  const unreadable = planPreset(suitePreset, { extensions: null, settings: {} }, [bgTone]);
+  assert.deepEqual(unreadable.vsix, []);
+});
+
+test('describePlan shows suite extensions to install and update', () => {
+  const c = { on: false, bold: (s: string) => s, dim: (s: string) => s, green: (s: string) => s, yellow: (s: string) => s } as never;
+  const add = describePlan(planPreset(suitePreset, { extensions: [], extensionVersions: {}, settings: {} }, [bgTone]), c);
+  assert.ok(add.includes('Suite extensions to install or update (1)'));
+  assert.ok(add.includes('  + local.bg-tone v1.2.0 (@pulpfixer/ext-bg-tone)'));
+  const up = describePlan(planPreset(suitePreset, { extensions: ['local.bg-tone'], extensionVersions: { 'local.bg-tone': '0.10.0' }, settings: {} }, [bgTone]), c);
+  assert.ok(up.includes('  ~ local.bg-tone v0.10.0 -> v1.2.0'));
 });

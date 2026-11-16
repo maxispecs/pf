@@ -1,4 +1,5 @@
 {
+    "bgTone.logo": "packages/core/assets/pulpfixer-small.png",
     "bgTone.color": "#eab308",
     "workbench.colorCustomizations": {
         "sideBar.background": "#f2eee0",

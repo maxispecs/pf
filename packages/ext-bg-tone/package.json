@@ -1,0 +1,36 @@
+{
+  "name": "@pulpfixer/ext-bg-tone",
+  "version": "1.0.0",
+  "description": "pf suite extension: Background Tone for Cursor and VS Code (a .vsix that pf sys apply suite installs). Settings live in the repo's pulpfixer.json.",
+  "license": "MIT",
+  "type": "module",
+  "pf": {
+    "extension": {
+      "id": "local.bg-tone",
+      "vsix": "bg-tone.vsix"
+    }
+  },
+  "files": [
+    "bg-tone.vsix"
+  ],
+  "scripts": {
+    "build": "node esbuild.cjs",
+    "watch": "node esbuild.cjs --watch",
+    "typecheck": "tsc -p tsconfig.json",
+    "package": "node scripts/package.mjs",
+    "prepack": "node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  }
+}

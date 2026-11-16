@@ -9,6 +9,7 @@ import { confirm, reporter } from '@pulpfixer/kit/ui/prompt';
 import { compareVersions, readJson, readText, takeFlag } from '@pulpfixer/kit/util';
 import { displayVersion } from '@pulpfixer/kit/version';
 import { fetchLatest } from '../update/check.js';
+import { updateSuiteExtensions } from '@pulpfixer/plugin-system';
 import { updatePlugins } from '../plugins/manage.js';
 import { refreshStackSkills, updateSkills } from '../skills/manage.js';
 import { TASKS_HELPER_PATHS, findVerCopies, isTasksHelper, resolveTasksHelper } from './repo.js';
@@ -99,7 +100,7 @@ function refreshRepoTools(ctx: Context, dryRun: boolean, check = false): number 
 }
 
 /**
- * Plugins and skills from the registry follow pf: `pf update` updates them too. The stack skills
+ * Plugins, skills and the suite extensions in Cursor (Background Tone) follow pf: `pf update` updates them too. The stack skills
  * (ver, pnpm) are installed into ~/.pf/skills when missing; the repo refresh then copies from there.
  */
 async function refreshAddons(check: boolean, dryRun: boolean): Promise<number> {
@@ -109,12 +110,14 @@ async function refreshAddons(check: boolean, dryRun: boolean): Promise<number> {
   r.step('Skills');
   const stack = refreshStackSkills({ check, dryRun });
   const skills = updateSkills([], { check, dryRun, skipStack: true });
-  return plugins || stack || skills;
+  r.step('Cursor extensions');
+  const extensions = await updateSuiteExtensions({ check, dryRun });
+  return plugins || stack || skills || extensions;
 }
 
 export const updateCommand: Command = {
   name: 'update',
-  summary: 'Update pf, its plugins, the ver and pnpm skills and this repo\'s copies from cellars',
+  summary: 'Update pf, its plugins, suite extensions, the ver and pnpm skills and this repo\'s copies from cellars',
   group: 'Tools',
   usage: 'pf update [--check] [--yes] [--dry-run]',
   async run(ctx, args) {
