@@ -47,7 +47,8 @@
 			actionsEl = null;
 			return null;
 		}
-		const row = h('div', 'actions');
+		// With buttons the row sits beside the name; a hint alone gets its own line under the card.
+		const row = h('div', buttons.length || a.canEdit ? 'actions actions-inline' : 'actions');
 		row.setAttribute('role', 'toolbar');
 		row.setAttribute('aria-label', 'Repo actions');
 		for (const b of buttons) {
@@ -83,7 +84,11 @@
 
 		const actions = actionsRow(state.actions);
 		if (actions) {
-			children.push(actions);
+			if (actions.classList.contains('actions-inline')) {
+				card.append(actions);
+			} else {
+				children.push(actions);
+			}
 		}
 
 		agentTimes = [];

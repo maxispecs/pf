@@ -67,6 +67,8 @@ body {
 .act:active { background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground)); }
 .act:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
 .act .codicon { font-size: 16px; }
-.act-edit { margin-left: auto; opacity: 0.55; }
+/* Beside the name: the name gives way (ellipsis), the buttons keep their size. */
+.actions-inline { flex: none; flex-wrap: nowrap; margin-top: 0; }
+.act-edit { opacity: 0.55; }
 .act-edit:hover, .act-edit:focus-visible { opacity: 1; }
 .actions-hint { font-size: 0.9em; color: var(--vscode-descriptionForeground); }

@@ -58,7 +58,7 @@ Commands: **Set Tone Color**, **Open Repo Settings**, **Choose Repo Logo...**, *
 
 ## Action buttons
 
-Under the repo name, the Repo Identity card shows small icon buttons for the repo's **featured actions** (run,
+Beside the repo name, the Repo Identity card shows small icon buttons for the repo's **featured actions** (run,
 deploy, publish, docs and your own commands). Hover for the name, click to run `pf <action>` in the integrated
 terminal. The list comes from `pf actions --json`, so only what the repo really has is offered; it needs `pf` (a
 hint replaces the buttons when it is missing or too old) and a trusted workspace.
