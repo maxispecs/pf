@@ -7,7 +7,7 @@ import { cycleCommands } from './cycle.js';
 import { deployCommand } from './deploy.js';
 import { docCommand } from './doc.js';
 import { doctorCommand } from './doctor.js';
-import { gitPushCommand } from './git-push.js';
+import { gitCommand } from './git.js';
 import { hostCommand } from './host.js';
 import { initCommand } from './init.js';
 import { installCommand } from './install.js';
@@ -38,7 +38,7 @@ export function allCommands(): Command[] {
     mcpCommand,
     ...TASK_COMMANDS,
     installCommand,
-    gitPushCommand,
+    gitCommand,
     docCommand,
     deployCommand,
     publishCommand,

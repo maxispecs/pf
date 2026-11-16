@@ -9,6 +9,9 @@
     },
     "doc": {
       "featured": true
+    },
+    "publish:staging": {
+      "featured": false
     }
   }
 }

@@ -42,36 +42,42 @@ pf actions feature build --dry-run
 | `build`, `test`, `lint` | `pf build`, ... | `package`, `beaker`, `checklist` | no |
 | `install`, `install:<to>` | `pf install [<to>]` | `desktop-download` | no |
 | `tools` | `pf tools` | `tools` | no |
-| `git:push` | `pf git-push` | `repo-push` | no (the repo needs a git remote) |
+| `git:push` | `pf git push` | `repo-push` | no (the repo needs a git remote) |
 | a custom command | `pf <name>` | `terminal` | only with `"featured": true` |
 
 Only what the repo really has is listed, so a repo without a staging target has no deploy button. Production deploy and publish still ask before they run, because the button just runs `pf` in a terminal. Set `featured` and `icon` in [pulpfixer.json](/concepts/pulpfixer-json#actions); `pf actions feature` and `unfeature` write the `actions` section there, keeping the rest of the file. An older pf has no `actions` command, so the card shows a hint to update it.
 
-## pf git-push
+## pf git
 
-`pf git-push` (short: `pf gp`) pushes the current branch to the **primary** remote, then to any **secondary** remotes you set up on this machine, so a second repository stays a copy of the first. With nothing set up it is a plain push to the primary remote.
+`pf git` holds the git helpers for the repo. In a terminal it opens a menu: push, show the remotes, add or remove a **backup remote**, set the **primary** remote. Without a terminal it prints the remotes.
+
+`pf git push` (short: `pf gp`) pushes the current branch to the **primary** remote, then to any **backup** remotes you set up on this machine, so a second repository stays a copy of the first. With nothing set up it is a plain push to the primary remote.
 
 ```bash
-pf gp                          # push to the primary, then every secondary
+pf git                         # the menu (the remotes when piped)
+pf gp                          # = pf git push: the primary, then every backup remote
 pf gp --dry-run                # show the git push lines, run nothing
 pf gp --no-secondary           # the primary only, this once
 pf gp --tags                   # other arguments go to every git push
 
-pf gp config                   # show the primary and secondary remotes
-pf gp config add backup git@example.com:team/repo.git   # add the git remote and make it a secondary
-pf gp config add mirror        # an existing git remote becomes a secondary
-pf gp config remove backup     # stop pushing there (the git remote stays)
-pf gp config primary gh        # push to "gh" first
-pf gp config primary --unset
+pf git status                  # show the primary and backup remotes
+pf git backup                  # interactive: pick a remote or name a new one and give its URL
+pf git backup add backup git@example.com:team/repo.git   # add the git remote and make it a backup
+pf git backup add mirror       # an existing git remote becomes a backup
+pf git backup remove backup    # stop pushing there (the git remote stays)
+pf git primary gh              # push to "gh" first
+pf git primary --unset
 ```
 
+Add a backup remote with `pf git backup` (or "Add a backup remote" in the menu): it offers the git remotes the repo has that are not used yet, or a new one; for a new one it asks for the name (default `backup`) and the URL, runs `git remote add` and records it. From then on `pf gp` pushes to the primary, then the backup. Without a terminal give the arguments (`pf git backup add <remote> <url>`). Each interactive step prints the command that does the same thing.
+
 - **Primary**: the one in `.pf/config.json`, else the branch's upstream remote, else `origin`. The first push of a branch (no upstream yet) is `git push <primary> -u HEAD`, since a plain `git push origin` would fail there.
-- **Secondaries** get the same push as the primary: the current branch, by name. Nothing is deleted on them and there is no `--mirror`. `-u` goes to the primary only, so a secondary never becomes the branch's upstream.
-- A failing primary push stops everything. A failing secondary is reported and the other secondaries still run; `pf gp` then exits with 1.
-- Extra arguments are git push options or refspecs, never a remote name, and go to every push. `pf gp` only pushes: it does not stage or commit.
+- **Backup remotes** get the same push as the primary: the current branch, by name. Nothing is deleted on them and there is no `--mirror`. `-u` goes to the primary only, so a backup never becomes the branch's upstream.
+- A failing primary push stops everything. A failing backup is reported and the other backups still run; `pf gp` then exits with 1.
+- Extra arguments are git push options or refspecs, never a remote name, and go to every push. `pf git push` only pushes: it does not stage or commit.
 - The settings are machine-local, in the repo's gitignored `.pf/` folder (see [Local settings](/concepts/local-settings)), so another checkout or machine can push elsewhere. The remotes themselves are ordinary git remotes in `.git/config`.
 
-The menu and `pf actions` list it as `git:push` when the repo is a git checkout with a remote.
+The menu lists `git` for any git checkout, and `git push` (also `pf actions` id `git:push`) when the repo has a remote.
 
 ## pf init
 

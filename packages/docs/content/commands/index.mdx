@@ -18,7 +18,7 @@ Run `pf list` for the list that applies in the current directory, and `pf help` 
 | `pf deploy production` | Only a `deploy:production` script or `pulpfixer.json` entry; always confirms |
 | `pf publish staging` | Run the repo's `publish:cellars` script (else its staging deploy); always confirms |
 | `pf tools [name] [args]` | List and run the repo's own `./a` tools. See [Tools and repo setup](/commands/tools-and-repo) |
-| `pf git-push [--dry-run] [--no-secondary]` (`pf gp`) | Push to the primary remote, then the secondary remotes set up on this machine (`pf gp config`). See [Tools and repo setup](/commands/tools-and-repo#pf-git-push) |
+| `pf git [push \| status \| backup \| primary]` | Git helpers: a menu in a terminal, including adding a backup remote. `pf git push` (`pf gp`) pushes to the primary remote, then the backup remotes. See [Tools and repo setup](/commands/tools-and-repo#pf-git) |
 | `pf actions [--all] [--json]` | The repo's actions (run, deploy, publish, docs, custom commands) with an icon and a featured flag: the buttons of the Background Tone card. `pf actions feature\|unfeature <id...>` chooses them. See [Tools and repo setup](/commands/tools-and-repo#pf-actions) |
 | `pf init` | Write `pulpfixer.json` for this repo from what was detected |
 | `pf repo` | Hook pf's tools into this repo (link, pnpm commands, versioning, background tone logo and extension, `.pf/` in `.gitignore`, deploy), or update them |

@@ -4,7 +4,7 @@ title: Local settings
 
 # Local settings
 
-`pulpfixer.json` is committed, so it holds what every checkout of the repo shares. Some settings differ per machine: which extra git remotes `pf gp` pushes to, for example. Those live in the repo's `.pf/` folder, which is never committed.
+`pulpfixer.json` is committed, so it holds what every checkout of the repo shares. Some settings differ per machine: which backup git remotes `pf gp` pushes to, for example. Those live in the repo's `.pf/` folder, which is never committed.
 
 ```
 my-repo/
@@ -32,7 +32,7 @@ my-repo/
 
 | Key | Meaning |
 |-----|---------|
-| `git.push.primary` | The remote `pf gp` pushes to first. Unset: the branch's upstream remote, else `origin`. |
-| `git.push.secondary` | Remotes that get the same push after the primary. |
+| `git.push.primary` | The remote `pf git push` (`pf gp`) pushes to first. Unset: the branch's upstream remote, else `origin`. |
+| `git.push.secondary` | The backup remotes: they get the same push after the primary. |
 
-Only remote **names** are stored. Their URLs stay in `.git/config`, which is per checkout already. Use `pf gp config` to edit the file (see [pf git-push](/commands/tools-and-repo#pf-git-push)); an invalid `config.json` reads as empty and is never overwritten.
+Only remote **names** are stored. Their URLs stay in `.git/config`, which is per checkout already. Use `pf git` to edit the file (see [pf git](/commands/tools-and-repo#pf-git)); an invalid `config.json` reads as empty and is never overwritten.

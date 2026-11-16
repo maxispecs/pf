@@ -303,7 +303,7 @@ async function setupLink(ctx: Context, dryRun: boolean, done: string[]): Promise
   return r.ok ? 0 : 1;
 }
 
-/** Keep `.pf/` (machine-local pf settings, such as the secondary remotes of `pf gp`) out of git. */
+/** Keep `.pf/` (machine-local pf settings, such as the backup remotes of `pf git`) out of git. */
 function setupLocal(root: string, dryRun: boolean, done: string[]): number {
   const c = err();
   const r = ensureLocalIgnored(root, { dryRun });

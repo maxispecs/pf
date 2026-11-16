@@ -103,7 +103,7 @@ test('planPush: a missing remote, or a detached HEAD, is an error with a hint', 
   const noPrimary = planPush(facts({ remotes: [] }));
   assert.ok(!noPrimary.ok && /git remote add origin/.test(noPrimary.error));
   const missing = planPush(facts({ config: { secondary: ['backup'] } }));
-  assert.ok(!missing.ok && /"backup"/.test(missing.error) && /pf gp config/.test(missing.error));
+  assert.ok(!missing.ok && /"backup"/.test(missing.error) && /pf git backup add/.test(missing.error));
   const detached = planPush(facts({ branch: null }));
   assert.ok(!detached.ok && /detached/.test(detached.error));
   assert.ok(planPush(facts({ branch: null, args: ['HEAD:refs/heads/x'] })).ok);
@@ -117,20 +117,20 @@ test('pf gp with nothing configured pushes the primary remote only', () => {
   assert.ok(!fs.existsSync(path.join(dir, '.pf')));
 });
 
-test('pf gp config add sets up a secondary remote, and pf gp pushes to both', () => {
+test('pf git backup add sets up a backup remote, and pf gp pushes to both', () => {
   const { dir, origin, bare } = mkCheckout();
   const backup = bare('backup');
-  const add = pf(dir, 'gp', 'config', 'add', 'backup', backup);
+  const add = pf(dir, 'git', 'backup', 'add', 'backup', backup);
   assert.equal(add.code, 0, add.out);
   assert.equal(git(dir, 'remote', 'get-url', 'backup'), backup);
   assert.equal(fs.readFileSync(path.join(dir, '.pf', '.gitignore'), 'utf8'), '*\n');
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, '.pf', 'config.json'), 'utf8')), { git: { push: { secondary: ['backup'] } } });
   assert.equal(git(dir, 'status', '--porcelain'), '', 'the .pf folder is never shown to git');
 
-  const show = pf(dir, 'gp', 'config');
+  const show = pf(dir, 'git');
   assert.equal(show.code, 0, show.out);
   assert.match(show.out, /primary:\s+origin/);
-  assert.match(show.out, /secondary:\s+backup/);
+  assert.match(show.out, /backup:\s+backup/);
 
   const r = pf(dir, 'gp');
   assert.equal(r.code, 0, r.out);
@@ -151,7 +151,7 @@ test('pf gp config add sets up a secondary remote, and pf gp pushes to both', ()
 test('pf gp --dry-run and --no-secondary', () => {
   const { dir, origin, bare } = mkCheckout();
   const backup = bare('backup');
-  pf(dir, 'gp', 'config', 'add', 'backup', backup);
+  pf(dir, 'git', 'backup', 'add', 'backup', backup);
   const dry = pf(dir, 'gp', '--dry-run');
   assert.equal(dry.code, 0, dry.out);
   assert.match(dry.out, /git push origin/);
@@ -166,8 +166,8 @@ test('a failing secondary does not stop the others, and the exit code says so', 
   const { dir, origin, bare } = mkCheckout();
   const backup = bare('backup');
   git(dir, 'remote', 'add', 'broken', path.join(mkRepo({}), 'does-not-exist.git'));
-  for (const name of ['broken']) assert.equal(pf(dir, 'gp', 'config', 'add', name).code, 0);
-  assert.equal(pf(dir, 'gp', 'config', 'add', 'backup', backup).code, 0);
+  for (const name of ['broken']) assert.equal(pf(dir, 'git', 'backup', 'add', name).code, 0);
+  assert.equal(pf(dir, 'git', 'backup', 'add', 'backup', backup).code, 0);
   const r = pf(dir, 'gp');
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /push failed for broken/);
@@ -179,52 +179,82 @@ test('a failing primary push stops before the secondary remotes', () => {
   const { dir, bare } = mkCheckout();
   const backup = bare('backup');
   git(dir, 'remote', 'set-url', 'origin', path.join(mkRepo({}), 'does-not-exist.git'));
-  pf(dir, 'gp', 'config', 'add', 'backup', backup);
+  pf(dir, 'git', 'backup', 'add', 'backup', backup);
   const r = pf(dir, 'gp');
   assert.notEqual(r.code, 0);
-  assert.match(r.out, /secondary remotes were not pushed/);
+  assert.match(r.out, /backup remotes were not pushed/);
   assert.equal(head(backup), null);
 });
 
-test('pf gp config: primary, remove and the refusals', () => {
+test('pf git backup and primary: add, remove and the refusals', () => {
   const { dir, bare } = mkCheckout();
   const backup = bare('backup');
-  assert.equal(pf(dir, 'gp', 'config', 'add', 'origin').code, 1, 'the primary cannot be its own secondary');
-  assert.equal(pf(dir, 'gp', 'config', 'add', 'nope').code, 1, 'an unknown remote needs a URL');
-  assert.equal(pf(dir, 'gp', 'config', 'add', '--force').code, 1);
-  assert.equal(pf(dir, 'gp', 'config', 'add', 'backup', backup, '--dry-run').code, 0);
+  assert.equal(pf(dir, 'git', 'backup', 'add', 'origin').code, 1, 'the primary cannot be its own secondary');
+  assert.equal(pf(dir, 'git', 'backup', 'add', 'nope').code, 1, 'an unknown remote needs a URL');
+  assert.equal(pf(dir, 'git', 'backup', 'add', '--force').code, 1);
+  assert.equal(pf(dir, 'git', 'backup', 'add', 'backup', backup, '--dry-run').code, 0);
   assert.ok(!fs.existsSync(path.join(dir, '.pf')), 'a dry run writes nothing');
   assert.throws(() => git(dir, 'remote', 'get-url', 'backup'));
-  assert.equal(pf(dir, 'gp', 'config', 'add', 'backup', backup).code, 0);
-  assert.equal(pf(dir, 'gp', 'config', 'primary', 'backup').code, 0);
+  assert.equal(pf(dir, 'git', 'backup', 'add', 'backup', backup).code, 0);
+  assert.equal(pf(dir, 'git', 'primary', 'backup').code, 0);
   const cfg = () => JSON.parse(fs.readFileSync(path.join(dir, '.pf', 'config.json'), 'utf8')).git?.push;
   assert.deepEqual(cfg(), { primary: 'backup' }, 'a new primary leaves the secondary list');
-  assert.equal(pf(dir, 'gp', 'config', 'primary', '--unset').code, 0);
+  assert.equal(pf(dir, 'git', 'primary', '--unset').code, 0);
   assert.equal(cfg(), undefined);
-  assert.equal(pf(dir, 'gp', 'config', 'add', 'backup').code, 0);
-  assert.equal(pf(dir, 'gp', 'config', 'remove', 'backup').code, 0);
+  assert.equal(pf(dir, 'git', 'backup', 'add', 'backup').code, 0);
+  assert.equal(pf(dir, 'git', 'backup', 'remove', 'backup').code, 0);
   assert.equal(cfg(), undefined);
   assert.equal(git(dir, 'remote', 'get-url', 'backup'), backup, 'the git remote itself stays');
-  assert.equal(pf(dir, 'gp', 'config', 'remove', 'backup').code, 1);
-  assert.equal(pf(dir, 'gp', 'config', 'bogus').code, 2);
+  assert.equal(pf(dir, 'git', 'backup', 'remove', 'backup').code, 1);
+  assert.equal(pf(dir, 'git', 'backup', 'bogus').code, 2);
 });
 
 test('pf gp outside a git repo fails cleanly', () => {
   assert.equal(pf(mkRepo({ 'pulpfixer.json': '{}' }), 'gp').code, 1);
 });
 
-test('git-push and gp are commands, and the repo gets a git:push action', () => {
+test('git and gp are commands, and the repo gets a git:push action', () => {
   const names = allCommands().map((c) => c.name);
-  assert.ok(names.includes('git-push') && names.includes('gp'));
+  assert.ok(names.includes('git') && names.includes('gp') && !names.includes('git-push'));
   const { dir } = mkCheckout();
   const ctx = buildContext(dir);
   const entryNames = entriesFor(ctx).map((e) => e.name);
-  assert.ok(entryNames.includes('git push'));
+  assert.ok(entryNames.includes('git push') && entryNames.includes('git'));
   const action = listActions(ctx).find((a) => a.id === 'git:push');
-  assert.deepEqual(action?.argv, ['git-push']);
+  assert.deepEqual(action?.argv, ['git', 'push']);
   assert.equal(action?.featured, false);
   assert.equal(action?.icon, 'repo-push');
   const noRemote = mkRepo({});
   git(noRemote, 'init', '-b', 'main');
-  assert.ok(!entriesFor(buildContext(noRemote)).some((e) => e.name === 'git push'));
+  const noRemoteNames = entriesFor(buildContext(noRemote)).map((e) => e.name);
+  assert.ok(!noRemoteNames.includes('git push'), 'nothing to push without a remote');
+  assert.ok(noRemoteNames.includes('git'), 'but the git menu can still add one');
+});
+
+test('pf git push is what pf gp runs, and pf git without a terminal prints the remotes', () => {
+  const { dir, origin, bare } = mkCheckout();
+  const backup = bare('backup');
+  assert.equal(pf(dir, 'git', 'backup', 'add', 'backup', backup).code, 0);
+  const dry = pf(dir, 'git', 'push', '--dry-run');
+  assert.equal(dry.code, 0, dry.out);
+  assert.match(dry.out, /git push origin/);
+  assert.match(dry.out, /git push backup/);
+  const r = pf(dir, 'git', 'push');
+  assert.equal(r.code, 0, r.out);
+  assert.equal(head(origin), git(dir, 'rev-parse', 'main'));
+  assert.equal(head(backup), git(dir, 'rev-parse', 'main'));
+  const show = pf(dir, 'git');
+  assert.equal(show.code, 0, show.out);
+  assert.match(show.out, /primary:\s+origin/);
+  assert.match(show.out, /backup:\s+backup/);
+  assert.equal(pf(dir, 'git', 'status').code, 0);
+});
+
+test('pf git: unknown subcommands, and a backup remote needs a terminal or arguments', () => {
+  const { dir } = mkCheckout();
+  assert.equal(pf(dir, 'git', 'bogus').code, 2);
+  assert.equal(pf(dir, 'git', 'backup').code, 2, 'the wizard needs a terminal');
+  assert.equal(pf(dir, 'git', 'primary').code, 1, 'no remote named and no terminal');
+  assert.equal(pf(dir, 'git', 'backup', 'add', 'x', '-oProxyCommand=evil').code, 1, 'a URL cannot be an option');
+  assert.equal(pf(mkRepo({ 'pulpfixer.json': '{}' }), 'git', 'status').code, 1);
 });

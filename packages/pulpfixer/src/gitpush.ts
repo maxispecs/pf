@@ -1,7 +1,7 @@
 import type { GitPushConfig } from '@pulpfixer/kit/local-state';
 
 /**
- * Pure planning for `pf git-push`: which remotes get pushed, in which order, with which args.
+ * Pure planning for `pf git push`: which remotes get pushed, in which order, with which args.
  * Nothing here runs git; the command gathers the facts and executes the steps.
  */
 
@@ -51,9 +51,9 @@ export function planPush(f: PushFacts): PushPlan {
   const known = new Set(f.remotes);
   if (!known.has(primary)) {
     const hint = f.config.primary
-      ? `the primary remote in .pf/config.json is "${primary}". Change it with pf gp config primary <remote>, or add the remote with git remote add`
+      ? `the primary remote in .pf/config.json is "${primary}". Change it with pf git primary <remote>, or add the remote with git remote add`
       : f.remotes.length
-        ? `pick one with pf gp config primary <remote> (this repo has: ${f.remotes.join(', ')})`
+        ? `pick one with pf git primary <remote> (this repo has: ${f.remotes.join(', ')})`
         : 'this repo has no remote yet: git remote add origin <url>';
     return { ok: false, error: `no git remote named "${primary}": ${hint}` };
   }
@@ -62,7 +62,7 @@ export function planPush(f: PushFacts): PushPlan {
   if (missing.length) {
     return {
       ok: false,
-      error: `secondary remote${missing.length > 1 ? 's' : ''} ${missing.map((m) => `"${m}"`).join(', ')} ${missing.length > 1 ? 'are' : 'is'} configured but missing from git. Add ${missing.length > 1 ? 'them' : 'it'} with pf gp config add <remote> <url>, or drop ${missing.length > 1 ? 'them' : 'it'} with pf gp config remove <remote>`,
+      error: `backup remote${missing.length > 1 ? 's' : ''} ${missing.map((m) => `"${m}"`).join(', ')} ${missing.length > 1 ? 'are' : 'is'} configured but missing from git. Add ${missing.length > 1 ? 'them' : 'it'} with pf git backup add <remote> <url>, or drop ${missing.length > 1 ? 'them' : 'it'} with pf git backup remove <remote>`,
     };
   }
   // A branch with no upstream (its first push) fails a plain `git push <remote>` when the remote is the default
