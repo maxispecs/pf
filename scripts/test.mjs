@@ -11,5 +11,8 @@ for (const pkg of readdirSync(path.join(root, 'packages'))) {
   const dir = path.join(root, 'packages', pkg, 'tests');
   if (existsSync(dir)) for (const f of readdirSync(dir)) if (f.endsWith('.test.ts')) files.push(path.join(dir, f));
 }
-const r = spawnSync(process.execPath, ['--conditions=source', '--import', 'tsx', '--test', ...files], { cwd: root, stdio: 'inherit' });
+// Plain text whatever terminal runs this (the dev cycle runs it in one): tests that check colors set their own env.
+const env = { ...process.env, NO_COLOR: '1' };
+delete env.FORCE_COLOR;
+const r = spawnSync(process.execPath, ['--conditions=source', '--import', 'tsx', '--test', ...files], { cwd: root, stdio: 'inherit', env });
 process.exit(r.status ?? 1);
