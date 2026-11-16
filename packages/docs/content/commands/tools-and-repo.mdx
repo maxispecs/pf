@@ -42,9 +42,36 @@ pf actions feature build --dry-run
 | `build`, `test`, `lint` | `pf build`, ... | `package`, `beaker`, `checklist` | no |
 | `install`, `install:<to>` | `pf install [<to>]` | `desktop-download` | no |
 | `tools` | `pf tools` | `tools` | no |
+| `git:push` | `pf git-push` | `repo-push` | no (the repo needs a git remote) |
 | a custom command | `pf <name>` | `terminal` | only with `"featured": true` |
 
 Only what the repo really has is listed, so a repo without a staging target has no deploy button. Production deploy and publish still ask before they run, because the button just runs `pf` in a terminal. Set `featured` and `icon` in [pulpfixer.json](/concepts/pulpfixer-json#actions); `pf actions feature` and `unfeature` write the `actions` section there, keeping the rest of the file. An older pf has no `actions` command, so the card shows a hint to update it.
+
+## pf git-push
+
+`pf git-push` (short: `pf gp`) pushes the current branch to the **primary** remote, then to any **secondary** remotes you set up on this machine, so a second repository stays a copy of the first. With nothing set up it is a plain push to the primary remote.
+
+```bash
+pf gp                          # push to the primary, then every secondary
+pf gp --dry-run                # show the git push lines, run nothing
+pf gp --no-secondary           # the primary only, this once
+pf gp --tags                   # other arguments go to every git push
+
+pf gp config                   # show the primary and secondary remotes
+pf gp config add backup git@example.com:team/repo.git   # add the git remote and make it a secondary
+pf gp config add mirror        # an existing git remote becomes a secondary
+pf gp config remove backup     # stop pushing there (the git remote stays)
+pf gp config primary gh        # push to "gh" first
+pf gp config primary --unset
+```
+
+- **Primary**: the one in `.pf/config.json`, else the branch's upstream remote, else `origin`. The first push of a branch (no upstream yet) is `git push <primary> -u HEAD`, since a plain `git push origin` would fail there.
+- **Secondaries** get the same push as the primary: the current branch, by name. Nothing is deleted on them and there is no `--mirror`. `-u` goes to the primary only, so a secondary never becomes the branch's upstream.
+- A failing primary push stops everything. A failing secondary is reported and the other secondaries still run; `pf gp` then exits with 1.
+- Extra arguments are git push options or refspecs, never a remote name, and go to every push. `pf gp` only pushes: it does not stage or commit.
+- The settings are machine-local, in the repo's gitignored `.pf/` folder (see [Local settings](/concepts/local-settings)), so another checkout or machine can push elsewhere. The remotes themselves are ordinary git remotes in `.git/config`.
+
+The menu and `pf actions` list it as `git:push` when the repo is a git checkout with a remote.
 
 ## pf init
 
@@ -65,6 +92,7 @@ See [pulpfixer.json](/concepts/pulpfixer-json) for the format.
 - the `/pnpm` root commands: `pnpm ask` (every root script, grouped), `pnpm doc` (the docs site) and `pnpm deploy:staging`, adding the last two only where a docs site or a staging target exists;
 - `/ver` versioning: `versions.json` and `pnpm ver`;
 - **background tone**: sets `bgTone.logo` in `pulpfixer.json` from an image in the repo (`logo.svg`, `assets/logo.png`, `public/icon.svg`, else the first local image in the README) when it has none, never replacing one that is set, and offers to install the Background Tone extension into Cursor when it is missing (below);
+- **local settings**: adds `.pf/` (machine-local pf settings, see [Local settings](/concepts/local-settings)) to the repo's `.gitignore`, once;
 - **deploy**: tells you what `pf d` runs, or, when the repo has none, wires one (below).
 
 ```bash
@@ -74,6 +102,7 @@ pf repo --no-link     # skip the link
 pf repo --no-pnpm     # skip the pnpm commands
 pf repo --no-ver      # skip versioning
 pf repo --no-tone     # skip the background tone step
+pf repo --no-local    # skip the .gitignore step for .pf/
 pf repo --no-deploy   # skip the deploy step
 pf repo --deploy      # run the deploy setup even when pf d already resolves
 ```

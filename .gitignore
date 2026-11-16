@@ -11,3 +11,4 @@ next-env.d.ts
 *.tsbuildinfo
 packages/docs/public/_pagefind
 *.vsix
+.pf/

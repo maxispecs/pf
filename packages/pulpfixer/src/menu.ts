@@ -6,6 +6,9 @@ import { aboutCommand } from './commands/about.js';
 import { agentCommand } from './commands/agent.js';
 import { runDeployAuto, runDeployStaging, runPublishStaging } from './commands/deploy.js';
 import { runDoc } from './commands/doc.js';
+import { gitPushCommand, readRepo } from './commands/git-push.js';
+import { resolvePrimary } from './gitpush.js';
+import { loadLocalConfig } from '@pulpfixer/kit/local-state';
 import { doctorCommand } from './commands/doctor.js';
 import { initCommand } from './commands/init.js';
 import { installCommand, runInstall } from './commands/install.js';
@@ -178,6 +181,20 @@ export function entriesFor(ctx: Context): Entry[] {
         ...action('publish:staging', ['publish', 'staging']),
         detail: formatCmd(publish.steps[0]!.cmd, ctx.workdir) + ', asks first',
         run: () => runPublishStaging(ctx),
+      });
+    }
+    const push = ctx.repo.hasGit ? readRepo(ctx.repo.root) : null;
+    if (push && push.remotes.length) {
+      const cfg = loadLocalConfig(push.root).git?.push ?? {};
+      const primary = resolvePrimary(cfg, push.upstreamRemote);
+      const extra = (cfg.secondary ?? []).filter((r) => r !== primary).length;
+      fromRepo.push({
+        name: 'git push',
+        summary: gitPushCommand.summary,
+        group: 'Develop',
+        ...action('git:push', ['git-push']),
+        detail: `${primary}${extra ? ` + ${extra} secondary` : ''}`,
+        run: () => gitPushCommand.run(ctx, []),
       });
     }
     // The pulpfixer checkout's own dev cycle (`pf c`): bump, commit, publish to staging, update pf.

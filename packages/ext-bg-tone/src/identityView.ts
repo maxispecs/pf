@@ -136,7 +136,9 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 				? 'Install pf to get repo action buttons.'
 				: status.type === 'old-pf'
 					? 'Update pf (pf update) to get repo action buttons.'
-					: '';
+					: status.type === 'error'
+						? `Repo actions failed: ${status.reason}`.slice(0, 140)
+						: '';
 		return {
 			buttons: this.actions.featured.map(({ id, label, icon }) => ({ id, label, icon })),
 			canEdit: status.type === 'ready' && this.actions.actions.length > 0,

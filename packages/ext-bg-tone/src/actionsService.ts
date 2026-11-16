@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { RepoAction, commandLine, parseActions } from './actions.ts';
+import { RepoAction, commandLine, isMissingInterpreter, mergePath, parseActions } from './actions.ts';
 import { primaryFolder } from './store.ts';
 
 /** Files whose change can add or remove an action (what pf's detection reads, plus its own config). */
@@ -28,12 +28,38 @@ export function pfCommand(): string {
 	return typeof value === 'string' && value.trim() !== '' ? value.trim() : 'pf';
 }
 
+/** The login shell's PATH, once known (a GUI-launched editor may not have node on its own). */
+let shellPath: string | undefined;
+
+/** Directories where node and pf usually live, for an editor started from the Dock with a short PATH. */
+function extraBinDirs(): string[] {
+	const home = os.homedir();
+	return [
+		'/opt/homebrew/bin',
+		'/usr/local/bin',
+		path.join(home, '.volta', 'bin'),
+		path.join(home, '.local', 'bin'),
+		path.join(home, '.npm-global', 'bin'),
+		...(shellPath ? shellPath.split(path.delimiter) : []),
+	].filter(dir => fs.existsSync(dir));
+}
+
 function run(file: string, args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
 	return new Promise((resolve, reject) => {
 		execFile(
 			file,
 			args,
-			{ cwd, timeout: EXEC_TIMEOUT_MS, maxBuffer: 4 * 1024 * 1024, env: { ...process.env, NO_COLOR: '1', PF_NO_UPDATE_CHECK: '1' } },
+			{
+				cwd,
+				timeout: EXEC_TIMEOUT_MS,
+				maxBuffer: 4 * 1024 * 1024,
+				env: {
+					...process.env,
+					PATH: mergePath(process.env.PATH, extraBinDirs(), path.delimiter),
+					NO_COLOR: '1',
+					PF_NO_UPDATE_CHECK: '1',
+				},
+			},
 			(error, stdout, stderr) => {
 				if (error) {
 					reject(Object.assign(error, { stdout, stderr }));
@@ -64,6 +90,16 @@ function loginShellLookup(): Promise<string | undefined> {
 	return run(process.env.SHELL, ['-lc', 'command -v pf'], os.homedir())
 		.then(r => r.stdout.trim().split('\n').pop()?.trim() || undefined)
 		.catch(() => undefined);
+}
+
+/** `$PATH` as a login shell sees it ('' when it cannot be read, so the retry happens once). */
+function loginShellPath(): Promise<string> {
+	if (process.platform === 'win32' || !process.env.SHELL) {
+		return Promise.resolve('');
+	}
+	return run(process.env.SHELL, ['-lc', 'printf %s "$PATH"'], os.homedir())
+		.then(r => r.stdout.trim().split('\n').pop()?.trim() ?? '')
+		.catch(() => '');
 }
 
 /**
@@ -176,6 +212,20 @@ export class ActionsService implements vscode.Disposable {
 
 	/** Runs pf; when the configured `pf` is not on this process's PATH, tries the usual install places and a login shell once. */
 	private async exec(args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
+		try {
+			return await this.execPf(args, cwd);
+		} catch (e) {
+			const err = e as NodeJS.ErrnoException & { stderr?: string };
+			if (shellPath !== undefined || !isMissingInterpreter(err.code, err.stderr ?? '')) {
+				throw e;
+			}
+			// pf was found but its node was not: take the PATH of a login shell (nvm, fnm, asdf...) and retry once.
+			shellPath = await loginShellPath();
+			return this.execPf(args, cwd);
+		}
+	}
+
+	private async execPf(args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
 		const configured = pfCommand();
 		if (this.resolvedPf) {
 			return run(this.resolvedPf, args, cwd);

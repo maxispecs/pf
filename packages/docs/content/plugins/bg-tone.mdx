@@ -67,7 +67,7 @@ The pencil at the end of the row opens the **Actions** tab of Repo Settings, whi
 | `bgTone.showActions` | `true` | Show the buttons (a personal setting) |
 | `bgTone.pfPath` | `pf` | The `pf` command. Set a full path when the editor cannot find it. Machine scope, so a repo cannot change it |
 
-Safety: the page only sends an action id; the extension looks it up in pf's list, runs the executable from `bgTone.pfPath` and quotes every argument. Nothing runs in an untrusted workspace. Without `pf`, or with a pf that has no `actions` command, the card shows a hint instead of buttons. The list refreshes when `pulpfixer.json`, `package.json`, `composer.json`, a `Makefile` or a `justfile` changes.
+Safety: the page only sends an action id; the extension looks it up in pf's list, runs the executable from `bgTone.pfPath` and quotes every argument. Nothing runs in an untrusted workspace. Without `pf`, or with a pf that has no `actions` command, the card shows a hint instead of buttons, and so does a pf that fails to run (the reason is shown). An editor started from the Dock or Spotlight has a short `PATH` without `node`, which pf needs; the extension adds the usual install folders (Homebrew, `/usr/local/bin`, Volta, `~/.local/bin`, npm global) and, if node is still missing, your login shell's `PATH`. The list refreshes when `pulpfixer.json`, `package.json`, `composer.json`, a `Makefile` or a `justfile` changes.
 
 ## pf repo
 

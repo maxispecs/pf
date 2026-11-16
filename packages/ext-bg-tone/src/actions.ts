@@ -113,6 +113,25 @@ export function commandLine(pf: string, argv: string[], platform: string = proce
 	return [pf, ...argv].map(a => quoteArg(a, platform)).join(' ');
 }
 
+/**
+ * `current` PATH with the `extra` directories appended when missing. A GUI-launched editor has a short
+ * PATH without node, and pf is a `#!/usr/bin/env node` script, so it needs the usual install places.
+ */
+export function mergePath(current: string | undefined, extra: readonly string[], sep: string = process.platform === 'win32' ? ';' : ':'): string {
+	const parts = (current ?? '').split(sep).filter(p => p !== '');
+	for (const dir of extra) {
+		if (dir !== '' && !parts.includes(dir)) {
+			parts.push(dir);
+		}
+	}
+	return parts.join(sep);
+}
+
+/** True when pf itself started but its `node` (or another interpreter) was not on PATH (exit 127, `env: node: No such file`). */
+export function isMissingInterpreter(code: unknown, stderr: string): boolean {
+	return code === 127 && /no such file or directory|not found/i.test(stderr);
+}
+
 /** Where the action list stands (`ActionsService.status` has this shape). */
 export type ActionsStatusInfo =
 	| { type: 'ready' | 'loading' | 'no-pf' | 'old-pf' }

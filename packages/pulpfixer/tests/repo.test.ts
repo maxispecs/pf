@@ -45,6 +45,23 @@ test('pf repo installs the pnpm helper and versioning, and wires package.json', 
   assert.match(r.out, /installed scripts\/version\.mjs/);
 });
 
+test('pf repo keeps .pf/ out of git: it adds it to .gitignore once, and --no-local and --dry-run skip it', () => {
+  const dir = demo();
+  fs.writeFileSync(path.join(dir, '.gitignore'), 'node_modules\n');
+  const dry = pf(dir, 'repo', '--dry-run');
+  assert.equal(dry.code, 0, dry.out);
+  assert.match(dry.out, /would add \.pf\//);
+  assert.equal(fs.readFileSync(path.join(dir, '.gitignore'), 'utf8'), 'node_modules\n');
+  assert.equal(pf(dir, 'repo', '--no-local').code, 0);
+  assert.equal(fs.readFileSync(path.join(dir, '.gitignore'), 'utf8'), 'node_modules\n');
+  const r = pf(dir, 'repo');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /local settings: added \.pf\//);
+  assert.equal(fs.readFileSync(path.join(dir, '.gitignore'), 'utf8'), 'node_modules\n.pf/\n');
+  assert.match(pf(dir, 'repo').out, /\.pf\/ is already in \.gitignore/);
+  assert.equal(fs.readFileSync(path.join(dir, '.gitignore'), 'utf8'), 'node_modules\n.pf/\n');
+});
+
 test('pf repo --dry-run writes nothing', () => {
   const dir = demo();
   const before = fs.readFileSync(path.join(dir, 'package.json'), 'utf8');

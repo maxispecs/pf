@@ -1,0 +1,38 @@
+---
+title: Local settings
+---
+
+# Local settings
+
+`pulpfixer.json` is committed, so it holds what every checkout of the repo shares. Some settings differ per machine: which extra git remotes `pf gp` pushes to, for example. Those live in the repo's `.pf/` folder, which is never committed.
+
+```
+my-repo/
+  pulpfixer.json      committed: shared
+  .pf/
+    config.json       this machine only
+    .gitignore        contains "*"
+```
+
+## Staying out of git
+
+- `pf repo` (`pf rp`) adds `.pf/` to the repo's `.gitignore` (creating the file if needed, never twice). `pf rp --no-local` skips it.
+- The first time pf writes `.pf/`, it also creates `.pf/.gitignore` with `*`, so the folder stays out of git even in a repo where `pf rp` was never run.
+- pf never touches a `.gitignore` in a folder that has no `.git` of its own.
+
+## config.json
+
+```json
+{
+  "git": {
+    "push": { "primary": "origin", "secondary": ["backup"] }
+  }
+}
+```
+
+| Key | Meaning |
+|-----|---------|
+| `git.push.primary` | The remote `pf gp` pushes to first. Unset: the branch's upstream remote, else `origin`. |
+| `git.push.secondary` | Remotes that get the same push after the primary. |
+
+Only remote **names** are stored. Their URLs stay in `.git/config`, which is per checkout already. Use `pf gp config` to edit the file (see [pf git-push](/commands/tools-and-repo#pf-git-push)); an invalid `config.json` reads as empty and is never overwritten.

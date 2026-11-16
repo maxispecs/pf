@@ -20,6 +20,7 @@ const DEFAULTS: Record<string, ActionMeta> = {
   'deploy:production': { icon: 'cloud', featured: true },
   'publish:staging': { icon: 'cloud-upload', featured: true },
   tools: { icon: 'tools', featured: false },
+  'git:push': { icon: 'repo-push', featured: false },
   // The pulpfixer checkout's dev cycle (`pf c`); that repo features it in its own pulpfixer.json.
   cycle: { icon: 'sync', featured: false },
 };

@@ -4,6 +4,7 @@ import { LEGACY_REPO_CONFIG, migrateRepoConfig, REPO_CONFIG, repoConfigName } fr
 import { buildContext, type Context } from '@pulpfixer/kit/context';
 import { findDeployHelpers, type DeployHelper } from '@pulpfixer/kit/detect/helpers';
 import { capture, formatCmd, runCmd } from '@pulpfixer/kit/exec';
+import { ensureLocalIgnored } from '@pulpfixer/kit/local-state';
 import { linkRepo, listRepoRecords, REPO_LINK_REVISION, repoLink, repoRemote } from '@pulpfixer/kit/repo-link';
 import { printSuccessLogo } from '@pulpfixer/kit/ui/banner';
 import { err } from '@pulpfixer/kit/ui/palette';
@@ -302,6 +303,18 @@ async function setupLink(ctx: Context, dryRun: boolean, done: string[]): Promise
   return r.ok ? 0 : 1;
 }
 
+/** Keep `.pf/` (machine-local pf settings, such as the secondary remotes of `pf gp`) out of git. */
+function setupLocal(root: string, dryRun: boolean, done: string[]): number {
+  const c = err();
+  const r = ensureLocalIgnored(root, { dryRun });
+  if (!r.ok) {
+    process.stderr.write(`${badgeLabel('error', c)} ${r.error}\n`);
+    return 1;
+  }
+  done.push(`local settings: ${r.message}`);
+  return 0;
+}
+
 function listLinks(): number {
   const c = err();
   const records = listRepoRecords();
@@ -316,9 +329,9 @@ function listLinks(): number {
 
 export const repoCommand: Command = {
   name: 'repo',
-  summary: 'Hook pf tools into this repo (link, pnpm commands, versioning, background tone, deploy), or update them',
+  summary: 'Hook pf tools into this repo (link, pnpm commands, versioning, background tone, local settings, deploy), or update them',
   group: 'Tools',
-  usage: 'pf repo [--dry-run] [--no-link] [--no-pnpm] [--no-ver] [--no-tone] [--no-deploy] [--deploy] | pf repo --list',
+  usage: 'pf repo [--dry-run] [--no-link] [--no-pnpm] [--no-ver] [--no-tone] [--no-local] [--no-deploy] [--deploy] | pf repo --list',
   async run(ctx: Context, args: string[]) {
     const c = err();
     const rest = [...args];
@@ -328,6 +341,7 @@ export const repoCommand: Command = {
     const noPnpm = takeFlag(rest, '--no-pnpm');
     const noVer = takeFlag(rest, '--no-ver');
     const noTone = takeFlag(rest, '--no-tone');
+    const noLocal = takeFlag(rest, '--no-local');
     const noDeploy = takeFlag(rest, '--no-deploy');
     const forceDeploy = takeFlag(rest, '--deploy');
     if (!ctx.repo) {
@@ -359,6 +373,12 @@ export const repoCommand: Command = {
     if (!noTone) {
       process.stderr.write(`\n${h2('Background tone', c)}\n`);
       const code = await setupTone(root, dryRun, done);
+      if (code !== 0) return code;
+    }
+
+    if (!noLocal) {
+      process.stderr.write(`\n${h2('Local settings', c)}\n`);
+      const code = setupLocal(root, dryRun, done);
       if (code !== 0) return code;
     }
 

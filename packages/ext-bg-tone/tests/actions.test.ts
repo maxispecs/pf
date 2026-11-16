@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { commandLine, diffFeatured, parseAction, parseActions, quoteArg, statusNotice } from '../src/actions.ts';
+import { commandLine, diffFeatured, isMissingInterpreter, mergePath, parseAction, parseActions, quoteArg, statusNotice } from '../src/actions.ts';
 
 const doc = (actions: unknown[], over: Record<string, unknown> = {}) =>
 	JSON.stringify({ schema: 1, repo: 'arbiter', actions, ...over });
@@ -87,4 +87,17 @@ test('statusNotice explains what stops the list and is empty when it is usable',
 	assert.match(statusNotice({ type: 'old-pf' }), /pf update/);
 	assert.match(statusNotice({ type: 'unavailable', reason: 'workspace not trusted' }), /workspace not trusted/);
 	assert.match(statusNotice({ type: 'error', reason: 'boom' }), /boom/);
+});
+
+test('mergePath appends only the missing directories', () => {
+	assert.equal(mergePath('/usr/bin:/bin', ['/opt/homebrew/bin', '/bin'], ':'), '/usr/bin:/bin:/opt/homebrew/bin');
+	assert.equal(mergePath(undefined, ['/a', '', '/a'], ':'), '/a');
+	assert.equal(mergePath('C:\\x', ['C:\\y'], ';'), 'C:\\x;C:\\y');
+});
+
+test('isMissingInterpreter spots a pf whose node is not on PATH', () => {
+	assert.equal(isMissingInterpreter(127, 'env: node: No such file or directory'), true);
+	assert.equal(isMissingInterpreter(127, '/bin/sh: pf: command not found'), true);
+	assert.equal(isMissingInterpreter(1, 'env: node: No such file or directory'), false);
+	assert.equal(isMissingInterpreter(127, ''), false);
 });
