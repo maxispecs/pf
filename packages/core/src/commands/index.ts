@@ -1,4 +1,5 @@
 import { aboutCommand } from './about.js';
+import { actionsCommand } from './actions.js';
 import { agentCommand } from './agent.js';
 import { artCommand } from './art.js';
 import { mcpCommand } from './mcp.js';
@@ -20,6 +21,7 @@ import type { Command } from '@pulpfixer/kit/types';
 import { uninstallCommand } from './uninstall.js';
 import { updateCommand } from './update.js';
 import { verCommand } from './ver.js';
+import { versionsCommand } from './versions.js';
 import { pluginCommand } from './plugin.js';
 import { profileCommand } from './profile.js';
 import { publishCommand } from './publish.js';
@@ -39,7 +41,9 @@ export function allCommands(): Command[] {
     deployCommand,
     publishCommand,
     verCommand,
+    versionsCommand,
     toolsCommand,
+    actionsCommand,
     skillCommand,
     initCommand,
     repoCommand,

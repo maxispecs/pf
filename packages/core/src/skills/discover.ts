@@ -64,6 +64,13 @@ function scan(dir: string, source: string, depth: number, out: Skill[]): void {
   }
 }
 
+/** Every skill in one folder (no de-duplication across folders), sorted by name. */
+export function skillsIn(dir: string, source: string): Skill[] {
+  const found: Skill[] = [];
+  scan(dir, source, 3, found);
+  return found.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Source label of the skills that ship with pf. */
 export const BUNDLED_LABEL = 'pulpfixer';
 

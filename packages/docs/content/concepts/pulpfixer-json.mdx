@@ -27,8 +27,21 @@ Older pf versions called it `pf.json`. pf still reads a `pf.json` when the repo 
 | `group` | The menu heading |
 | `cwd` | Directory to run in, relative to the repo root |
 | `message` | `true` when the command makes a commit and takes a commit message as its last argument, so `pf d "text"` passes it on (deploy entries only) |
+| `icon` | A [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) name (`database`, `cloud-upload`) for the command's button, see [`pf actions`](/commands/tools-and-repo#pf-actions) |
+| `featured` | `true` to show the command as a button on the Background Tone card. Custom commands are not featured unless they say so |
 
 Built-in names (`dev`, `build`, `test`, `lint`, `install`) override detection. `deploy:staging`, `deploy:production`, `publish:staging` and `doc` override those commands. A plain `deploy` entry is the repo's own deploy when it names no environment: `pf deploy` (`pf d`) runs it when there is no staging or production target, and always asks first, like production. Any other name shows up in the menu and runs with `pf <name>`, for example `pf seed`.
+
+## actions
+
+```json
+{
+  "commands": { "seed": { "run": "./scripts/seed.sh", "icon": "database", "featured": true } },
+  "actions": { "install": { "featured": false }, "build": { "featured": true, "icon": "package" } }
+}
+```
+
+Overrides for the repo's buttons by action id (`dev`, `deploy:staging`, `publish:staging`, `doc`, `build`, `install:local`, a custom command's name, ...). `featured` shows or hides the button, `icon` is a codicon name. They beat a custom command's own `icon` / `featured`, which beat the defaults. `pf actions --all` lists the ids; `pf actions feature <id>` and `unfeature <id>` write this section. A bad icon name is ignored.
 
 ## id
 

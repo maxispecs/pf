@@ -24,6 +24,7 @@ export const SHORTCUTS: Shortcut[] = [
   { names: ['rp'], target: ['repo'], summary: 'Hook pf tools into this repo or update them', group: 'Tools' },
   { names: ['u'], target: ['update'], summary: 'Update pf, its plugins and skills', group: 'Tools' },
   { names: ['v'], target: ['ver'], summary: 'List versions and bump them', group: 'Tools' },
+  { names: ['vs'], target: ['versions'], summary: 'List versions of pf, plugins, skills and extensions installed here', group: 'Tools' },
   { names: ['s'], target: ['shortcuts'], summary: 'List the shortcuts', group: 'Help' },
   { names: ['up'], target: ['s3'], summary: 'Upload to the exchange bucket', group: 'AWS' },
 ];

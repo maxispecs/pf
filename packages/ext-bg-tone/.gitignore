@@ -1,3 +1,5 @@
 dist
 .stage
 *.vsix
+media/codicon.css
+media/codicon.ttf

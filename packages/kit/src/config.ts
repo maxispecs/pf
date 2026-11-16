@@ -11,7 +11,20 @@ export interface CustomCommand {
   cwd?: string;
   /** The command takes a message as its last argument (a deploy that commits): `pf d "text"` passes it on. */
   message?: boolean;
+  /** Codicon name for the action's button (`rocket`), see `pf actions`. */
+  icon?: string;
+  /** Show the command as a button on the Repo Identity card. Custom commands are not featured unless they say so. */
+  featured?: boolean;
 }
+
+/** Per-action overrides in the `actions` section of `pulpfixer.json`, keyed by action id (`install`, `deploy:staging`, a custom command's name). */
+export interface ActionOverride {
+  featured?: boolean;
+  icon?: string;
+}
+
+/** A codicon name: lowercase letters, digits and dashes (`rocket`, `cloud-upload`). */
+export const ICON_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /** What the agent may be granted on AWS. A missing list means no limit from this layer. */
 export interface AgentAwsScope {
@@ -92,6 +105,8 @@ export interface RepoConfig {
   id?: string;
   name?: string;
   commands: Record<string, CustomCommand>;
+  /** Overrides for the buttons `pf actions` lists (`featured`, `icon`), by action id. */
+  actions?: Record<string, ActionOverride>;
   /** Name of the user's profile this repo uses. */
   profile?: string;
   /** What the repo asks for. It can only narrow the profile's limits, never widen them. */
@@ -140,8 +155,23 @@ export function parseProfile(v: unknown): ProfileConfig {
   return out;
 }
 
+/** Keep only well-formed entries of the `actions` section (a bad icon name is dropped, the rest is kept). */
+export function parseActionOverrides(v: unknown): Record<string, ActionOverride> | undefined {
+  if (!isObj(v)) return undefined;
+  const out: Record<string, ActionOverride> = {};
+  for (const [id, o] of Object.entries(v)) {
+    if (id === '__proto__' || !isObj(o)) continue;
+    const entry: ActionOverride = {
+      ...(typeof o.featured === 'boolean' ? { featured: o.featured } : {}),
+      ...(typeof o.icon === 'string' && ICON_NAME.test(o.icon) ? { icon: o.icon } : {}),
+    };
+    if (Object.keys(entry).length) out[id] = entry;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 export function loadRepoConfig(root: string): RepoConfig {
-  const raw = readJson<{ id?: unknown; name?: unknown; commands?: unknown; profile?: unknown; agent?: unknown; bgTone?: unknown }>(repoConfigPath(root));
+  const raw = readJson<{ id?: unknown; name?: unknown; commands?: unknown; actions?: unknown; profile?: unknown; agent?: unknown; bgTone?: unknown }>(repoConfigPath(root));
   const commands: Record<string, CustomCommand> = {};
   if (raw && raw.commands && typeof raw.commands === 'object') {
     for (const [name, v] of Object.entries(raw.commands as Record<string, unknown>)) {
@@ -155,15 +185,19 @@ export function loadRepoConfig(root: string): RepoConfig {
           ...(typeof o.group === 'string' ? { group: o.group } : {}),
           ...(typeof o.cwd === 'string' ? { cwd: o.cwd } : {}),
           ...(o.message === true ? { message: true } : {}),
+          ...(typeof o.icon === 'string' && ICON_NAME.test(o.icon) ? { icon: o.icon } : {}),
+          ...(typeof o.featured === 'boolean' ? { featured: o.featured } : {}),
         };
       }
     }
   }
+  const actions = parseActionOverrides(raw?.actions);
   const scope = isObj(raw?.agent) ? parseAgentAwsScope(raw.agent.aws) : undefined;
   return {
     ...(typeof raw?.id === 'string' && raw.id.trim() ? { id: raw.id.trim() } : {}),
     ...(typeof raw?.name === 'string' ? { name: raw.name } : {}),
     commands,
+    ...(actions ? { actions } : {}),
     ...(typeof raw?.profile === 'string' && raw.profile.trim() ? { profile: raw.profile.trim() } : {}),
     ...(scope ? { agent: { aws: scope } } : {}),
     ...(isObj(raw?.bgTone) ? { bgTone: raw.bgTone } : {}),

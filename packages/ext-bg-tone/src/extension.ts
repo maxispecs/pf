@@ -14,6 +14,8 @@ import {
 	updateIdentityContext,
 } from './identityView.ts';
 import { applyTitle } from './title.ts';
+import { ActionsService } from './actionsService.ts';
+import { diffFeatured } from './actions.ts';
 
 const NO_COLOR_LABEL = 'No color';
 const CUSTOM_LABEL = 'Custom hex color...';
@@ -21,7 +23,8 @@ const SETTINGS_LABEL = 'Open full repo settings...';
 
 export function activate(context: vscode.ExtensionContext): void {
 	const logos = new LogoService();
-	const card = new IdentityCardProvider(context, logos);
+	const actions = new ActionsService();
+	const card = new IdentityCardProvider(context, logos, actions);
 	const item = new IdentityItemProvider(logos);
 
 	const reapply = () => {
@@ -61,6 +64,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	context.subscriptions.push(
 		logos,
+		actions,
 		card,
 		item,
 		statusItem,
@@ -74,6 +78,9 @@ export function activate(context: vscode.ExtensionContext): void {
 			refreshStatus();
 			reapply();
 			refreshLogo();
+			// pulpfixer.json also holds the commands and `actions` the buttons come from.
+			actions.refreshSoon();
+			card.refresh();
 		}),
 		vscode.window.onDidChangeActiveColorTheme(() => void applyTone(context)),
 
@@ -91,10 +98,12 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand('bgTone.clearLogo', () => clearLogo(context)),
 		vscode.commands.registerCommand('bgTone.randomize', () => randomize(context)),
 		vscode.commands.registerCommand('bgTone.clear', () => clear(context)),
+		vscode.commands.registerCommand('bgTone.editActions', () => editActions(actions)),
 	);
 
 	reapply();
 	refreshLogo();
+	void actions.refresh();
 }
 
 export function deactivate(): void {
@@ -205,6 +214,42 @@ async function randomize(context: vscode.ExtensionContext): Promise<void> {
 		vscode.workspace.name ??
 		'workspace';
 	await writeColor(context, colorFromName(name));
+}
+
+/** Multi-select picker over every repo action; the ticked ones become buttons on the Repo Identity card. */
+async function editActions(service: ActionsService): Promise<void> {
+	if (!ensureWorkspace()) {
+		return;
+	}
+	await service.refresh();
+	const all = service.actions;
+	if (all.length === 0) {
+		void vscode.window.showInformationMessage('Background Tone: no repo actions found. Is pf installed and up to date?');
+		return;
+	}
+	const items = all.map(a => ({
+		label: `$(${a.icon}) ${a.label}`,
+		description: `pf ${a.argv.join(' ')}`,
+		picked: a.featured,
+		id: a.id,
+	}));
+	const picked = await vscode.window.showQuickPick(items, {
+		title: 'Background Tone: Featured Repo Actions',
+		placeHolder: 'Tick the actions to show as buttons on the Repo Identity card',
+		canPickMany: true,
+		matchOnDescription: true,
+	});
+	if (!picked) {
+		return;
+	}
+	const { feature, unfeature } = diffFeatured(all, picked.map(p => p.id));
+	const failures = [
+		await service.setFeatured(feature, true),
+		await service.setFeatured(unfeature, false),
+	].filter((m): m is string => !!m);
+	if (failures.length > 0) {
+		void vscode.window.showErrorMessage(`Background Tone: could not save the featured actions. ${failures[0]}`);
+	}
 }
 
 async function clear(context: vscode.ExtensionContext): Promise<void> {

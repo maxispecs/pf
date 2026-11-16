@@ -60,6 +60,23 @@ export function cachedExtension(pkg: string): CachedExtension | null {
   return { pkg, version, info: { pkg, version, id: checked.id, file } };
 }
 
+/** Every extension package already on this machine (`@pulpfixer/ext-<name>` in the presets prefix). */
+export function cachedExtensions(): CachedExtension[] {
+  const dir = path.join(presetsDir(), 'node_modules', ...EXTENSION_SCOPE.split('/'));
+  let entries: string[] = [];
+  try {
+    entries = fs.readdirSync(dir);
+  } catch {
+    // nothing fetched yet
+  }
+  return entries
+    .map((e) => `${EXTENSION_SCOPE}/${e}`)
+    .filter(isExtensionPackage)
+    .sort()
+    .map((pkg) => cachedExtension(pkg))
+    .filter((c): c is CachedExtension => c !== null);
+}
+
 export interface FetchedExtension {
   info: ExtensionInfo;
   source: 'registry' | 'cache';

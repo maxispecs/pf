@@ -18,6 +18,7 @@ Run `pf list` for the list that applies in the current directory, and `pf help` 
 | `pf deploy production` | Only a `deploy:production` script or `pulpfixer.json` entry; always confirms |
 | `pf publish staging` | Run the repo's `publish:cellars` script (else its staging deploy); always confirms |
 | `pf tools [name] [args]` | List and run the repo's own `./a` tools. See [Tools and repo setup](/commands/tools-and-repo) |
+| `pf actions [--all] [--json]` | The repo's actions (run, deploy, publish, docs, custom commands) with an icon and a featured flag: the buttons of the Background Tone card. `pf actions feature\|unfeature <id...>` chooses them. See [Tools and repo setup](/commands/tools-and-repo#pf-actions) |
 | `pf init` | Write `pulpfixer.json` for this repo from what was detected |
 | `pf repo` | Hook pf's tools into this repo (link, pnpm commands, versioning, background tone logo and extension, deploy), or update them |
 | `pf agent [prompt]` | Open the coding agent (Claude Code, Codex or Cursor). See [Agent](/agent) |
@@ -45,3 +46,20 @@ Commands that run something support `--dry-run`. Short names such as `pf r` and 
 | `pf update` (`pf u`) | Update pf, installed plugins, the suite extensions installed in Cursor (Background Tone), the `ver` and `pnpm` skills and registry skills, then this repo's copies of their helpers. `--check`, `--yes`, `--dry-run` |
 | `pf uninstall` | Remove pf. `--purge`, `--no-package`, `--no-shell`, `--yes`, `--dry-run` |
 | `pf doctor` | Check this machine and repo for problems. `--offline` |
+| `pf versions` (`pf vs`) | List the versions of everything pulpfixer-related installed here: pf, the bundled kit and plugins, registry plugins, skills, presets and the suite extensions in Cursor. `--json`. No network. See [Versions](#versions) |
+
+## Versions
+
+`pf versions` (short: `pf vs`) reads what is on this machine and prints it in sections:
+
+| Section | What it lists |
+|---------|---------------|
+| pf | The running version, where it is installed, and the Node version |
+| pf on PATH | Every `pf` on `PATH`, in order. A legacy (1.x) one or a shadowed one is flagged |
+| Bundled with pf | `@pulpfixer/kit` and the built-in plugins, at the versions this pf ships |
+| Plugins | Plugins installed from the registry (`~/.pf/plugins`), and whether each loaded |
+| Skills | Registry skills in `~/.pf/skills` and the agent folders (`~/.cursor`, `~/.claude`, `~/.agents`), what else sits in `~/.pf/skills`, and the skills bundled with pf, with the version from the package or from `metadata.version` in `SKILL.md` |
+| Presets | The presets `pf sys apply` fetched into `~/.pf/sys/presets` |
+| Cursor extensions | The suite extensions (Background Tone), at the version Cursor has installed, with a hint when a newer one was fetched |
+
+Warnings are yellow and problems red (a plugin that failed to load, an unusable preset). `pf versions --json` prints the same data for scripts. It never uses the network; `pf update --check` compares with the registry. For the versions of a repo's own modules, use [`pf ver`](/commands/ver).

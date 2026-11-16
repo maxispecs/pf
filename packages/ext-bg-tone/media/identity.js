@@ -16,6 +16,53 @@
 		return el;
 	}
 
+	const ICON_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+	let actionsKey = '';
+	let actionsEl = null;
+
+	/** One flat icon button; the tooltip is the native `title`, which also names it for screen readers. */
+	function iconButton(icon, label, onClick, extraClass) {
+		const button = h('button', 'act' + (extraClass ? ' ' + extraClass : ''));
+		button.type = 'button';
+		button.title = label;
+		button.setAttribute('aria-label', label);
+		button.append(h('span', 'codicon codicon-' + (ICON_NAME.test(icon) ? icon : 'terminal')));
+		button.addEventListener('click', onClick);
+		return button;
+	}
+
+	/**
+	 * The row of featured repo actions. The same element is reused while the actions are unchanged, so the
+	 * periodic refresh does not rebuild the buttons under the pointer (that would drop a tooltip or focus).
+	 */
+	function actionsRow(actions) {
+		const a = actions || { buttons: [], canEdit: false, hint: '' };
+		const key = JSON.stringify(a);
+		if (key === actionsKey) {
+			return actionsEl;
+		}
+		actionsKey = key;
+		const buttons = Array.isArray(a.buttons) ? a.buttons : [];
+		if (!buttons.length && !a.canEdit && !a.hint) {
+			actionsEl = null;
+			return null;
+		}
+		const row = h('div', 'actions');
+		row.setAttribute('role', 'toolbar');
+		row.setAttribute('aria-label', 'Repo actions');
+		for (const b of buttons) {
+			row.append(iconButton(b.icon, b.label, () => vscode.postMessage({ type: 'run', id: b.id })));
+		}
+		if (a.canEdit) {
+			row.append(iconButton('edit', 'Choose featured actions...', () => vscode.postMessage({ type: 'editActions' }), 'act-edit'));
+		}
+		if (a.hint) {
+			row.append(h('span', 'actions-hint', a.hint));
+		}
+		actionsEl = row;
+		return row;
+	}
+
 	function render(state) {
 		const logo = h('div', 'logo');
 		if (state.logoSrc) {
@@ -33,6 +80,11 @@
 		const card = h('div', 'card');
 		card.append(logo, info);
 		const children = [card];
+
+		const actions = actionsRow(state.actions);
+		if (actions) {
+			children.push(actions);
+		}
 
 		agentTimes = [];
 		const agents = Array.isArray(state.agents) ? state.agents : [];

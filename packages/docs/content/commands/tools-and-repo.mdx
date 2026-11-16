@@ -17,6 +17,35 @@ pf tools --dry-run
 
 A command named like a task (`dev`, `build`, `test`, `lint`, `install` or `setup`) becomes that task's repo script, so `pf dev` runs it. `deploy:staging` and `deploy:production` become deploy targets (`-y` is added when its usage mentions it, since pf already confirmed). Everything else is reached with `pf tools`.
 
+## pf actions
+
+`pf actions` lists what this repo can do, the same things the menu offers, as **actions**: each has an id, a tooltip label, a [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) name and a **featured** flag. Editors draw the featured ones as small icon buttons; the [Background Tone](/plugins/bg-tone#action-buttons) extension shows them on the Repo Identity card.
+
+```bash
+pf actions                      # the featured actions
+pf actions --all                # every action; * marks the featured ones
+pf actions --json               # for editors: {"schema":1,"repo":"...","actions":[...]} on stdout
+pf actions feature build        # make "build" a button
+pf actions feature seed --icon database
+pf actions unfeature install:local
+pf actions feature build --dry-run
+```
+
+| Id | Runs | Icon | Featured by default |
+|----|------|------|---------------------|
+| `dev` | `pf dev` | `play` | yes |
+| `deploy:staging` | `pf deploy staging` | `rocket` | yes |
+| `deploy:production` | `pf deploy production` | `cloud` | yes |
+| `deploy` | `pf deploy` (a repo's own deploy) | `rocket` | yes |
+| `publish:staging` | `pf publish staging` | `cloud-upload` | yes |
+| `doc` | `pf doc` | `book` | yes |
+| `build`, `test`, `lint` | `pf build`, ... | `package`, `beaker`, `checklist` | no |
+| `install`, `install:<to>` | `pf install [<to>]` | `desktop-download` | no |
+| `tools` | `pf tools` | `tools` | no |
+| a custom command | `pf <name>` | `terminal` | only with `"featured": true` |
+
+Only what the repo really has is listed, so a repo without a staging target has no deploy button. Production deploy and publish still ask before they run, because the button just runs `pf` in a terminal. Set `featured` and `icon` in [pulpfixer.json](/concepts/pulpfixer-json#actions); `pf actions feature` and `unfeature` write the `actions` section there, keeping the rest of the file. An older pf has no `actions` command, so the card shows a hint to update it.
+
 ## pf init
 
 ```bash

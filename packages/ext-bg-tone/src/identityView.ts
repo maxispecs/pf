@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { LogoService, webviewLogoSrc } from './logoService.ts';
 import * as path from 'node:path';
 import { AgentRun, readChatTitles, readRecentAgentRuns } from './agentRuns.ts';
+import type { ActionsService } from './actionsService.ts';
 import { primaryFolder, readConfig, repoName } from './settings.ts';
 
 /** How often the card re-reads the agent transcripts (cheap: one directory scan, two small reads). */
@@ -50,7 +51,10 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 	constructor(
 		private readonly context: vscode.ExtensionContext,
 		private readonly logos: LogoService,
-	) {}
+		private readonly actions: ActionsService,
+	) {
+		this.disposables.push(this.actions.onDidChange(() => this.refresh()));
+	}
 
 	resolveWebviewView(view: vscode.WebviewView): void {
 		this.view = view;
@@ -79,9 +83,15 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 				this.stopPolling();
 			}
 		}, null, this.disposables);
-		view.webview.onDidReceiveMessage((m: { type?: string }) => {
+		view.webview.onDidReceiveMessage((m: { type?: string; id?: unknown }) => {
 			if (m?.type === 'ready') {
 				this.refresh();
+				void this.actions.refresh();
+			} else if (m?.type === 'run' && typeof m.id === 'string') {
+				// Only an id comes from the page; what runs is looked up in pf's own list.
+				this.actions.runAction(m.id);
+			} else if (m?.type === 'editActions') {
+				void vscode.commands.executeCommand('bgTone.editActions');
 			}
 		}, null, this.disposables);
 	}
@@ -113,8 +123,25 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 				color,
 				logoSrc: logo ? webviewLogoSrc(view.webview, logo) : '',
 				agents: agents.map(({ title, status, updatedAt }) => ({ title, status, updatedAt })),
+				actions: config.showActions ? this.actionsState() : { buttons: [], canEdit: false, hint: '' },
 			},
 		});
+	}
+
+	/** What the card draws for the actions row: the featured buttons, whether to offer editing, and a hint when pf is the problem. */
+	private actionsState(): { buttons: Array<{ id: string; label: string; icon: string }>; canEdit: boolean; hint: string } {
+		const status = this.actions.status;
+		const hint =
+			status.type === 'no-pf'
+				? 'Install pf to get repo action buttons.'
+				: status.type === 'old-pf'
+					? 'Update pf (pf update) to get repo action buttons.'
+					: '';
+		return {
+			buttons: this.actions.featured.map(({ id, label, icon }) => ({ id, label, icon })),
+			canEdit: status.type === 'ready' && this.actions.actions.length > 0,
+			hint,
+		};
 	}
 
 	/** Recent agent chats, labelled with the tab title Cursor shows (first request as fallback). */
@@ -156,8 +183,9 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; script-src 'nonce-${n}';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${n}';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="${media('codicon.css')}">
 <link rel="stylesheet" href="${media('identity.css')}">
 </head>
 <body>

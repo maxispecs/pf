@@ -105,6 +105,18 @@
           "scope": "window",
           "markdownDescription": "Show the last 3 Cursor agent chats for this repo (title, status and how long ago) on the Repo Identity card. Chats come from `~/.cursor/projects/.../agent-transcripts` and tab titles are read from Cursor's state database via the system `sqlite3` command; local windows only."
         },
+        "bgTone.showActions": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "markdownDescription": "Show the repo's featured actions (run, deploy, publish, docs and your own commands) as small icon buttons on the Repo Identity card. The list comes from `pf actions --json`; choose which actions are featured with the pencil button, `pf actions feature <id>`, or `featured` / `icon` in the repo's `pulpfixer.json`. Needs `pf`; buttons run in the integrated terminal."
+        },
+        "bgTone.pfPath": {
+          "type": "string",
+          "default": "pf",
+          "scope": "machine",
+          "markdownDescription": "The `pf` command the action buttons run. Leave it as `pf` when it is on your PATH; set a full path when the editor cannot find it. Machine scope: a repo's workspace settings cannot change it."
+        },
         "bgTone.palette": {
           "type": "array",
           "default": [],
@@ -143,6 +155,11 @@
         "command": "bgTone.openSettings",
         "title": "Background Tone: Open Repo Settings",
         "icon": "$(settings-gear)"
+      },
+      {
+        "command": "bgTone.editActions",
+        "title": "Background Tone: Choose Featured Repo Actions...",
+        "icon": "$(edit)"
       },
       {
         "command": "bgTone.pickLogo",

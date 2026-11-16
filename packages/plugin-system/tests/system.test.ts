@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { installVsixArgv, listExtensionsArgv, parseExtensionVersions, parseExtensions, settingsPathFor } from '../src/apps/editor.js';
 import { cachedExtension, fetchExtension, validateExtensionManifest } from '../src/extensions.js';
 import { findApp } from '../src/apps/index.js';
+import { systemVersions } from '../src/versions.js';
 import { parseJsonc, sameJson, setTopLevelKeys } from '../src/jsonc.js';
 import { capturePreset, describePlan, isEmptyPlan, planPreset, settingsToWrite } from '../src/plan.js';
 import { cachedPreset, fetchPreset, installArgv, isPresetName, parseSearch, pickPresetPackages, presetOfPackage, presetPackage, validatePreset } from '../src/presets.js';
@@ -329,4 +330,57 @@ test('describePlan shows suite extensions to install and update', () => {
   assert.ok(add.includes('  + local.bg-tone v1.2.0 (@pulpfixer/ext-bg-tone)'));
   const up = describePlan(planPreset(suitePreset, { extensions: ['local.bg-tone'], extensionVersions: { 'local.bg-tone': '0.10.0' }, settings: {} }, [bgTone]), c);
   assert.ok(up.includes('  ~ local.bg-tone v0.10.0 -> v1.2.0'));
+});
+
+// ---- versions ----
+
+test('systemVersions lists cached presets and extensions with what the app has installed', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-sys-'));
+  const prev = process.env.PF_HOME;
+  process.env.PF_HOME = home;
+  const nm = path.join(home, 'sys', 'presets', 'node_modules', '@pulpfixer');
+  const put = (name: string, files: Record<string, string>) => {
+    fs.mkdirSync(path.join(nm, name), { recursive: true });
+    for (const [f, text] of Object.entries(files)) fs.writeFileSync(path.join(nm, name, f), text);
+  };
+  const app = (extensions: string[] | null, versions: Record<string, string> | null, found = true) => ({
+    label: 'Cursor',
+    detect: () => found,
+    readState: () => ({ cli: 'cursor', extensions, extensionVersions: versions, settingsPath: '', settingsText: null, settings: {}, problems: [] }),
+  });
+  try {
+    assert.deepEqual(systemVersions({ app: null }), { presets: [], extensions: [], app: { label: 'Cursor', found: false, readable: false } });
+
+    put('preset-cursor', { 'package.json': '{"version":"1.4.0"}', 'preset.json': '{"app":"cursor"}' });
+    put('ext-bg-tone', { 'package.json': JSON.stringify({ version: '2.0.0', pf: { extension: { id: 'local.bg-tone', vsix: 'bg-tone.vsix' } } }), 'bg-tone.vsix': 'x' });
+    put('ext-broken', { 'package.json': '{"version":"0.1.0"}' });
+
+    const got = systemVersions({ app: app(['local.bg-tone'], { 'local.bg-tone': '1.0.0' }) });
+    assert.deepEqual(got.presets, [{ name: 'cursor', package: '@pulpfixer/preset-cursor', version: '1.4.0' }]);
+    assert.deepEqual(got.app, { label: 'Cursor', found: true, readable: true });
+    assert.deepEqual(got.extensions.map((e) => [e.package, e.version, e.id, e.installed]), [
+      ['@pulpfixer/ext-bg-tone', '2.0.0', 'local.bg-tone', '1.0.0'],
+      ['@pulpfixer/ext-broken', '0.1.0', null, null],
+    ]);
+    assert.ok(got.extensions[1]!.problem);
+
+    // not installed in the app, and an app whose extensions cannot be read
+    assert.equal(systemVersions({ app: app([], {}) }).extensions[0]!.installed, null);
+    const unreadable = systemVersions({ app: app(null, null) });
+    assert.deepEqual([unreadable.app.readable, unreadable.extensions[0]!.installed], [false, null]);
+    // installed without a version
+    assert.equal(systemVersions({ app: app(['local.bg-tone'], {}) }).extensions[0]!.installed, '');
+
+    // Background Tone installed from elsewhere (never fetched) still shows up
+    fs.rmSync(path.join(nm, 'ext-bg-tone'), { recursive: true });
+    const other = systemVersions({ app: app(['local.bg-tone'], { 'local.bg-tone': '1.0.0' }) });
+    assert.deepEqual(other.extensions.map((e) => [e.package, e.installed]), [
+      ['@pulpfixer/ext-broken', null],
+      ['@pulpfixer/ext-bg-tone', '1.0.0'],
+    ]);
+  } finally {
+    if (prev === undefined) delete process.env.PF_HOME;
+    else process.env.PF_HOME = prev;
+    fs.rmSync(home, { recursive: true, force: true });
+  }
 });

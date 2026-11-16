@@ -22,5 +22,13 @@ export interface Entry {
   detail?: string;
   /** The command line that does the same thing, when it is not `pf <name>`. */
   cli?: string;
+  /** Stable id of an action adapted from the repo (`dev`, `deploy:staging`, a custom command's name). `pf actions` lists these. */
+  id?: string;
+  /** The pf arguments that run it, e.g. `['deploy', 'staging']` (`pf deploy staging`). */
+  argv?: string[];
+  /** Codicon name for a button (`rocket`). */
+  icon?: string;
+  /** Shown as a button in editors by default (before the repo's `actions` overrides). */
+  featured?: boolean;
   run: () => Promise<number>;
 }

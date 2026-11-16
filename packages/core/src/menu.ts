@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { defaultMeta } from './actionmeta.js';
 import { resolveAgent } from './agent/agents.js';
 import { aboutCommand } from './commands/about.js';
 import { agentCommand } from './commands/agent.js';
@@ -18,6 +19,7 @@ import { pluginCommand } from './commands/plugin.js';
 import { profileCommand } from './commands/profile.js';
 import { repoCommand } from './commands/repo.js';
 import { verCommand } from './commands/ver.js';
+import { versionsCommand } from './commands/versions.js';
 import type { Context } from '@pulpfixer/kit/context';
 import { detectDocs } from '@pulpfixer/kit/detect/docs';
 import { detectDeploy, detectProduction, detectStaging } from '@pulpfixer/kit/detect/deploy';
@@ -75,6 +77,11 @@ function groupRank(g: string): number {
 export function entriesFor(ctx: Context): Entry[] {
   const entries: Entry[] = [];
   const fromRepo: Entry[] = [];
+  /** Action metadata for an entry adapted from the repo: its id, the pf args that run it and the default icon / featured flag. */
+  const action = (id: string, argv: string[], own: { icon?: string; featured?: boolean } = {}) => {
+    const d = defaultMeta(id);
+    return { id, argv, icon: own.icon ?? d.icon, featured: own.featured ?? d.featured };
+  };
   const tool = (cmd: { name: string; summary: string; run: (c: Context, a: string[]) => Promise<number> }, group: string, detail?: string): Entry => ({
     name: cmd.name,
     summary: cmd.summary,
@@ -93,6 +100,7 @@ export function entriesFor(ctx: Context): Entry[] {
         name: t.name,
         summary: t.summary,
         group: t.group,
+        ...action(t.name, [t.name]),
         detail: formatCmd(list[0]!.cmd, ctx.workdir) + (list.length > 1 ? `  (+${list.length - 1} more)` : ''),
         run: () => runTask(ctx, t.name as Task, { pick: true }),
       });
@@ -105,6 +113,7 @@ export function entriesFor(ctx: Context): Entry[] {
           name: `install ${target}`,
           summary: target === 'local' ? 'Install locally' : `Install to ${target}`,
           group: 'Develop',
+          ...action(`install:${target}`, ['install', target]),
           detail: formatCmd(cand.cmd, ctx.workdir),
           run: () => runInstall(ctx, target),
         });
@@ -116,6 +125,7 @@ export function entriesFor(ctx: Context): Entry[] {
           name: 'install',
           summary: installCommand.summary,
           group: 'Develop',
+          ...action('install', ['install']),
           detail: formatCmd(deps[0]!.cmd, ctx.workdir) + (deps.length > 1 ? `  (+${deps.length - 1} more)` : ''),
           run: () => runTask(ctx, 'install', { pick: true }),
         });
@@ -127,6 +137,7 @@ export function entriesFor(ctx: Context): Entry[] {
         name: 'doc',
         summary: 'Run the docs site locally',
         group: 'Docs & deploy',
+        ...action('doc', ['doc']),
         detail: formatCmd(docs[0]!.cmd, ctx.workdir),
         run: () => runDoc(ctx, { pick: true }),
       });
@@ -137,6 +148,7 @@ export function entriesFor(ctx: Context): Entry[] {
         name: 'deploy staging',
         summary: 'Deploy to staging',
         group: 'Docs & deploy',
+        ...action('deploy:staging', ['deploy', 'staging']),
         detail: `${staging.steps.length} step(s), asks first`,
         run: () => runDeployStaging(ctx),
       });
@@ -150,6 +162,7 @@ export function entriesFor(ctx: Context): Entry[] {
           name: production.steps.length ? 'deploy production' : 'deploy',
           summary: production.steps.length ? 'Deploy to production' : 'Deploy (the repo\'s own deploy command)',
           group: 'Docs & deploy',
+          ...(production.steps.length ? action('deploy:production', ['deploy', 'production']) : action('deploy', ['deploy'])),
           detail: formatCmd(found.steps[0]!.cmd, ctx.workdir) + ', asks first',
           run: () => runDeployAuto(ctx),
         });
@@ -161,6 +174,7 @@ export function entriesFor(ctx: Context): Entry[] {
         name: 'publish staging',
         summary: 'Publish to the staging registry (cellars)',
         group: 'Docs & deploy',
+        ...action('publish:staging', ['publish', 'staging']),
         detail: formatCmd(publish.steps[0]!.cmd, ctx.workdir) + ', asks first',
         run: () => runPublishStaging(ctx),
       });
@@ -171,15 +185,17 @@ export function entriesFor(ctx: Context): Entry[] {
         name,
         summary: cfg.description ?? cfg.run,
         group: cfg.group ?? 'Tools',
+        ...action(name, [name], { icon: cfg.icon, featured: cfg.featured }),
         ...(cfg.description ? { detail: cfg.run } : {}),
         run: () => runCustom(ctx, name, []),
       });
     }
     entries.push(tool(verCommand, 'Tools', findVersionsRoot(ctx.cwd) ? 'versions.json' : 'not set up yet'));
     const localCli = localCliFor(ctx);
-    if (localCli) fromRepo.push(tool(toolsCommand, 'Tools', `${localCli.commands.length} in ${localCli.entry}`));
+    if (localCli) fromRepo.push({ ...tool(toolsCommand, 'Tools', `${localCli.commands.length} in ${localCli.entry}`), ...action('tools', ['tools']) });
     entries.push(tool(skillCommand, 'Tools'));
     entries.push(tool(pluginCommand, 'Tools'));
+    entries.push(tool(versionsCommand, 'Tools'));
     entries.push(tool(repoCommand, 'Tools'));
     entries.push(tool(profileCommand, 'Tools', profileDetail(ctx)));
     if (!ctx.repo.hasConfig) entries.push(tool(initCommand, 'Tools'));
@@ -190,6 +206,7 @@ export function entriesFor(ctx: Context): Entry[] {
     entries.push(agentEntry(ctx));
     entries.push({ ...tool(skillCommand, 'Tools'), name: 'skill', summary: 'Run a skill' });
     entries.push(tool(pluginCommand, 'Tools'));
+    entries.push(tool(versionsCommand, 'Tools'));
     entries.push(tool(profileCommand, 'Tools', profileDetail(ctx)));
     entries.push(tool(doctorCommand, 'Tools'));
     entries.push(tool(setupCommand, 'Tools'));

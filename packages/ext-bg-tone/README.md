@@ -50,9 +50,31 @@ customization keys are left alone.
 | `bgTone.logoLocations` | `["identityCard", "explorerItem"]` | Where to show the identity: `identityCard`, `explorerItem`, `windowTitle`. |
 | `bgTone.titleEmoji` | `""` | Emoji or short text (max 8 characters) used as the window title prefix. |
 | `bgTone.showLastAgent` | `true` | Show the last 3 Cursor agent chats (title, status, time since) on the Repo Identity card. |
+| `bgTone.showActions` | `true` | Show the repo's featured actions as icon buttons on the Repo Identity card (personal setting). |
+| `bgTone.pfPath` | `pf` | The `pf` command the buttons run. Machine scope: a repo's workspace settings cannot change it. |
 
 Commands: **Set Tone Color**, **Open Repo Settings**, **Choose Repo Logo...**, **Clear Repo Logo**,
-**Randomize Tone** (stable color from the folder name), **Clear Tone**.
+**Randomize Tone** (stable color from the folder name), **Clear Tone**, **Choose Featured Repo Actions...**.
+
+## Action buttons
+
+Under the repo name, the Repo Identity card shows small icon buttons for the repo's **featured actions** (run,
+deploy, publish, docs and your own commands). Hover for the name, click to run `pf <action>` in the integrated
+terminal. The list comes from `pf actions --json`, so only what the repo really has is offered; it needs `pf` (a
+hint replaces the buttons when it is missing or too old) and a trusted workspace.
+
+Which actions are featured, and their [codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html)
+icons, live in the repo's `pulpfixer.json` (not in the `bgTone` section; pf owns them):
+
+```json
+{
+  "commands": { "seed": { "run": "./scripts/seed.sh", "icon": "database", "featured": true } },
+  "actions": { "doc": { "featured": false }, "build": { "featured": true, "icon": "package" } }
+}
+```
+
+The pencil at the end of the row opens a picker over every action (it runs `pf actions feature` / `unfeature`).
+Run `pf actions --all` to see the ids.
 
 ## Repo logo
 
