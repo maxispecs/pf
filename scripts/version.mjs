@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 // major.minor versioning for a repo ("stack") and its sub-packages.
 // Source of truth is versions.json at the repo root. Zero dependencies, Node >= 18.
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Revision of this CLI, bumped whenever it changes. `--cli-version` prints it so the /ver skill
 // can tell whether a repo's copy is older than the skill's. Copies without it count as 0.
-const CLI_VERSION = 6;
+const CLI_VERSION = 7;
 const MANIFEST = 'versions.json';
+// Events a repo can hook into through the "hooks" key of versions.json.
+const HOOK_EVENTS = ['postSync', 'preCommit'];
 const SKIP_DIRS = new Set([
   'node_modules', 'dist', 'build', 'out', 'coverage', 'venv', 'env', '__pycache__',
   'site-packages', 'target', 'vendor',
@@ -21,6 +24,7 @@ const TYPES = ['node', 'python', 'php', 'skill'];
 const PARTS = ['major', 'minor'];
 // Marks the interactive commit button (it shares the button hit-box list with the [+] buttons).
 const COMMIT_BUTTON = '\0commit';
+const EXIT_BUTTON = '\0exit';
 
 class CliError extends Error {}
 
@@ -44,9 +48,16 @@ Commands:
                           today's date as "since".
   sync                    Rewrite package.json / pyproject.toml / composer.json / VERSION from versions.json
 
+Hooks: versions.json may hold a "hooks" object with shell commands, each a string or an array.
+  postSync   runs after bump and sync wrote the manifests (update extra version files here)
+  preCommit  runs before the commit button's git add / git commit (formatters, pre-commit)
+Files a hook changes join the commit. Commands may use {files}; env: VER_ROOT, VER_EVENT,
+VER_STACK, VER_CHANGES (JSON), VER_FILES (newline separated).
+
 Options:
   --json                  (list) machine-readable output
   --dry-run               (bump, init, sync) show changes without writing files
+  --no-hooks              (bump, sync, commit button) do not run hooks
   --prune                 (init) drop packages from versions.json that no longer exist
   --root <dir>            repo root (default: nearest dir with versions.json, or cwd for init)
   --cli-version           print this CLI's revision number
@@ -633,7 +644,29 @@ function loadManifest(root) {
       throw new CliError(`Invalid type "${pkg.type}" for ${rel} in ${MANIFEST}: expected ${TYPES.join(' or ')}`);
     }
   }
+  loadHooks(data);
   return data;
+}
+
+// Validates the optional "hooks" key and returns { event: [command, ...] }.
+function loadHooks(manifest) {
+  const hooks = {};
+  const raw = manifest.hooks;
+  if (raw == null) return hooks;
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new CliError(`Invalid "hooks" in ${MANIFEST}: expected an object keyed by ${HOOK_EVENTS.join(' or ')}`);
+  }
+  for (const [event, value] of Object.entries(raw)) {
+    if (!HOOK_EVENTS.includes(event)) {
+      throw new CliError(`Unknown hook "${event}" in ${MANIFEST}: expected ${HOOK_EVENTS.join(' or ')}`);
+    }
+    const list = typeof value === 'string' ? [value] : value;
+    if (!Array.isArray(list) || list.some((x) => typeof x !== 'string' || !x.trim())) {
+      throw new CliError(`Invalid hooks.${event} in ${MANIFEST}: expected a command string or an array of command strings`);
+    }
+    hooks[event] = list;
+  }
+  return hooks;
 }
 
 function saveManifest(root, data, dryRun) {
@@ -699,7 +732,8 @@ function printSyncResults(root, results, dryRun) {
     const file = toPosix(path.relative(root, r.file)) || r.file;
     if (r.status === 'updated') {
       const verb = dryRun ? c.yellow('would update') : c.green('updated');
-      console.log(`  ${verb} ${file} ${c.dim('->')} ${c.boldGreen(r.version)}`);
+      const to = r.hook ? c.dim('(changed by hook)') : `${c.dim('->')} ${c.boldGreen(r.version)}`;
+      console.log(`  ${verb} ${file} ${to}`);
     } else if (r.status === 'skipped') console.log(`  ${c.yellow('skipped')} ${file} ${c.dim(`(${r.reason})`)}`);
     else if (r.status === 'missing') console.log(`  ${c.yellow('skipped')} ${file} ${c.dim('(file not found)')}`);
   }
@@ -796,7 +830,7 @@ function cmdList(root, flags) {
 // many packages it bumps. An explicit stack bump in that same command is the only stack
 // change. `stackMinorDone` is set once this process has already raised the stack, so later
 // package bumps in the interactive list do not raise it again.
-function applyBumps(root, bumps, dryRun, { stackMinorDone = false } = {}) {
+function applyBumps(root, bumps, dryRun, { stackMinorDone = false, noHooks = false } = {}) {
   if (!bumps.length) throw new CliError('Usage: bump <target> <major|minor> [<target> <major|minor> ...]');
   for (const { part } of bumps) {
     if (!PARTS.includes(part)) throw new CliError(`Invalid part "${part}": expected major or minor`);
@@ -838,7 +872,28 @@ function applyBumps(root, bumps, dryRun, { stackMinorDone = false } = {}) {
     results.push(syncPackage(root, rel, manifest.packages[rel].type, manifest.packages[rel].version, dryRun));
   }
   if (changes.some(([t]) => t === 'stack')) results.push(...syncStack(root, manifest.stack.version, dryRun));
-  return { changes, results, consumedStackMinor };
+  // A failing hook must not hide that the bump was already written, so it is returned, not thrown.
+  let hooks = [];
+  let hookError = null;
+  try {
+    hooks = runPostSync(root, manifest, results, changes, { dryRun, noHooks });
+  } catch (e) {
+    if (!(e instanceof CliError)) throw e;
+    hookError = e;
+  }
+  return { changes, results, consumedStackMinor, hooks, hookError };
+}
+
+// Runs the postSync hooks after manifests were written. Files the hooks changed are appended to
+// `results` as updated entries (without a version) so they are reported and committed with the rest.
+function runPostSync(root, manifest, results, changes, { dryRun, noHooks }) {
+  const files = new Set([MANIFEST]);
+  for (const r of results) if (r.status === 'updated') files.add(toPosix(path.relative(root, r.file)));
+  const run = runHooks(root, manifest, 'postSync', { files: [...files], changes }, { dryRun, noHooks });
+  for (const file of run.files) {
+    if (!files.has(file)) results.push({ file: path.join(root, file), status: 'updated', hook: true });
+  }
+  return run.ran;
 }
 
 function parseBumpArgs(positional) {
@@ -851,7 +906,9 @@ function parseBumpArgs(positional) {
 }
 
 function cmdBump(root, positional, flags) {
-  const { changes, results } = applyBumps(root, parseBumpArgs(positional), flags.dryRun);
+  const { changes, results, hooks, hookError } = applyBumps(root, parseBumpArgs(positional), flags.dryRun, {
+    noHooks: flags.noHooks,
+  });
 
   console.log(flags.dryRun ? c.yellow('Dry run, no files written:') : c.green(`Updated ${MANIFEST}:`));
   const changeRows = changes.map(([t, from, to, since]) => [
@@ -860,12 +917,105 @@ function cmdBump(root, positional, flags) {
   ]);
   console.log(table(changeRows, '  '));
   printSyncResults(root, results, flags.dryRun);
+  printHooks(hooks, flags.dryRun);
+  if (hookError) throw hookError;
 }
 
 // ---------- git helpers (interactive commit button)
 
 function git(root, args) {
-  return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  return execFileSync('git', args, {
+    cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024,
+  });
+}
+
+// Last `n` lines of command output, so a failing hook is visible (git/pre-commit print the
+// failing hook last, and the first lines are always the hooks that passed).
+function tailLines(text, n = 20) {
+  const lines = text.trim().split('\n');
+  return (lines.length > n ? [`... (${lines.length - n} earlier lines omitted)`, ...lines.slice(-n)] : lines).join('\n');
+}
+
+// Dirty files (modified, staged or untracked) under root, mapped to a content hash. Comparing two
+// snapshots tells which files a command touched. Empty outside a git repo.
+function dirtySnapshot(root) {
+  const snap = new Map();
+  let top;
+  let out;
+  try {
+    top = git(root, ['rev-parse', '--show-toplevel']).trim();
+    out = git(root, ['status', '--porcelain', '-z', '--untracked-files=all']);
+  } catch {
+    return snap;
+  }
+  const real = fs.realpathSync(root);
+  const parts = out.split('\0');
+  for (let i = 0; i < parts.length; i++) {
+    const entry = parts[i];
+    if (entry.length < 4) continue;
+    if (entry[0] === 'R' || entry[0] === 'C') i++; // the next entry is the original path
+    const abs = path.join(top, entry.slice(3));
+    const rel = toPosix(path.relative(real, abs));
+    if (rel.startsWith('..')) continue;
+    let hash = 'missing';
+    try {
+      hash = createHash('sha1').update(fs.readFileSync(abs)).digest('hex');
+    } catch { /* deleted or unreadable */ }
+    snap.set(rel, hash);
+  }
+  return snap;
+}
+
+const shellQuote = (s) => (process.platform === 'win32' ? `"${s}"` : `'${s.replace(/'/g, `'\\''`)}'`);
+
+// Runs the commands a repo configured for `event`. `ctx` is { files, changes }: the files already
+// pending and the version changes. Returns { files, ran }: files the hooks changed (relative to root,
+// found by diffing the git working tree around each command) and what ran. Commands run through the
+// shell from the repo root with {files} replaced and VER_* set. A failing command throws.
+function runHooks(root, manifest, event, ctx, { dryRun = false, noHooks = false } = {}) {
+  const commands = noHooks ? [] : loadHooks(manifest)[event] ?? [];
+  if (!commands.length) return { files: [], ran: [] };
+  if (dryRun) return { files: [], ran: commands.map((command) => ({ command, output: '' })) };
+  const known = new Set(ctx.files);
+  const changed = new Set();
+  const ran = [];
+  for (const template of commands) {
+    const current = [...known];
+    const env = {
+      ...process.env,
+      VER_ROOT: root,
+      VER_EVENT: event,
+      VER_STACK: manifest.stack.version,
+      VER_CHANGES: JSON.stringify(ctx.changes ?? []),
+      VER_FILES: current.join('\n'),
+    };
+    const command = template.replaceAll('{files}', current.map(shellQuote).join(' '));
+    const before = dirtySnapshot(root);
+    const r = spawnSync(command, {
+      cwd: root, env, shell: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024,
+    });
+    const output = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim();
+    if (r.error || r.status !== 0) {
+      const why = r.error ? r.error.message : `exit ${r.status ?? r.signal}`;
+      const hint = event === 'postSync'
+        ? `\n${MANIFEST} and the manifests are already updated. Fix the hook, then run "sync" to repeat it.` : '';
+      throw new CliError(`${event} hook failed (${why}): ${template}${output ? `\n${tailLines(output)}` : ''}${hint}`);
+    }
+    for (const [file, hash] of dirtySnapshot(root)) {
+      if (before.get(file) === hash) continue;
+      changed.add(file);
+      known.add(file);
+    }
+    ran.push({ command: template, output });
+  }
+  return { files: [...changed], ran };
+}
+
+function printHooks(ran, dryRun) {
+  for (const { command, output } of ran) {
+    console.log(`  ${dryRun ? c.yellow('would run') : c.green('ran')} ${c.dim('hook')} ${command}`);
+    if (!dryRun && output) for (const line of output.split('\n')) console.log(`    ${c.dim(line)}`);
+  }
 }
 
 function isGitRepo(root) {
@@ -888,15 +1038,32 @@ function isIgnored(root, rel) {
 }
 
 // Commits exactly `files` (paths relative to root), leaving other staged or unstaged work alone.
-function commitFiles(root, files, message) {
+// preCommit hooks run first, and files they change are committed too. If the commit fails because
+// the repo's own git hooks (pre-commit: whitespace, black, ruff) modified the files, the files are
+// staged again and the commit is retried once.
+function commitFiles(root, files, message, { noHooks = false, changes = [] } = {}) {
   const paths = files.filter((f) => !isIgnored(root, f));
   if (!paths.length) throw new CliError('Nothing to commit: every changed file is git-ignored');
-  try {
+  const hooked = runHooks(root, loadManifest(root), 'preCommit', { files: paths, changes }, { noHooks });
+  for (const f of hooked.files) if (!paths.includes(f) && !isIgnored(root, f)) paths.push(f);
+
+  const attempt = () => {
     git(root, ['add', '--', ...paths]);
     git(root, ['commit', '-m', message, '--', ...paths]);
-  } catch (e) {
-    const detail = `${e.stderr ?? ''}${e.stdout ?? ''}`.trim().split('\n').filter(Boolean).slice(0, 2).join(' ');
-    throw new CliError(`git commit failed${detail ? `: ${detail}` : ''}`);
+  };
+  const output = (e) => tailLines(`${e.stdout ?? ''}${e.stderr ?? ''}`);
+  const before = dirtySnapshot(root);
+  try {
+    attempt();
+  } catch (first) {
+    const after = dirtySnapshot(root);
+    const autoFixed = paths.some((p) => after.has(p) && after.get(p) !== before.get(p));
+    if (!autoFixed) throw new CliError(`git commit failed:\n${output(first)}`);
+    try {
+      attempt();
+    } catch (second) {
+      throw new CliError(`git commit failed again after its hooks modified files:\n${output(second)}`);
+    }
   }
   return paths;
 }
@@ -1026,7 +1193,10 @@ function buildInteractiveView(root, flags, status, columns, hover, stackMinorDon
     buttons.push({ row: lines.length, x1: 1, x2: label.length, target: COMMIT_BUTTON, part: COMMIT_BUTTON });
   } else lines.push('');
   lines.push(status || '');
-  lines.push(c.bold('Press any key to exit'));
+  // The exit line is clickable too: any key or a click on it quits.
+  const exitLabel = 'Press any key to exit';
+  lines.push(hover?.target === EXIT_BUTTON ? `\x1b[1;7m${exitLabel}\x1b[0m` : c.bold(exitLabel));
+  buttons.push({ row: lines.length, x1: 1, x2: exitLabel.length, target: EXIT_BUTTON, part: EXIT_BUTTON });
   if (warnings.length) {
     lines.push('');
     lines.push(c.yellow(c.bold('Warnings:')));
@@ -1090,7 +1260,8 @@ function cmdInteractive(root, flags) {
     const { files, targets } = commit.pending;
     if (!files.size) return;
     const message = pendingMessage(commit.pending);
-    const committed = commitFiles(root, [...files], message);
+    const changes = [...targets].map(([t, { from, to }]) => [t, from, to]);
+    const committed = commitFiles(root, [...files], message, { noHooks: flags.noHooks, changes });
     files.clear();
     targets.clear();
     hover = null;
@@ -1101,13 +1272,16 @@ function cmdInteractive(root, flags) {
   const click = (x, y) => {
     const hit = buttonAt(x, y);
     if (!hit) return;
+    if (hit.target === EXIT_BUTTON) return quit();
     try {
       if (hit.target === COMMIT_BUTTON) {
         commitPending();
         render();
         return;
       }
-      const applied = applyBumps(root, [{ target: hit.target, part: hit.part }], flags.dryRun, { stackMinorDone });
+      const applied = applyBumps(root, [{ target: hit.target, part: hit.part }], flags.dryRun, {
+        stackMinorDone, noHooks: flags.noHooks,
+      });
       const { changes } = applied;
       stackMinorDone = applied.consumedStackMinor;
       if (!flags.dryRun) recordPending(root, commit.pending, applied);
@@ -1115,9 +1289,13 @@ function cmdInteractive(root, flags) {
       const prefix = flags.dryRun ? 'would bump' : 'bumped';
       log.push(`${prefix} ${hit.target} ${hit.part}: ${text}`);
       status = `${c.green(prefix)} ${colorTarget(hit.target)} ${hit.part}: ${c.dim(text)}`;
+      if (applied.hookError) throw applied.hookError;
     } catch (e) {
       if (!(e instanceof CliError)) throw e;
-      status = `${c.red('error:')} ${e.message}`;
+      // The screen is one row per line, so show the first line and print the full text on exit.
+      const [first, ...more] = e.message.split('\n');
+      status = `${c.red('error:')} ${first}${more.length ? c.dim(' (details printed on exit)') : ''}`;
+      if (more.length) log.push(`${cErr.red('error:')} ${e.message}`);
     }
     render();
   };
@@ -1196,21 +1374,25 @@ function cmdSync(root, flags) {
   for (const [rel, pkg] of Object.entries(manifest.packages)) {
     if (isDir(path.join(root, rel))) results.push(syncPackage(root, rel, pkg.type, pkg.version, flags.dryRun));
   }
+  // postSync hooks run even when nothing changed: they may repair files the CLI does not know about.
+  const hooks = runPostSync(root, manifest, results, [], { dryRun: flags.dryRun, noHooks: flags.noHooks });
   const changed = results.filter((r) => r.status !== 'unchanged');
   if (!changed.length) console.log(c.green(`All native manifests already match ${MANIFEST}`));
   else printSyncResults(root, changed, flags.dryRun);
+  printHooks(hooks, flags.dryRun);
 }
 
 // ---------- main
 
 function parseArgs(argv) {
-  const flags = { json: false, dryRun: false, prune: false, help: false, cliVersion: false, root: null };
+  const flags = { json: false, dryRun: false, prune: false, noHooks: false, help: false, cliVersion: false, root: null };
   const positional = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--json') flags.json = true;
     else if (a === '--dry-run') flags.dryRun = true;
     else if (a === '--prune') flags.prune = true;
+    else if (a === '--no-hooks') flags.noHooks = true;
     else if (a === '--cli-version') flags.cliVersion = true;
     else if (a === '-h' || a === '--help') flags.help = true;
     else if (a === '--root') {
