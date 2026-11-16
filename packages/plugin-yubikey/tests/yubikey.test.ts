@@ -9,7 +9,7 @@ import { appEnabled, findings, parseFidoInfo, parseInfo, parseOathInfo, parsePgp
 import { accountsArgv, clipboardTools, codeArgv, copyText, isCode, parseAccounts, ykArgv, ykError } from '../src/ykman.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const entry = path.join(root, '..', 'core', 'src', 'bin', 'pf.ts');
+const entry = path.join(root, '..', 'pulpfixer', 'src', 'bin', 'pf.ts');
 const loader = path.join(root, '..', '..', 'node_modules', 'tsx', 'dist', 'loader.mjs');
 
 // Output captured from ykman 5.9.2 and a YubiKey 5C Nano (firmware 5.2.4).

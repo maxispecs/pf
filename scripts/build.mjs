@@ -8,7 +8,7 @@ import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tsc = path.join(root, 'node_modules', '.bin', 'tsc');
-const PACKAGES = ['kit', 'plugin-aws', 'plugin-system', 'plugin-yubikey', 'core'];
+const PACKAGES = ['kit', 'plugin-aws', 'plugin-system', 'plugin-yubikey', 'pulpfixer'];
 
 for (const name of PACKAGES) {
   const dir = path.join(root, 'packages', name);
@@ -17,9 +17,9 @@ for (const name of PACKAGES) {
   if (r.status !== 0) process.exit(r.status ?? 1);
   console.log(`built packages/${name}`);
 }
-const bin = path.join(root, 'packages', 'core', 'dist', 'bin', 'pf.js');
+const bin = path.join(root, 'packages', 'pulpfixer', 'dist', 'bin', 'pf.js');
 if (!existsSync(bin)) {
-  console.error('build: packages/core/dist/bin/pf.js was not produced');
+  console.error('build: packages/pulpfixer/dist/bin/pf.js was not produced');
   process.exit(1);
 }
 chmodSync(bin, 0o755);

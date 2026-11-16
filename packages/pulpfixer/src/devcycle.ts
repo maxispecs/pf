@@ -165,7 +165,7 @@ async function waitForRegistry(version: string, tries = 15): Promise<boolean> {
 export function findCheckout(dir: string): string | null {
   let cur = path.resolve(dir);
   for (;;) {
-    const core = readJson<{ name?: string }>(path.join(cur, 'packages', 'core', 'package.json'));
+    const core = readJson<{ name?: string }>(path.join(cur, 'packages', 'pulpfixer', 'package.json'));
     if (core?.name === PACKAGE_NAME && fs.existsSync(path.join(cur, 'pf')) && fs.existsSync(path.join(cur, 'scripts', 'release.mjs'))) return cur;
     const parent = path.dirname(cur);
     if (parent === cur) return null;
@@ -267,7 +267,7 @@ export async function runDevCycle(root: string, args: string[] = []): Promise<nu
   }
 
   r.step('Update the global pf');
-  const core = readJson<{ version?: string }>(root, 'packages', 'core', 'package.json')?.version;
+  const core = readJson<{ version?: string }>(root, 'packages', 'pulpfixer', 'package.json')?.version;
   if (toPublish.length && core && !(await waitForRegistry(core))) {
     r.warn(`the registry does not serve pulpfixer ${core} yet: pf u may report it is current. Run it again in a moment.`);
   }

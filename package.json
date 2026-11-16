@@ -10,14 +10,14 @@
     "node": ">=18"
   },
   "scripts": {
-    "dev": "tsx --conditions=source packages/core/src/bin/pf.ts",
+    "dev": "tsx --conditions=source packages/pulpfixer/src/bin/pf.ts",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.check.json && pnpm --filter @pulpfixer/ext-bg-tone typecheck",
     "test": "node scripts/test.mjs",
-    "pf": "node packages/core/dist/bin/pf.js",
+    "pf": "node packages/pulpfixer/dist/bin/pf.js",
     "docs:dev": "pnpm --filter @pulpfixer/docs dev",
     "docs:build": "pnpm --filter @pulpfixer/docs build",
-    "install:local": "bash packages/core/scripts/install.sh --from-source",
+    "install:local": "bash packages/pulpfixer/scripts/install.sh --from-source",
     "release": "node scripts/release.mjs",
     "publish:cellars": "node scripts/release.mjs --publish",
     "ver": "node scripts/version.mjs",
@@ -47,7 +47,7 @@
     "Tools": {
       "ver": "List versions and bump commands",
       "skills:sync": "Refresh the bundled /ver and /pnpm helpers from the skills checkout",
-      "logo": "Regenerate the header art from packages/core/assets/pulpfixer.png (--preview to see it)"
+      "logo": "Regenerate the header art from packages/pulpfixer/assets/pulpfixer.png (--preview to see it)"
     },
     "Help": {
       "ask": "Show this list"

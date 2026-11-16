@@ -13,8 +13,8 @@ Every package and the whole stack have a `major.minor` version, kept in `version
 When you change a package, bump its **minor** version before you finish:
 
 ```bash
-pnpm ver bump packages/core minor
-pnpm ver bump packages/kit packages/core minor   # several targets; the stack minor rises once
+pnpm ver bump packages/pulpfixer minor
+pnpm ver bump packages/kit packages/pulpfixer minor   # several targets; the stack minor rises once
 ```
 
 - Use **major** only for breaking changes.
@@ -22,7 +22,7 @@ pnpm ver bump packages/kit packages/core minor   # several targets; the stack mi
 - Bump a package only when its own files changed. A core change that depends on a new kit change bumps both.
 - After adding or removing a package, run `pnpm ver init` (`--prune` for removals).
 
-The packages that get versions are `packages/core`, `packages/kit`, `packages/plugin-aws`, `packages/plugin-system`, `packages/plugin-yubikey`, `packages/preset-cursor`, `packages/preset-suite`, `packages/ext-bg-tone` and `packages/docs`.
+The packages that get versions are `packages/pulpfixer`, `packages/kit`, `packages/plugin-aws`, `packages/plugin-system`, `packages/plugin-yubikey`, `packages/preset-cursor`, `packages/preset-suite`, `packages/ext-bg-tone` and `packages/docs`.
 
 ## Release
 

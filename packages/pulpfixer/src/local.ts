@@ -38,7 +38,7 @@ export function localEntries(root: string, ctx: Context = buildContext(root)): E
       group: 'Global pf',
       detail: 'build, pack the packages, then npm install -g',
       cli: 'pnpm install:local',
-      run: () => runCmd({ argv: ['bash', path.join(root, 'packages', 'core', 'scripts', 'install.sh'), '--from-source'], cwd: root }, { base: root }),
+      run: () => runCmd({ argv: ['bash', path.join(root, 'packages', 'pulpfixer', 'scripts', 'install.sh'), '--from-source'], cwd: root }, { base: root }),
     },
     {
       name: 'update',

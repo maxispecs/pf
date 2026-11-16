@@ -61,7 +61,7 @@ pf accepts form elicitation as `elicitation: {}` (2025-06-18) or `elicitation: {
 ## How Claude's allowlist is built
 
 ```ts
-// packages/core/src/agent/adapters.ts
+// packages/pulpfixer/src/agent/adapters.ts
 function claudeAllowedTools(tools: Tool[]): string[] {
   return tools.filter((t) => t.readOnly || t.asksUser).map((t) => `mcp__${SERVER_NAME}__${t.name}`);
 }
@@ -77,13 +77,13 @@ A tool may only be `asksUser` if it gets your approval from `session.elicit` bef
 | `packages/kit/src/plugin.ts` | `Plugin.tools(ctx)`: plugins contribute tools |
 | `packages/kit/src/config.ts` | `ProfileConfig`, `AgentAwsScope`, parsing of `profiles` and pulpfixer.json `profile` / `agent.aws` |
 | `packages/kit/src/profiles.ts` | `resolveProfile`, `narrowLimits`, `saveProfile`, `removeProfile`, `setDefaultProfile` |
-| `packages/core/src/agent/launch.ts` | `startAgent`: picks the CLI, builds the persona, writes launch files, spawns |
-| `packages/core/src/agent/adapters.ts` | `buildLaunch` per CLI, `mcpServerArgv`, Claude's allowlist |
-| `packages/core/src/agent/persona.ts` | the system prompt and its rules |
-| `packages/core/src/agent/mcp.ts` | the MCP server: `handle`, `serve`, sessions, elicitation, audit |
-| `packages/core/src/agent/tools.ts` | the built-in repo tools (`TOOLS`) |
-| `packages/core/src/plugins/index.ts` | `agentTools(ctx)`: built-in tools, then plugin tools that do not reuse a name |
-| `packages/core/src/audit.ts` | `openAudit`, shared with host mode |
+| `packages/pulpfixer/src/agent/launch.ts` | `startAgent`: picks the CLI, builds the persona, writes launch files, spawns |
+| `packages/pulpfixer/src/agent/adapters.ts` | `buildLaunch` per CLI, `mcpServerArgv`, Claude's allowlist |
+| `packages/pulpfixer/src/agent/persona.ts` | the system prompt and its rules |
+| `packages/pulpfixer/src/agent/mcp.ts` | the MCP server: `handle`, `serve`, sessions, elicitation, audit |
+| `packages/pulpfixer/src/agent/tools.ts` | the built-in repo tools (`TOOLS`) |
+| `packages/pulpfixer/src/plugins/index.ts` | `agentTools(ctx)`: built-in tools, then plugin tools that do not reuse a name |
+| `packages/pulpfixer/src/audit.ts` | `openAudit`, shared with host mode |
 | `packages/plugin-aws/src/access.ts` | scopes, `DENIED`, `checkOperation`, `limitsFor`, `paramArgv`, `redactJson`, `redactText` |
 | `packages/plugin-aws/src/grants.ts` | the grant store |
 | `packages/plugin-aws/src/agent-tools.ts` | the four `pf_aws_*` tools |

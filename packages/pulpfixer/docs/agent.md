@@ -145,7 +145,7 @@ pf agent "find errors in /ecs/api logs from the last hour"        # logs scope (
 
 ### Deploy setup (`pf rp --deploy`)
 
-For a repo that deploys through its own helper script (`./tl d`, `./al d`) `pf repo` asks which `pulpfixer.json` key to write (`deploy`, `deploy:staging` or `deploy:production`; no terminal means `deploy`), then starts the agent with the bundled `deploy-setup` skill (`packages/core/assets/skills/deploy-setup/SKILL.md`). Claude and Cursor are started in print mode, so the process exits when the task is done and pf continues. Print mode writes stream-json events (`--output-format stream-json`, plus `--verbose` for Claude), and pf shows them live (`packages/core/src/agent/stream.ts`): the agent's messages, each tool call with its main argument, failed tools, and a closing line with the time, turns and cost. If the repo still has a legacy `pf.json`, `pf repo` renames it to `pulpfixer.json` before the agent starts. The prompt lists the helpers pf found at the repo root, ranked (`GWLOCAL` helpers first, server-only ones such as `a.sh` last) as hints only. The agent reads the repo's deploy notes and the helper, picks the dev-machine command, and writes that key, with `"message": true` when the command commits and takes a commit message. It never runs the deploy. pf then previews `pf d`.
+For a repo that deploys through its own helper script (`./tl d`, `./al d`) `pf repo` asks which `pulpfixer.json` key to write (`deploy`, `deploy:staging` or `deploy:production`; no terminal means `deploy`), then starts the agent with the bundled `deploy-setup` skill (`packages/pulpfixer/assets/skills/deploy-setup/SKILL.md`). Claude and Cursor are started in print mode, so the process exits when the task is done and pf continues. Print mode writes stream-json events (`--output-format stream-json`, plus `--verbose` for Claude), and pf shows them live (`packages/pulpfixer/src/agent/stream.ts`): the agent's messages, each tool call with its main argument, failed tools, and a closing line with the time, turns and cost. If the repo still has a legacy `pf.json`, `pf repo` renames it to `pulpfixer.json` before the agent starts. The prompt lists the helpers pf found at the repo root, ranked (`GWLOCAL` helpers first, server-only ones such as `a.sh` last) as hints only. The agent reads the repo's deploy notes and the helper, picks the dev-machine command, and writes that key, with `"message": true` when the command commits and takes a commit message. It never runs the deploy. pf then previews `pf d`.
 
 ## Troubleshoot mode (`pf t`)
 
@@ -265,7 +265,7 @@ Defense in depth still applies: point the profile at a role that allows only the
 
 ### The skill
 
-The agent follows the bundled `troubleshoot` skill (`packages/core/assets/skills/troubleshoot/SKILL.md`; a same-named skill of yours or in the repo wins): get oriented with `pf_aws_context`, request the fewest scopes, check the account, read from the symptom outward, compare with the last deploy, report the cause with evidence, then propose a fix and wait for your agreement before `pf_aws_act`.
+The agent follows the bundled `troubleshoot` skill (`packages/pulpfixer/assets/skills/troubleshoot/SKILL.md`; a same-named skill of yours or in the repo wins): get oriented with `pf_aws_context`, request the fewest scopes, check the account, read from the symptom outward, compare with the last deploy, report the cause with evidence, then propose a fix and wait for your agreement before `pf_aws_act`.
 
 ### Without `pf t`
 
@@ -275,14 +275,14 @@ The same tools are served by `pf agent` and `pf mcp`, so any session can use the
 
 | Path | What |
 |------|------|
-| `packages/core/src/commands/troubleshoot.ts` | the command, the link wizard, the credentials check |
+| `packages/pulpfixer/src/commands/troubleshoot.ts` | the command, the link wizard, the credentials check |
 | `packages/plugin-aws/src/infra.ts` | deployment detection (`detectAwsDeployment`, `scanAwsHints`, `scopesFor`) |
 | `packages/plugin-aws/src/awsconfig.ts` | `~/.aws/config` parsing (names, account, region, kind only) and candidate ranking |
 | `packages/plugin-aws/src/link.ts` | `linkChoices`, `applyLink`: register a profile and name it in `pulpfixer.json` |
 | `packages/plugin-aws/src/access.ts` | `ACTIONS`, `checkAction`, the new `lambda-metadata` and `cloudformation` scopes |
 | `packages/plugin-aws/src/agent-tools.ts` | `pf_aws_context`, `pf_aws_link_profile`, `pf_aws_act` |
 | `packages/kit/src/profiles.ts`, `context.ts` | `linkRepoProfile`, `refreshContext` (config reloads before each tool call) |
-| `packages/core/assets/skills/troubleshoot/` | the skill |
+| `packages/pulpfixer/assets/skills/troubleshoot/` | the skill |
 
 ## Profiles
 
@@ -639,20 +639,20 @@ pf accepts form elicitation as `elicitation: {}` (2025-06-18) or `elicitation: {
 | `packages/kit/src/plugin.ts` | `Plugin.tools(ctx)`: plugins contribute tools |
 | `packages/kit/src/config.ts` | `ProfileConfig`, `AgentAwsScope`, parsing of `profiles` and pulpfixer.json `profile` / `agent.aws` |
 | `packages/kit/src/profiles.ts` | `resolveProfile`, `narrowLimits`, `saveProfile`, `removeProfile`, `setDefaultProfile` |
-| `packages/core/src/agent/launch.ts` | `startAgent`: picks the CLI, builds the persona, writes launch files, spawns |
-| `packages/core/src/agent/adapters.ts` | `buildLaunch` per CLI, `mcpServerArgv`, Claude's allowlist |
-| `packages/core/src/agent/persona.ts` | the system prompt and its rules |
-| `packages/core/src/agent/mcp.ts` | the MCP server: `handle`, `serve`, sessions, elicitation, audit |
-| `packages/core/src/agent/tools.ts` | the built-in repo tools (`TOOLS`) |
-| `packages/core/src/plugins/index.ts` | `agentTools(ctx)`: built-in tools, then plugin tools that do not reuse a name |
-| `packages/core/src/commands/mcp.ts`, `profile.ts`, `agent.ts` | `pf mcp`, `pf profile`, `pf agent` |
-| `packages/core/src/audit.ts` | `openAudit`, shared with host mode |
+| `packages/pulpfixer/src/agent/launch.ts` | `startAgent`: picks the CLI, builds the persona, writes launch files, spawns |
+| `packages/pulpfixer/src/agent/adapters.ts` | `buildLaunch` per CLI, `mcpServerArgv`, Claude's allowlist |
+| `packages/pulpfixer/src/agent/persona.ts` | the system prompt and its rules |
+| `packages/pulpfixer/src/agent/mcp.ts` | the MCP server: `handle`, `serve`, sessions, elicitation, audit |
+| `packages/pulpfixer/src/agent/tools.ts` | the built-in repo tools (`TOOLS`) |
+| `packages/pulpfixer/src/plugins/index.ts` | `agentTools(ctx)`: built-in tools, then plugin tools that do not reuse a name |
+| `packages/pulpfixer/src/commands/mcp.ts`, `profile.ts`, `agent.ts` | `pf mcp`, `pf profile`, `pf agent` |
+| `packages/pulpfixer/src/audit.ts` | `openAudit`, shared with host mode |
 | `packages/plugin-aws/src/access.ts` | scopes, `DENIED`, `checkOperation`, `limitsFor`, `paramArgv`, `redactJson`, `redactText` |
 | `packages/plugin-aws/src/grants.ts` | the grant store |
 | `packages/plugin-aws/src/project.ts` | `projectAws(ctx)`: the profile that applies, ready to use, or why not |
 | `packages/plugin-aws/src/agent-tools.ts` | the `pf_aws_*` tools |
 | `packages/plugin-aws/src/infra.ts`, `awsconfig.ts`, `link.ts` | `pf t`: deployment detection, `~/.aws/config` parsing and ranking, linking a repo to a profile |
-| `packages/core/src/commands/troubleshoot.ts` | `pf t`: the command, the link wizard, the credentials check |
+| `packages/pulpfixer/src/commands/troubleshoot.ts` | `pf t`: the command, the link wizard, the credentials check |
 | `packages/plugin-aws/src/commands/aws.ts` | `pf aws grants` / `pf aws revoke` |
 
 ### The tool contract
@@ -689,7 +689,7 @@ A tool returns `{ ok, text }`. `ok: false` reaches the model as an MCP error res
 ### How Claude's allowlist is built
 
 ```ts
-// packages/core/src/agent/adapters.ts
+// packages/pulpfixer/src/agent/adapters.ts
 function claudeAllowedTools(tools: Tool[]): string[] {
   return tools.filter((t) => t.readOnly || t.asksUser).map((t) => `mcp__${SERVER_NAME}__${t.name}`);
 }
@@ -828,7 +828,7 @@ test('the note is written only after approval', async () => {
 });
 ```
 
-To test over the protocol, drive `serve()` with in-memory streams: send `initialize` with `capabilities.elicitation`, call the tool, answer the `elicitation/create` request, and read the result. See `mcp serve: a grant request asks the user through elicitation and is audited` in `packages/core/tests/agent.test.ts`. The AWS tool tests are in `packages/plugin-aws/tests/agent-tools.test.ts`.
+To test over the protocol, drive `serve()` with in-memory streams: send `initialize` with `capabilities.elicitation`, call the tool, answer the `elicitation/create` request, and read the result. See `mcp serve: a grant request asks the user through elicitation and is audited` in `packages/pulpfixer/tests/agent.test.ts`. The AWS tool tests are in `packages/plugin-aws/tests/agent-tools.test.ts`.
 
 ## Security model
 

@@ -20,8 +20,8 @@ function skillsDir() {
 }
 
 const FILES = [
-  { from: 'ver/scripts/version.mjs', to: ['packages/core/assets/version.mjs', 'scripts/version.mjs'] },
-  { from: 'pnpm/scripts/tasks.mjs', to: ['packages/core/assets/tasks.mjs', 'scripts/tasks.mjs'] },
+  { from: 'ver/scripts/version.mjs', to: ['packages/pulpfixer/assets/version.mjs', 'scripts/version.mjs'] },
+  { from: 'pnpm/scripts/tasks.mjs', to: ['packages/pulpfixer/assets/tasks.mjs', 'scripts/tasks.mjs'] },
 ];
 
 const dir = skillsDir();

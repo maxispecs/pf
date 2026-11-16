@@ -21,4 +21,4 @@ fi
 
 # Tells pf it runs from a checkout: with no command it shows the local menu.
 export PF_LOCAL="$root"
-exec "$tsx" --conditions=source "$root/packages/core/src/bin/pf.ts" "$@"
+exec "$tsx" --conditions=source "$root/packages/pulpfixer/src/bin/pf.ts" "$@"

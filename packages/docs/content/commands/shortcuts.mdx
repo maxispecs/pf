@@ -29,7 +29,7 @@ A shortcut is a short name for a full command. Extra arguments pass through to t
 
 ## Adding one
 
-A shortcut is one entry in `SHORTCUTS` in `packages/core/src/commands/shortcuts.ts`:
+A shortcut is one entry in `SHORTCUTS` in `packages/pulpfixer/src/commands/shortcuts.ts`:
 
 ```ts
 { names: ['docs'], target: ['doc'], summary: 'Run the docs site locally (pf doc)', group: 'Docs & deploy' },
@@ -37,4 +37,4 @@ A shortcut is one entry in `SHORTCUTS` in `packages/core/src/commands/shortcuts.
 
 `group` is one of the command groups; `pf s` shows the shortcut under it.
 
-`names` can hold several short names for the same target, and `target` can have fixed arguments, such as `['deploy', 'staging']`. Add a test in `packages/core/tests/shortcuts.test.ts`.
+`names` can hold several short names for the same target, and `target` can have fixed arguments, such as `['deploy', 'staging']`. Add a test in `packages/pulpfixer/tests/shortcuts.test.ts`.

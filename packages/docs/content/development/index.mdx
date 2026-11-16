@@ -15,7 +15,7 @@ pf is a pnpm workspace. The shipped packages are versioned together by `versions
 | `packages/preset-cursor` | `@pulpfixer/preset-cursor` | Data only: the standard Cursor extensions and settings. Published alone, not a dependency of core: `pf sys apply cursor` fetches its latest version |
 | `packages/preset-suite` | `@pulpfixer/preset-suite` | Data only: the pulpfixer suite, a list of extension packages. Published alone: `pf sys apply suite` fetches its latest version |
 | `packages/ext-bg-tone` | `@pulpfixer/ext-bg-tone` | The Background Tone extension for Cursor, shipped as a `.vsix`. Published alone, never a dependency of core: `pf sys apply suite` and `pf update` fetch its latest version. Type-checked on its own (it targets the VS Code API) |
-| `packages/core` | `pulpfixer` | The `pf` binary: built-in commands, agent, host mode, skills, install and update. Depends on kit and every plugin |
+| `packages/pulpfixer` | `pulpfixer` | The `pf` binary: built-in commands, agent, host mode, skills, install and update. Depends on kit and every plugin |
 | `packages/docs` | `@pulpfixer/docs` | This documentation site (Nextra). Private, never published |
 
 ```mermaid
@@ -57,14 +57,14 @@ cd ~/some/repo && ~/dev/agents/pulpfixer/pf dev --dry-run
 
 | Path | What |
 |------|------|
-| `packages/core/src/bin/pf.ts`, `cli.ts` | Entry point, banner, dispatch |
-| `packages/core/src/menu.ts` | Repo menu, fallback menu, static list |
-| `packages/core/src/commands/` | Built-in commands |
-| `packages/core/src/agent/` | Coding agent: persona, tool registry, MCP server, launchers |
-| `packages/core/src/host/` | Host mode |
-| `packages/core/src/skills/` | Skill discovery and runner |
-| `packages/core/src/plugins/` | Plugin registry, loader and management |
-| `packages/core/src/install/`, `update/` | Machine setup and update check |
+| `packages/pulpfixer/src/bin/pf.ts`, `cli.ts` | Entry point, banner, dispatch |
+| `packages/pulpfixer/src/menu.ts` | Repo menu, fallback menu, static list |
+| `packages/pulpfixer/src/commands/` | Built-in commands |
+| `packages/pulpfixer/src/agent/` | Coding agent: persona, tool registry, MCP server, launchers |
+| `packages/pulpfixer/src/host/` | Host mode |
+| `packages/pulpfixer/src/skills/` | Skill discovery and runner |
+| `packages/pulpfixer/src/plugins/` | Plugin registry, loader and management |
+| `packages/pulpfixer/src/install/`, `update/` | Machine setup and update check |
 | `packages/kit/src/detect/` | Repo, stack, docs and staging detection, command resolution |
 | `packages/kit/src/ui/` | Palette, picker, prompts, text helpers |
 | `packages/plugin-aws/src/`, `plugin-system/src/`, `plugin-yubikey/src/` | The built-in plugins |
@@ -75,14 +75,14 @@ cd ~/some/repo && ~/dev/agents/pulpfixer/pf dev --dry-run
 
 ## Adding things
 
-**A command.** Add `packages/core/src/commands/<name>.ts`, register it in `packages/core/src/commands/index.ts`, show it in `packages/core/src/menu.ts` if it belongs in the menu, and add a test. A shortcut is one entry in `SHORTCUTS` ([Shortcuts](/commands/shortcuts)).
+**A command.** Add `packages/pulpfixer/src/commands/<name>.ts`, register it in `packages/pulpfixer/src/commands/index.ts`, show it in `packages/pulpfixer/src/menu.ts` if it belongs in the menu, and add a test. A shortcut is one entry in `SHORTCUTS` ([Shortcuts](/commands/shortcuts)).
 
 **A stack.** Add it to `packages/kit/src/detect/stacks.ts` with a test in `packages/kit/tests/`.
 
-**A built-in plugin.** Create `packages/plugin-<name>` (copy `plugin-aws`'s `package.json` and `tsconfig`), add it to `scripts/build.mjs`, to `ORDER` in `scripts/release.mjs`, to the `core` dependencies and to `packages/core/src/plugins/index.ts`, then run `pnpm ver init`.
+**A built-in plugin.** Create `packages/plugin-<name>` (copy `plugin-aws`'s `package.json` and `tsconfig`), add it to `scripts/build.mjs`, to `ORDER` in `scripts/release.mjs`, to the `core` dependencies and to `packages/pulpfixer/src/plugins/index.ts`, then run `pnpm ver init`.
 
 **A registry plugin.** See [Writing a plugin](/plugins/writing-a-plugin). Registry plugins live in the npm prefix `~/.pf/plugins`, and core imports them at startup in `main()`. Failures never stop pf.
 
 ## Docs
 
-Pages live in `packages/docs/content/` as MDX, with a `_meta.ts` per folder that sets the sidebar order and titles. When you change a command, plugin or the agent, update the matching page. The agent guide also exists in `packages/core/docs/agent.md`, so keep the two in step.
+Pages live in `packages/docs/content/` as MDX, with a `_meta.ts` per folder that sets the sidebar order and titles. When you change a command, plugin or the agent, update the matching page. The agent guide also exists in `packages/pulpfixer/docs/agent.md`, so keep the two in step.

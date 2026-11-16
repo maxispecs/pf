@@ -30,7 +30,7 @@ export default plugin;
 
 A `Plugin` has `name`, `summary` and `commands`, plus optional `entries(ctx)` (menu entries), `tools(ctx)` (agent tools served by `pf mcp`) and `api` (the plugin interface revision the plugin was written for, default 1). A command's `run` returns the exit code.
 
-A built-in plugin lives in `packages/plugin-<name>` instead, and also needs to be added to the build, the release order, the `core` dependencies and `packages/core/src/plugins/index.ts`. See [Development](/development).
+A built-in plugin lives in `packages/plugin-<name>` instead, and also needs to be added to the build, the release order, the `core` dependencies and `packages/pulpfixer/src/plugins/index.ts`. See [Development](/development).
 
 ## Agent tools
 
@@ -162,4 +162,4 @@ test('the note is written only after approval', async () => {
 });
 ```
 
-To test over the protocol, drive `serve()` with in-memory streams: send `initialize` with `capabilities.elicitation`, call the tool, answer the `elicitation/create` request, and read the result. See `mcp serve: a grant request asks the user through elicitation and is audited` in `packages/core/tests/agent.test.ts`.
+To test over the protocol, drive `serve()` with in-memory streams: send `initialize` with `capabilities.elicitation`, call the tool, answer the `elicitation/create` request, and read the result. See `mcp serve: a grant request asks the user through elicitation and is audited` in `packages/pulpfixer/tests/agent.test.ts`.

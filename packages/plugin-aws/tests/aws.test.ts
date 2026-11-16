@@ -9,7 +9,7 @@ import { findObject, formatSize, normalizePrefix, parseListing, uploadKey } from
 import { mkRepo } from './helpers.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const entry = path.join(root, '..', 'core', 'src', 'bin', 'pf.ts');
+const entry = path.join(root, '..', 'pulpfixer', 'src', 'bin', 'pf.ts');
 const loader = path.join(root, '..', '..', 'node_modules', 'tsx', 'dist', 'loader.mjs');
 
 const LISTING = JSON.stringify([

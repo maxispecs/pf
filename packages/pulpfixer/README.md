@@ -148,7 +148,7 @@ Installed plugins live in an npm prefix at `~/.pf/plugins`; its `package.json` `
 
 ## AWS plugin
 
-Plugins are separate packages (`packages/plugin-<name>`, built on `@pulpfixer/kit`) and are listed in `packages/core/src/plugins/index.ts`; each one contributes commands and optional menu entries. The `aws` plugin wraps the aws CLI (it must be on PATH) and starts with a shared **exchange bucket**:
+Plugins are separate packages (`packages/plugin-<name>`, built on `@pulpfixer/kit`) and are listed in `packages/pulpfixer/src/plugins/index.ts`; each one contributes commands and optional menu entries. The `aws` plugin wraps the aws CLI (it must be on PATH) and starts with a shared **exchange bucket**:
 
 ```bash
 pf s3 --setup              # wizard: asks for bucket, profile, folder and region (prefilled with what is saved)
@@ -266,11 +266,11 @@ cd ~/some/repo && ~/dev/agents/pulpfixer/pf dev --dry-run
 ## Release
 
 ```bash
-pnpm ver bump packages/core minor   # a published version cannot be reused
+pnpm ver bump packages/pulpfixer minor   # a published version cannot be reused
 pnpm release                # typecheck, test, build, npm publish --dry-run
 pnpm publish:cellars        # the real publish (asks you to type the version)
 ```
 
 ## Shortcuts
 
-`pf docs` is `pf doc` (run the repo's docs site; `--dry-run` previews, `--pick` chooses between several), `pf r` is `pf dev` (run the repo), `pf i` is `pf install` and `pf il` / `pf install-local` is `pf install local` (the repo's `install:local` / `install:<to>` script or `pulpfixer.json` entry, found in package.json, composer and the local CLI, no confirmation; `pf install` with no target prefers `install:local` and falls back to the dependency install, `--deps` forces that), `pf rp` is `pf repo`, `pf d` is `pf deploy` (staging if configured, else production, else the repo's own deploy), `pf ds` is `pf deploy staging` and `pf dp` is `pf deploy production` (only a `deploy:production` script or `pulpfixer.json` entry; always confirms). `pf ps` is `pf publish staging`: it runs the repo's `publish:cellars` (or `publish:staging`) script, or the `publish:staging` / `publish:cellars` entry in `pulpfixer.json`, and always confirms (`--yes` without a TTY, `--dry-run` to preview). In a repo that only publishes (no deploy target, no skipped platform), `pf d`, `pf ds` and `pf dp` run that publish, and in a repo with no publish target `pf ps` runs the staging deploy. Add more in `packages/core/src/commands/shortcuts.ts`.
+`pf docs` is `pf doc` (run the repo's docs site; `--dry-run` previews, `--pick` chooses between several), `pf r` is `pf dev` (run the repo), `pf i` is `pf install` and `pf il` / `pf install-local` is `pf install local` (the repo's `install:local` / `install:<to>` script or `pulpfixer.json` entry, found in package.json, composer and the local CLI, no confirmation; `pf install` with no target prefers `install:local` and falls back to the dependency install, `--deps` forces that), `pf rp` is `pf repo`, `pf d` is `pf deploy` (staging if configured, else production, else the repo's own deploy), `pf ds` is `pf deploy staging` and `pf dp` is `pf deploy production` (only a `deploy:production` script or `pulpfixer.json` entry; always confirms). `pf ps` is `pf publish staging`: it runs the repo's `publish:cellars` (or `publish:staging`) script, or the `publish:staging` / `publish:cellars` entry in `pulpfixer.json`, and always confirms (`--yes` without a TTY, `--dry-run` to preview). In a repo that only publishes (no deploy target, no skipped platform), `pf d`, `pf ds` and `pf dp` run that publish, and in a repo with no publish target `pf ps` runs the staging deploy. Add more in `packages/pulpfixer/src/commands/shortcuts.ts`.

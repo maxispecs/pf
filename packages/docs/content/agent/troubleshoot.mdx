@@ -120,7 +120,7 @@ Defense in depth still applies: point the profile at a role that allows only the
 
 ## The skill
 
-The agent follows the bundled `troubleshoot` skill (`packages/core/assets/skills/troubleshoot/SKILL.md`; a same-named skill of yours or in the repo wins): get oriented with `pf_aws_context`, request the fewest scopes, check the account, read from the symptom outward, compare with the last deploy, report the cause with evidence, then propose a fix and wait for your agreement before `pf_aws_act`.
+The agent follows the bundled `troubleshoot` skill (`packages/pulpfixer/assets/skills/troubleshoot/SKILL.md`; a same-named skill of yours or in the repo wins): get oriented with `pf_aws_context`, request the fewest scopes, check the account, read from the symptom outward, compare with the last deploy, report the cause with evidence, then propose a fix and wait for your agreement before `pf_aws_act`.
 
 ## Without `pf t`
 
@@ -130,11 +130,11 @@ The same tools are served by `pf agent` and `pf mcp`, so any session can use the
 
 | Path | What |
 |------|------|
-| `packages/core/src/commands/troubleshoot.ts` | the command, the link wizard, the credentials check |
+| `packages/pulpfixer/src/commands/troubleshoot.ts` | the command, the link wizard, the credentials check |
 | `packages/plugin-aws/src/infra.ts` | deployment detection (`detectAwsDeployment`, `scanAwsHints`, `scopesFor`) |
 | `packages/plugin-aws/src/awsconfig.ts` | `~/.aws/config` parsing (names, account, region, kind only) and candidate ranking |
 | `packages/plugin-aws/src/link.ts` | `linkChoices`, `applyLink`: register a profile and name it in `pulpfixer.json` |
 | `packages/plugin-aws/src/access.ts` | `ACTIONS`, `checkAction`, the new `lambda-metadata` and `cloudformation` scopes |
 | `packages/plugin-aws/src/agent-tools.ts` | `pf_aws_context`, `pf_aws_link_profile`, `pf_aws_act` |
 | `packages/kit/src/profiles.ts`, `context.ts` | `linkRepoProfile`, `refreshContext` (config reloads before each tool call) |
-| `packages/core/assets/skills/troubleshoot/` | the skill |
+| `packages/pulpfixer/assets/skills/troubleshoot/` | the skill |

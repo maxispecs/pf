@@ -46,12 +46,12 @@ test('a suite extension is bumped alone too: core does not pin @pulpfixer/ext-*'
 });
 
 test('core alone changing bumps only core', () => {
-  const plan = planBumps([pkg('@pulpfixer/kit'), pkg('pulpfixer', { changes: ['packages/core/src/x.ts'] })]);
+  const plan = planBumps([pkg('@pulpfixer/kit'), pkg('pulpfixer', { changes: ['packages/pulpfixer/src/x.ts'] })]);
   assert.deepEqual(plan.map((b) => b.pkg.name), ['pulpfixer']);
 });
 
 test('test-only changes do not bump', () => {
-  assert.deepEqual(planBumps([pkg('pulpfixer', { changes: ['packages/core/tests/a.test.ts'] })]), []);
+  assert.deepEqual(planBumps([pkg('pulpfixer', { changes: ['packages/pulpfixer/tests/a.test.ts'] })]), []);
 });
 
 test('a package already bumped (ahead of the registry) is not bumped again', () => {
@@ -68,7 +68,7 @@ test('an ahead dependency pulls core along', () => {
 });
 
 test('an unreadable registry is never bumped automatically', () => {
-  assert.deepEqual(planBumps([pkg('pulpfixer', { published: null, changes: ['packages/core/src/x.ts'] })]), []);
+  assert.deepEqual(planBumps([pkg('pulpfixer', { published: null, changes: ['packages/pulpfixer/src/x.ts'] })]), []);
 });
 
 test('changesSinceBump sees edits after the commit that changed the version', () => {
@@ -92,12 +92,12 @@ test('changesSinceBump sees edits after the commit that changed the version', ()
 test('suggestCommitMessage names the packages and files touched', () => {
   const lines = [
     ' M versions.json',
-    ' M packages/core/package.json',
-    ' M packages/core/src/devcycle.ts',
-    ' M packages/core/src/commands/cycle.ts',
+    ' M packages/pulpfixer/package.json',
+    ' M packages/pulpfixer/src/devcycle.ts',
+    ' M packages/pulpfixer/src/commands/cycle.ts',
     '?? packages/kit/src/ui/text.ts',
   ];
-  assert.equal(suggestCommitMessage(lines, '2.9'), 'v2.9: update core (devcycle, cycle), kit (text)');
+  assert.equal(suggestCommitMessage(lines, '2.9'), 'v2.9: update pulpfixer (devcycle, cycle), kit (text)');
   assert.equal(suggestCommitMessage(['?? packages/kit/src/new.ts'], null), 'add kit (new)');
   assert.equal(suggestCommitMessage([' M versions.json', ' M packages/kit/package.json'], '2.9'), 'v2.9');
   assert.equal(suggestCommitMessage([' M scripts/build.mjs'], '2.9'), 'v2.9: update scripts (build)');
@@ -115,7 +115,7 @@ test('findCheckout finds the pulpfixer checkout from inside it, and nothing else
   const dir = mkRepo({
     pf: '#!/bin/sh\n',
     'scripts/release.mjs': '',
-    'packages/core/package.json': json({ name: 'pulpfixer' }),
+    'packages/pulpfixer/package.json': json({ name: 'pulpfixer' }),
     'packages/kit/src/x.ts': '',
   });
   assert.equal(fs.realpathSync(findCheckout(path.join(dir, 'packages', 'kit', 'src'))!), fs.realpathSync(dir));
