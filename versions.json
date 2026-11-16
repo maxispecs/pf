@@ -1,6 +1,6 @@
 {
   "stack": {
-    "version": "2.52",
+    "version": "2.53",
     "since": "2026-11-16"
   },
   "packages": {
@@ -45,7 +45,7 @@
       "type": "node"
     },
     "packages/pulpfixer": {
-      "version": "6.5",
+      "version": "6.6",
       "since": "2026-11-16",
       "type": "node"
     }
