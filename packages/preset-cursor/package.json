@@ -1,6 +1,6 @@
 {
   "name": "@pulpfixer/preset-cursor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "pf preset: the standard Cursor setup (extensions and settings) applied by pf sys apply cursor",
   "license": "MIT",
   "type": "module",

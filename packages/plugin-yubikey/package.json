@@ -1,6 +1,6 @@
 {
   "name": "@pulpfixer/plugin-yubikey",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "pf YubiKey plugin: OATH codes and a security check (pf otp, pf yk)",
   "license": "MIT",
   "type": "module",
