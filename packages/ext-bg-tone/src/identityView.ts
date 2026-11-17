@@ -1,9 +1,12 @@
 import * as vscode from 'vscode';
-import { LogoService, webviewLogoSrc } from './logoService.ts';
+import { LogoService } from './logoService.ts';
 import * as path from 'node:path';
 import { AgentRun, readChatTitles, readRecentAgentRuns } from './agentRuns.ts';
 import type { ActionsService } from './actionsService.ts';
+import { CardActions, CardAgent, CardCache, CardSnapshot, composeSnapshot, escapeAttribute, NO_ACTIONS } from './cardCache.ts';
 import { primaryFolder, readConfig, repoName } from './settings.ts';
+import { identityVisible } from './repoConfig.ts';
+import { isPfRepo } from './store.ts';
 
 /** How often the card re-reads the agent transcripts (cheap: one directory scan, two small reads). */
 const AGENT_POLL_MS = 10_000;
@@ -29,7 +32,8 @@ export async function updateIdentityContext(logos: LogoService): Promise<void> {
 	const hasLogo = logos.logo !== undefined;
 	const hasColor = config.color !== '' && config.enabled;
 	const hasFolder = !!vscode.workspace.workspaceFolders?.length;
-	const hasIdentity = hasFolder && (hasLogo || hasColor);
+	// A repo set up with `pf rp` has a pulpfixer.json: show the card even before a logo or color is chosen.
+	const hasIdentity = identityVisible({ hasFolder, hasLogo, hasColor, pfRepo: isPfRepo() });
 	await vscode.commands.executeCommand(
 		'setContext',
 		'bgTone.cardVisible',
@@ -59,6 +63,7 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		private readonly context: vscode.ExtensionContext,
 		private readonly logos: LogoService,
 		private readonly actions: ActionsService,
+		private readonly cache: CardCache,
 	) {
 		this.disposables.push(this.actions.onDidChange(() => this.refresh()));
 	}
@@ -72,7 +77,9 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 				...(vscode.workspace.workspaceFolders ?? []).map(f => f.uri),
 			],
 		};
-		view.webview.html = this.html(view.webview);
+		view.title = repoName();
+		// The page paints this right away; the fresh state replaces it when it is ready.
+		view.webview.html = this.html(view.webview, this.snapshot(undefined));
 		this.stopPolling();
 		this.pollTimer = setInterval(() => {
 			if (view.visible) {
@@ -113,30 +120,38 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 			return;
 		}
 		const generation = ++this.generation;
-		const config = readConfig();
-		const logo = this.logos.logo;
-		const color = config.enabled && /^#[0-9a-f]{6}$/i.test(config.color) ? config.color : '';
 		// The header stays readable while the card is collapsed (the logo itself needs the body).
 		view.title = repoName();
 		view.description = undefined;
-		const agents = config.showLastAgent ? await this.recentAgents() : [];
+		const runs = readConfig().showLastAgent ? await this.recentAgents() : [];
 		if (generation !== this.generation || this.view !== view) {
 			return; // a newer refresh superseded this one, or the view went away
 		}
-		void view.webview.postMessage({
-			type: 'state',
-			state: {
+		const snapshot = this.snapshot(runs.map(({ title, status, updatedAt }) => ({ title, status, updatedAt })));
+		if (this.logos.loaded && this.actions.status.type !== 'loading') {
+			this.cache.set(snapshot);
+		}
+		void view.webview.postMessage({ type: 'state', state: webviewState(view.webview, snapshot) });
+	}
+
+	/** The card from what is known now, with the cached values for the parts that have not loaded yet. */
+	private snapshot(agents: CardAgent[] | undefined): CardSnapshot {
+		const config = readConfig();
+		const logo = this.logos.logo;
+		return composeSnapshot(
+			{
 				name: repoName(),
-				color,
-				logoSrc: logo ? webviewLogoSrc(view.webview, logo) : '',
-				agents: agents.map(({ title, status, updatedAt }) => ({ title, status, updatedAt })),
-				actions: config.showActions ? this.actionsState() : { buttons: [], canEdit: false, hint: '' },
+				color: config.enabled && /^#[0-9a-f]{6}$/i.test(config.color) ? config.color : '',
+				logo: this.logos.loaded ? (logo ? { uri: logo.uri.toString(), mtime: logo.mtime } : null) : undefined,
+				agents: config.showLastAgent ? agents : [],
+				actions: !config.showActions ? NO_ACTIONS : this.actions.status.type === 'loading' ? undefined : this.actionsState(),
 			},
-		});
+			this.cache.snapshot,
+		);
 	}
 
 	/** What the card draws for the actions row: the featured buttons, whether to offer editing, and a hint when pf is the problem. */
-	private actionsState(): { buttons: Array<{ id: string; label: string; icon: string }>; canEdit: boolean; hint: string } {
+	private actionsState(): CardActions {
 		const status = this.actions.status;
 		const hint =
 			status.type === 'no-pf'
@@ -184,7 +199,7 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		}
 	}
 
-	private html(webview: vscode.Webview): string {
+	private html(webview: vscode.Webview, initial: CardSnapshot): string {
 		const media = (file: string) =>
 			webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', file));
 		const n = nonce();
@@ -198,7 +213,7 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 <link rel="stylesheet" href="${media('identity.css')}">
 </head>
 <body>
-<div id="card"></div>
+<div id="card" data-state="${escapeAttribute(JSON.stringify(webviewState(webview, initial)))}"></div>
 <script nonce="${n}" src="${media('identity.js')}"></script>
 </body>
 </html>`;
@@ -209,6 +224,13 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		this.disposables.forEach(d => d.dispose());
 		this.disposables.length = 0;
 	}
+}
+
+/** The message the page renders. `at` lets it choose between the state in its HTML and the one it saved itself. */
+function webviewState(webview: vscode.Webview, snapshot: CardSnapshot) {
+	const { logo, ...rest } = snapshot;
+	const logoSrc = logo ? webview.asWebviewUri(vscode.Uri.parse(logo.uri)).with({ query: `v=${logo.mtime}` }).toString() : '';
+	return { ...rest, logoSrc, at: Date.now() };
 }
 
 /** A one-item Explorer tree whose icon is the repo logo (small, but always in view). */

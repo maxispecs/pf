@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { CONFIG_FILE, LEGACY_CONFIG_FILE, editSection, parseSection, pickConfigFile } from './repoConfig.ts';
+import { CONFIG_FILE, LEGACY_CONFIG_FILE, editSection, isPfRepoConfig, parseSection, pickConfigFile } from './repoConfig.ts';
 
 /** Keys that live in the repo's pulpfixer.json (`bgTone` section). `showLastAgent` is personal and stays a VS Code setting. */
 export const REPO_KEYS = [
@@ -73,6 +73,11 @@ export function repoValues(): Record<string, unknown> {
 		void vscode.window.showWarningMessage(`Background Tone: ${path.basename(file)} is ${parsed.reason}, so its bgTone section is ignored. Fix the file; it is never overwritten.`);
 	}
 	return legacyWorkspaceValues();
+}
+
+/** True when the repo has a config file (pulpfixer.json, or a legacy pf.json): it is set up for pf. */
+export function isPfRepo(): boolean {
+	return isPfRepoConfig(readText(configFilePath()));
 }
 
 /** One repo value, falling back to the extension's default for the key (the contributed setting's default). */

@@ -64,7 +64,16 @@
 		return row;
 	}
 
-	function render(state) {
+	let logoKey = '';
+	let logoEl = null;
+
+	/** The logo box, reused while its image is unchanged so a refresh never reloads the picture. */
+	function logoBox(state) {
+		const letter = (state.name || '?').trim().charAt(0).toUpperCase();
+		const key = state.logoSrc ? 'img:' + state.logoSrc : 'letter:' + letter;
+		if (key === logoKey && logoEl) {
+			return logoEl;
+		}
 		const logo = h('div', 'logo');
 		if (state.logoSrc) {
 			const img = document.createElement('img');
@@ -72,8 +81,24 @@
 			img.alt = '';
 			logo.append(img);
 		} else {
-			logo.textContent = (state.name || '?').trim().charAt(0).toUpperCase();
+			logo.textContent = letter;
 		}
+		logoKey = key;
+		logoEl = logo;
+		return logo;
+	}
+
+	let stateKey = '';
+
+	function render(state) {
+		const { at, ...content } = state;
+		const key = JSON.stringify(content);
+		vscode.setState(state);
+		if (key === stateKey) {
+			return;
+		}
+		stateKey = key;
+		const logo = logoBox(state);
 
 		const info = h('div', 'info');
 		info.append(h('div', 'name', state.name));
@@ -169,5 +194,24 @@
 		}
 	});
 
+	/** The last known card: the one in the HTML, or the one this page saved if that is newer. */
+	function initialState() {
+		let fromHtml = null;
+		try {
+			fromHtml = root.dataset.state ? JSON.parse(root.dataset.state) : null;
+		} catch {
+			fromHtml = null;
+		}
+		const saved = vscode.getState();
+		if (saved && typeof saved === 'object' && (!fromHtml || (saved.at || 0) > (fromHtml.at || 0))) {
+			return saved;
+		}
+		return fromHtml;
+	}
+
+	const initial = initialState();
+	if (initial) {
+		render(initial);
+	}
 	vscode.postMessage({ type: 'ready' });
 })();

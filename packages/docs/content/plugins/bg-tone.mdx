@@ -43,6 +43,8 @@ The extension writes its settings to the `bgTone` section of the repo's `pulpfix
 
 Keys: `enabled`, `color`, `strength` (0 to 0.3), `surfaces`, `baseColors`, `accentBorder`, `logo`, `logoLocations` (`identityCard`, `explorerItem`, `scmCard` for the Repo Identity card in Source Control, `windowTitle`), `titleEmoji`, `palette`. The picker, the Repo Settings page (gear icon in the Explorer header) and the commands all write there, keeping every other key and the file's indentation. A `pulpfixer.json` that is not valid JSON is never overwritten. A repo that has not been converted yet and only has a `pf.json` is edited in place.
 
+The Repo Identity card appears once the repo has a logo or a tone color, and also in any repo that has a `pulpfixer.json` (what `pf rp` creates), even with no color or logo yet: it then shows the repo name (with a letter in place of the logo) and the action buttons.
+
 A repo that still keeps `bgTone.*` values in `.vscode/settings.json` keeps working: they are read until the first change moves them into `pulpfixer.json`. `bgTone.showLastAgent` (the last Cursor chats on the identity card) is personal, so it stays a normal VS Code user setting.
 
 The colors the extension derives from these values (`workbench.colorCustomizations`, an optional `window.title`) are written to the workspace's `.vscode/settings.json`, as before. They are recomputed from `pulpfixer.json` on every machine, so there is nothing to commit there.

@@ -85,7 +85,7 @@ along with `doc`.
 Choose an image that lives inside the repo (the picker refuses files outside it, and `..` or absolute paths in
 `bgTone.logo` are ignored), so the reference stays valid for everyone who clones the repo. The logo shows in:
 
-- the **Repo Identity** card at the top of the Explorer (logo, a large repo name, and a list with the
+- the **Repo Identity** card at the top of the Explorer (it also shows, without a logo or color, in a repo that has a `pulpfixer.json`, which `pf rp` creates; the logo is then a letter) (logo, a large repo name, and a list with the
   last 3 Cursor agent chats for this repo: each one's agent tab title and how long ago it was active ("running" while it works). Chats are found in
   `~/.cursor/projects/<repo>/agent-transcripts` and titles are read (read-only) from Cursor's global state database
   with the system `sqlite3` command; if that is unavailable the chat's first request is shown instead. Local

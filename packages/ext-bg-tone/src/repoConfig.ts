@@ -15,6 +15,23 @@ export function pickConfigFile(exists: (name: string) => boolean): string {
 	return !exists(CONFIG_FILE) && exists(LEGACY_CONFIG_FILE) ? LEGACY_CONFIG_FILE : CONFIG_FILE;
 }
 
+/**
+ * Whether a config file's text means the repo is set up for pf (`pf rp` creates pulpfixer.json). Any
+ * non-empty file counts, even one with no `bgTone` section or one that is not valid JSON.
+ */
+export function isPfRepoConfig(text: string | null): boolean {
+	return text !== null && text.trim() !== '';
+}
+
+/**
+ * Whether the Repo Identity card (and its `when` context keys) should exist. It shows once there is
+ * something to show (a logo or a tone color) and also in a repo set up for pf, where the card is useful
+ * with just the repo name and its action buttons.
+ */
+export function identityVisible(o: { hasFolder: boolean; hasLogo: boolean; hasColor: boolean; pfRepo: boolean }): boolean {
+	return o.hasFolder && (o.hasLogo || o.hasColor || o.pfRepo);
+}
+
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
 export type ParsedSection =

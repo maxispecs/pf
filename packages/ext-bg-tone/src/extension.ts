@@ -18,6 +18,7 @@ import {
 import { applyTitle } from './title.ts';
 import { ActionsService } from './actionsService.ts';
 import { diffFeatured } from './actions.ts';
+import { CardCache } from './cardCache.ts';
 
 const NO_COLOR_LABEL = 'No color';
 const CUSTOM_LABEL = 'Custom hex color...';
@@ -26,8 +27,9 @@ const SETTINGS_LABEL = 'Open full repo settings...';
 export function activate(context: vscode.ExtensionContext): void {
 	const logos = new LogoService();
 	const actions = new ActionsService();
-	const card = new IdentityCardProvider(context, logos, actions);
-	const scmCard = new IdentityCardProvider(context, logos, actions);
+	const cardCache = new CardCache(context.workspaceState);
+	const card = new IdentityCardProvider(context, logos, actions, cardCache);
+	const scmCard = new IdentityCardProvider(context, logos, actions, cardCache);
 	const item = new IdentityItemProvider(logos);
 
 	const reapply = () => {
@@ -90,8 +92,9 @@ export function activate(context: vscode.ExtensionContext): void {
 		}),
 		vscode.window.onDidChangeActiveColorTheme(() => void applyTone(context)),
 
-		vscode.window.registerWebviewViewProvider(IDENTITY_CARD_VIEW, card),
-		vscode.window.registerWebviewViewProvider(IDENTITY_SCM_CARD_VIEW, scmCard),
+		// Kept alive while hidden, so switching between Explorer and Source Control does not rebuild the card.
+		vscode.window.registerWebviewViewProvider(IDENTITY_CARD_VIEW, card, { webviewOptions: { retainContextWhenHidden: true } }),
+		vscode.window.registerWebviewViewProvider(IDENTITY_SCM_CARD_VIEW, scmCard, { webviewOptions: { retainContextWhenHidden: true } }),
 		vscode.window.registerTreeDataProvider(IDENTITY_ITEM_VIEW, item),
 		vscode.window.registerWebviewPanelSerializer(SETTINGS_PANEL_TYPE, {
 			async deserializeWebviewPanel(panel) {

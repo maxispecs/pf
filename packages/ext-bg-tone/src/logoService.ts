@@ -59,9 +59,15 @@ export class LogoService implements vscode.Disposable {
 	private watcher: vscode.FileSystemWatcher | undefined;
 	private watcherSubs: vscode.Disposable[] = [];
 	private generation = 0;
+	private resolved = false;
 
 	get current(): LogoStatus {
 		return this.status;
+	}
+
+	/** False until the first refresh finishes: until then `logo` is unknown, not absent. */
+	get loaded(): boolean {
+		return this.resolved;
 	}
 
 	/** The usable logo, if any. */
@@ -78,6 +84,7 @@ export class LogoService implements vscode.Disposable {
 		}
 		this.watch(next.type === 'ok' ? next.logo.relPath : '');
 		this.status = next;
+		this.resolved = true;
 		this.emitter.fire();
 	}
 

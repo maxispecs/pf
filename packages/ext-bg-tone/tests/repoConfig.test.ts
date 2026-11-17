@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { editSection, parseSection, pickConfigFile } from '../src/repoConfig.ts';
+import { editSection, identityVisible, isPfRepoConfig, parseSection, pickConfigFile } from '../src/repoConfig.ts';
 
 test('pickConfigFile prefers pulpfixer.json and falls back to an unconverted pf.json', () => {
 	assert.equal(pickConfigFile(() => false), 'pulpfixer.json');
@@ -53,4 +53,20 @@ test('editSection ignores a __proto__ key', () => {
 	const r = editSection('{}', { __proto__: 1, color: '#fff' } as Record<string, unknown>);
 	assert.ok(r.ok);
 	assert.deepEqual(JSON.parse(r.text), { bgTone: { color: '#fff' } });
+});
+
+test('isPfRepoConfig: any non-empty config file means the repo is set up for pf', () => {
+	assert.equal(isPfRepoConfig(null), false);
+	assert.equal(isPfRepoConfig(' \n'), false);
+	assert.equal(isPfRepoConfig('{"id":"x"}'), true);
+	assert.equal(isPfRepoConfig('{ nope'), true);
+});
+
+test('identityVisible: the card shows with a logo, a color, or in a pf repo, never without a folder', () => {
+	const base = { hasFolder: true, hasLogo: false, hasColor: false, pfRepo: false };
+	assert.equal(identityVisible(base), false);
+	assert.equal(identityVisible({ ...base, hasLogo: true }), true);
+	assert.equal(identityVisible({ ...base, hasColor: true }), true);
+	assert.equal(identityVisible({ ...base, pfRepo: true }), true);
+	assert.equal(identityVisible({ ...base, hasFolder: false, hasLogo: true, hasColor: true, pfRepo: true }), false);
 });
