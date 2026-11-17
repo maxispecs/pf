@@ -24,6 +24,8 @@ export interface CardSnapshot {
 	name: string;
 	/** The repo's stack version (`versions.json`), shown small beside the name; empty when the repo has none. */
 	version: string;
+	/** Files with uncommitted changes (`git status`), shown beside the version; null when unknown (no git, no repo). */
+	changes: number | null;
 	color: string;
 	logo: CardLogo | null;
 	agents: CardAgent[];
@@ -34,6 +36,7 @@ export interface CardSnapshot {
 export interface FreshCard {
 	name: string;
 	version: string;
+	changes: number | null | undefined;
 	color: string;
 	logo: CardLogo | null | undefined;
 	agents: CardAgent[] | undefined;
@@ -46,6 +49,7 @@ export function composeSnapshot(fresh: FreshCard, cached: CardSnapshot | undefin
 	return {
 		name: fresh.name,
 		version: fresh.version,
+		changes: fresh.changes !== undefined ? fresh.changes : cached?.changes ?? null,
 		color: fresh.color,
 		logo: fresh.logo !== undefined ? fresh.logo : cached?.logo ?? null,
 		agents: fresh.agents ?? cached?.agents ?? [],
@@ -63,7 +67,9 @@ export function parseSnapshot(raw: unknown): CardSnapshot | undefined {
 		return undefined;
 	}
 	const logo = s.logo && typeof s.logo.uri === 'string' && typeof s.logo.mtime === 'number' ? s.logo : null;
-	return { name: s.name, version: typeof s.version === 'string' ? s.version : '', color: s.color, logo, agents: s.agents, actions: s.actions };
+	const version = typeof s.version === 'string' ? s.version : '';
+	const changes = typeof s.changes === 'number' && Number.isInteger(s.changes) && s.changes >= 0 ? s.changes : null;
+	return { name: s.name, version, changes, color: s.color, logo, agents: s.agents, actions: s.actions };
 }
 
 /** Escapes a value for a double-quoted HTML attribute. */

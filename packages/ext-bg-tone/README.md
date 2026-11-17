@@ -36,7 +36,8 @@ customization keys are left alone.
   colors, live preview), **Logo** (the logo picker, where it shows, the window title prefix) and **Actions**
   (the featured repo actions). Everything it saves lands in the repo's `pulpfixer.json`.
 - **Version**: the Repo Identity card shows the repo's stack version (from `versions.json`, as kept by
-  `pnpm ver`) in small text beside the name; a repo without that file shows none.
+  `pnpm ver`) on the line below the name; a repo without that file shows none. Beside it the card shows how many files
+  have uncommitted changes (`git status`, untracked files included), hidden at zero or outside a git repo.
 
 ## Settings
 

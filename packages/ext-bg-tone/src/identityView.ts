@@ -9,6 +9,8 @@ import { identityVisible } from './repoConfig.ts';
 import { isPfRepo } from './store.ts';
 import { VERSIONS_FILE, parseStackVersion } from './stackVersion.ts';
 import * as fs from 'node:fs';
+import { execFile } from 'node:child_process';
+import { countChangedFiles } from './gitChanges.ts';
 
 /** How often the card re-reads the agent transcripts (cheap: one directory scan, two small reads). */
 const AGENT_POLL_MS = 10_000;
@@ -66,12 +68,29 @@ function stackVersion(): string {
 	}
 }
 
+/** Files with uncommitted changes in the primary folder (`git status`); null without a local git repo or git. */
+function uncommittedFiles(): Promise<number | null> {
+	const folder = primaryFolder();
+	if (folder?.uri.scheme !== 'file') {
+		return Promise.resolve(null);
+	}
+	return new Promise(resolve => {
+		execFile(
+			'git',
+			['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+			{ cwd: folder.uri.fsPath, timeout: 5000, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
+			(error, stdout) => resolve(error ? null : countChangedFiles(stdout)),
+		);
+	});
+}
+
 /** The "Repo Identity" card: the repo logo, name and tone color. One instance per view (Explorer, Source Control). */
 export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.Disposable {
 	private view: vscode.WebviewView | undefined;
 	private readonly disposables: vscode.Disposable[] = [];
 	private pollTimer: ReturnType<typeof setInterval> | undefined;
 	private generation = 0;
+	private soonTimer: ReturnType<typeof setTimeout> | undefined;
 	private readonly titleCache = new Map<string, { title: string; at: number }>();
 
 	constructor(
@@ -81,6 +100,15 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		private readonly cache: CardCache,
 	) {
 		this.disposables.push(this.actions.onDidChange(() => this.refresh()));
+		// The uncommitted-files count follows edits (the poll covers commits, checkouts and other tools).
+		const soon = () => this.refreshSoon();
+		this.disposables.push(
+			vscode.workspace.onDidSaveTextDocument(soon),
+			vscode.workspace.onDidCreateFiles(soon),
+			vscode.workspace.onDidDeleteFiles(soon),
+			vscode.workspace.onDidRenameFiles(soon),
+			{ dispose: () => clearTimeout(this.soonTimer) },
+		);
 		// `pnpm ver bump` rewrites versions.json: redraw the version beside the name.
 		const folder = primaryFolder();
 		if (folder) {
@@ -138,6 +166,16 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		void this.render();
 	}
 
+	/** A burst of saves or file changes becomes one refresh. */
+	private refreshSoon(): void {
+		clearTimeout(this.soonTimer);
+		this.soonTimer = setTimeout(() => {
+			if (this.view?.visible) {
+				this.refresh();
+			}
+		}, 1000);
+	}
+
 	private async render(): Promise<void> {
 		const view = this.view;
 		if (!view) {
@@ -147,11 +185,14 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		// The header stays readable while the card is collapsed (the logo itself needs the body).
 		view.title = repoName();
 		view.description = undefined;
-		const runs = readConfig().showLastAgent ? await this.recentAgents() : [];
+		const [runs, changes] = await Promise.all([
+			readConfig().showLastAgent ? this.recentAgents() : Promise.resolve([]),
+			uncommittedFiles(),
+		]);
 		if (generation !== this.generation || this.view !== view) {
 			return; // a newer refresh superseded this one, or the view went away
 		}
-		const snapshot = this.snapshot(runs.map(({ title, status, updatedAt }) => ({ title, status, updatedAt })));
+		const snapshot = this.snapshot(runs.map(({ title, status, updatedAt }) => ({ title, status, updatedAt })), changes);
 		if (this.logos.loaded && this.actions.status.type !== 'loading') {
 			this.cache.set(snapshot);
 		}
@@ -159,13 +200,14 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 	}
 
 	/** The card from what is known now, with the cached values for the parts that have not loaded yet. */
-	private snapshot(agents: CardAgent[] | undefined): CardSnapshot {
+	private snapshot(agents: CardAgent[] | undefined, changes?: number | null): CardSnapshot {
 		const config = readConfig();
 		const logo = this.logos.logo;
 		return composeSnapshot(
 			{
 				name: repoName(),
 				version: stackVersion(),
+				changes,
 				color: config.enabled && /^#[0-9a-f]{6}$/i.test(config.color) ? config.color : '',
 				logo: this.logos.loaded ? (logo ? { uri: logo.uri.toString(), mtime: logo.mtime } : null) : undefined,
 				agents: config.showLastAgent ? agents : [],

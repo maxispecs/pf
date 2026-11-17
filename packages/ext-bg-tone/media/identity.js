@@ -102,13 +102,26 @@
 
 		const info = h('div', 'info');
 		const name = h('div', 'name', state.name);
-		if (state.version) {
-			// Small text right after the name, like a <sub>.
-			const version = h('sub', 'version', 'v' + state.version);
-			version.title = 'Stack version ' + state.version;
-			name.append(version);
-		}
 		info.append(name);
+		// The line below the name: the stack version and, beside it, the files with uncommitted changes.
+		const hasChanges = typeof state.changes === 'number' && state.changes > 0;
+		if (state.version || hasChanges) {
+			const meta = h('div', 'meta');
+			if (state.version) {
+				const version = h('span', 'version', 'v' + state.version);
+				version.title = 'Stack version ' + state.version;
+				meta.append(version);
+			}
+			if (hasChanges) {
+				const label = state.changes + (state.changes === 1 ? ' uncommitted file' : ' uncommitted files');
+				const changes = h('span', 'changes');
+				changes.title = label;
+				changes.setAttribute('aria-label', label);
+				changes.append(h('span', 'codicon codicon-git-commit'), h('span', 'changes-count', String(state.changes)));
+				meta.append(changes);
+			}
+			info.append(meta);
+		}
 
 		const card = h('div', 'card');
 		card.append(logo, info);
