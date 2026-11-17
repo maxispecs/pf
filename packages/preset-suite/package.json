@@ -2,7 +2,7 @@
   "name": "@pulpfixer/preset-suite",
   "version": "1.1.0",
   "description": "pf preset: the pulpfixer suite, the extensions that go with pf (Background Tone), applied by pf sys apply suite",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "exports": {
     "./preset.json": "./preset.json"

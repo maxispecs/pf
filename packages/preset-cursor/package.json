@@ -2,7 +2,7 @@
   "name": "@pulpfixer/preset-cursor",
   "version": "1.0.0",
   "description": "pf preset: the standard Cursor setup (extensions and settings) applied by pf sys apply cursor",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "exports": {
     "./preset.json": "./preset.json"

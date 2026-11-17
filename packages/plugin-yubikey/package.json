@@ -2,7 +2,7 @@
   "name": "@pulpfixer/plugin-yubikey",
   "version": "1.0.0",
   "description": "pf YubiKey plugin: OATH codes and a security check (pf otp, pf yk)",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "exports": {
     ".": {

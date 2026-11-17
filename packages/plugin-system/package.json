@@ -2,7 +2,7 @@
   "name": "@pulpfixer/plugin-system",
   "version": "1.3.0",
   "description": "pf system plugin: apply configuration presets to apps on this machine (pf sys)",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "exports": {
     ".": {

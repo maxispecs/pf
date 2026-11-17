@@ -4,7 +4,7 @@
   "version": "3.11.0",
   "type": "module",
   "description": "pf: unified developer CLI for any repo, any language (monorepo root)",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "author": "Max Glotov, Sam Pretorius",
   "engines": {
     "node": ">=18"

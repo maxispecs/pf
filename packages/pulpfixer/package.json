@@ -2,7 +2,7 @@
   "name": "pulpfixer",
   "version": "6.11.0",
   "description": "pf: unified developer CLI for any repo, any language",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "author": "Max Glotov, Sam Pretorius",
   "type": "module",
   "bin": {
