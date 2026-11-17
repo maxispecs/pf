@@ -1,11 +1,11 @@
 {
   "stack": {
-    "version": "3.6",
+    "version": "3.7",
     "since": "2026-11-17"
   },
   "packages": {
     "packages/docs": {
-      "version": "1.25",
+      "version": "1.26",
       "since": "2026-11-17",
       "type": "node"
     },
@@ -45,7 +45,7 @@
       "type": "node"
     },
     "packages/pulpfixer": {
-      "version": "6.9",
+      "version": "6.10",
       "since": "2026-11-17",
       "type": "node"
     }

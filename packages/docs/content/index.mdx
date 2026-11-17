@@ -19,10 +19,10 @@ Every invocation prints a banner with its version (`pf v4.39`) on **stderr**, so
 ## Install
 
 ```bash
-npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup
+[ -w "$(npm root -g)" ] || { mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global && export PATH="$HOME/.npm-global/bin:$PATH" && echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.$(basename "$SHELL")rc; }; npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup
 ```
 
-Needs Node >= 18 and npm, no token. See [Getting started](/getting-started#install) for the other ways.
+Needs Node >= 18 and npm, no token, no `sudo` (a user-owned npm prefix is set up when the global directory is not writable). See [Getting started](/getting-started#install) for the other ways.
 
 ## Features
 

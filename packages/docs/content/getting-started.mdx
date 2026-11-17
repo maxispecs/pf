@@ -9,8 +9,10 @@ title: Getting started
 One line, with Node >= 18 and npm. No token is needed: pf and all its packages are public on the cellars registry.
 
 ```bash
-npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup
+[ -w "$(npm root -g)" ] || { mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global && export PATH="$HOME/.npm-global/bin:$PATH" && echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.$(basename "$SHELL")rc; }; npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup
 ```
+
+The first part only runs when npm's global directory is not writable by you (typical with Homebrew's Node: `EACCES ... rename '/opt/homebrew/lib/node_modules/pulpfixer'`). It switches npm to a user-owned prefix, `~/.npm-global`, and puts its `bin` on your `PATH` (`~/.zshrc` or `~/.bashrc`), so the install never needs `sudo` and Homebrew's directories stay untouched. Where the global directory is writable it does nothing. Open a new terminal afterwards, or `source` your rc file. The plain command is `npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup`.
 
 `--registry` applies to this install only, so your default npm registry is left alone. `pf setup` sets the machine up: shell completions, the optional registry auth line and cleanup of the legacy `pulpfixer` 1.x package (its data in `~/.pulpfixer` is left alone). Add `--yes` (`pf setup --yes`) to accept every step without prompts, for example in a provisioning script.
 
@@ -19,7 +21,7 @@ An `NPM_TOKEN` (from the frontend team) is only needed to publish packages or to
 From a checkout of the repo, the installer does the same and more:
 
 ```bash
-scripts/install.sh                # latest published version
+scripts/install.sh                # latest published version (switches to ~/.npm-global if npm's global dir is not writable)
 scripts/install.sh --from-source  # build this checkout, pack its packages and install them globally
 scripts/install.sh --plugin jira  # also install a registry plugin (repeatable)
 scripts/install.sh --dry-run      # show what would happen

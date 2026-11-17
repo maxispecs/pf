@@ -25,6 +25,9 @@
 # dependencies, so one `npm install -g` is enough. Plugins from the registry live in ~/.pf/plugins
 # (managed with `pf plugin`); `pf update` updates pf, those plugins and registry skills together.
 #
+# If npm's global directory is not writable by you (Homebrew Node owned by root: EACCES), the script
+# switches npm to a user prefix (~/.npm-global, or PF_NPM_PREFIX) and adds its bin to your shell rc.
+#
 # Needs Node >= 18 and npm (--host installs Node with dnf/yum/apt when it is missing).
 # pf and its packages are public on cellars, so installing needs no token. An auth line in
 # ~/.npmrc (NPM_TOKEN, token from #frontend) is only for publishing and private registry plugins;
@@ -125,6 +128,34 @@ command -v npm  >/dev/null 2>&1 || die "npm is not installed."
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
 [ "$NODE_MAJOR" -ge 18 ] || die "Node $(node -v) is too old: pf needs Node >= 18."
 ok "Node $(node -v), npm $(npm -v)"
+
+# 1b. A global prefix this user cannot write to (Homebrew's /opt/homebrew/lib/node_modules owned by
+#     root, a system Node in /usr/local) makes `npm install -g` fail with EACCES. Switch to a
+#     user-owned prefix instead of sudo: it never touches the system directories. (--host runs as
+#     root and keeps the system prefix.)
+if [ "$HOST" = 0 ]; then
+  GLOBAL_ROOT="$(npm root -g 2>/dev/null || true)"
+  GLOBAL_PREFIX="$(npm prefix -g 2>/dev/null || true)"
+  # The directory npm writes into: the global node_modules, or the prefix while it does not exist yet.
+  WRITE_DIR="$GLOBAL_ROOT"; [ -d "$WRITE_DIR" ] || WRITE_DIR="$GLOBAL_PREFIX"
+  if [ -n "$WRITE_DIR" ] && [ ! -w "$WRITE_DIR" ]; then
+    USER_PREFIX="${PF_NPM_PREFIX:-$HOME/.npm-global}"
+    warn "npm's global directory $WRITE_DIR is not writable by you: using the user prefix $USER_PREFIX (no sudo)"
+    run mkdir -p "$USER_PREFIX"
+    run npm config set prefix "$USER_PREFIX"
+    export PATH="$USER_PREFIX/bin:$PATH"
+    RC="$HOME/.$(basename "${SHELL:-/bin/zsh}")rc"
+    PATH_LINE="export PATH=\"$USER_PREFIX/bin:\$PATH\""
+    if [ -f "$RC" ] && grep -qF "$USER_PREFIX/bin" "$RC"; then
+      ok "$USER_PREFIX/bin is already on PATH in $RC"
+    elif [ "$DRY" = 1 ]; then
+      printf '  %swould append to %s:%s %s\n' "$D" "$RC" "$Z" "$PATH_LINE"
+    else
+      printf '%s\n' "$PATH_LINE" >> "$RC"
+      ok "added $USER_PREFIX/bin to PATH in $RC (open a new terminal, or: source $RC)"
+    fi
+  fi
+fi
 
 # 2. Registry auth (optional; presence only, never the token)
 REG_HOST="${REGISTRY#*://}"; REG_HOST="${REG_HOST%%/*}"

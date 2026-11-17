@@ -10,7 +10,15 @@ export const metadata: Metadata = {
   description: 'pf (pulpfixer): one developer CLI for any repo. Commands, agent, plugins and host mode.',
 }
 
-const navbar = <Navbar logo={<strong>pf</strong>} />
+const logo = (
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img src="/logo.png" alt="pulpfixer" width={28} height={28} style={{ borderRadius: 6 }} />
+    <strong>pf</strong>
+  </span>
+)
+
+const navbar = <Navbar logo={logo} />
 const footer = <Footer>pf (pulpfixer) documentation.</Footer>
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
