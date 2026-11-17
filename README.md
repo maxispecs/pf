@@ -1,5 +1,4 @@
 # pulpfixer
-## dev helper and agent
 
 ```text
          ⢀⣤⣤⣀⡀ ⣠
