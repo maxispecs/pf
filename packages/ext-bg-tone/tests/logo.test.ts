@@ -48,8 +48,9 @@ test('toRelativeLogoPath only returns paths inside the root', () => {
 });
 
 test('normalizeLogoLocations', () => {
-	assert.deepEqual(normalizeLogoLocations(undefined), ['identityCard', 'explorerItem']);
+	assert.deepEqual(normalizeLogoLocations(undefined), ['identityCard', 'explorerItem', 'scmCard']);
 	assert.deepEqual(normalizeLogoLocations(['windowTitle', 'bogus', 'identityCard']), ['identityCard', 'windowTitle']);
+	assert.deepEqual(normalizeLogoLocations(['windowTitle', 'scmCard']), ['scmCard', 'windowTitle']);
 	assert.deepEqual(normalizeLogoLocations([]), []);
 });
 

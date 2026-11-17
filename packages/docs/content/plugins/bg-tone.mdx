@@ -4,7 +4,7 @@ title: Background Tone (pulpfixer suite)
 
 # Background Tone
 
-Background Tone is a Cursor and VS Code extension that tints the side bar, title bar and more per repo, and shows a repo logo (a card at the top of the Explorer, an Explorer item, the tab icon of its settings page, an optional emoji in the window title). With several windows open you can tell which repo is which.
+Background Tone is a Cursor and VS Code extension that tints the side bar, title bar and more per repo, and shows a repo logo (a card at the top of the Explorer and in Source Control, an Explorer item, the tab icon of its settings page, an optional emoji in the window title). With several windows open you can tell which repo is which.
 
 It is the first extension of the **pulpfixer suite**: the extensions that go with pf, installed and kept current by the [system plugin](/plugins/system).
 
@@ -41,7 +41,7 @@ The extension writes its settings to the `bgTone` section of the repo's `pulpfix
 }
 ```
 
-Keys: `enabled`, `color`, `strength` (0 to 0.3), `surfaces`, `baseColors`, `accentBorder`, `logo`, `logoLocations`, `titleEmoji`, `palette`. The picker, the Repo Settings page (gear icon in the Explorer header) and the commands all write there, keeping every other key and the file's indentation. A `pulpfixer.json` that is not valid JSON is never overwritten. A repo that has not been converted yet and only has a `pf.json` is edited in place.
+Keys: `enabled`, `color`, `strength` (0 to 0.3), `surfaces`, `baseColors`, `accentBorder`, `logo`, `logoLocations` (`identityCard`, `explorerItem`, `scmCard` for the Repo Identity card in Source Control, `windowTitle`), `titleEmoji`, `palette`. The picker, the Repo Settings page (gear icon in the Explorer header) and the commands all write there, keeping every other key and the file's indentation. A `pulpfixer.json` that is not valid JSON is never overwritten. A repo that has not been converted yet and only has a `pf.json` is edited in place.
 
 A repo that still keeps `bgTone.*` values in `.vscode/settings.json` keeps working: they are read until the first change moves them into `pulpfixer.json`. `bgTone.showLastAgent` (the last Cursor chats on the identity card) is personal, so it stays a normal VS Code user setting.
 

@@ -82,16 +82,18 @@
             "enum": [
               "identityCard",
               "explorerItem",
+              "scmCard",
               "windowTitle"
             ]
           },
           "uniqueItems": true,
           "default": [
             "identityCard",
-            "explorerItem"
+            "explorerItem",
+            "scmCard"
           ],
           "scope": "window",
-          "markdownDescription": "Where to show the repo identity. `identityCard`: the Repo Identity view in the Explorer. `explorerItem`: a tree item using the logo as its icon. `windowTitle`: prefixes the window title with `bgTone.titleEmoji` (the native title bar cannot show an image). Legacy: read only when pulpfixer.json has no `bgTone` section; new values are written to pulpfixer.json."
+          "markdownDescription": "Where to show the repo identity. `identityCard`: the Repo Identity view in the Explorer. `explorerItem`: a tree item using the logo as its icon. `scmCard`: the same Repo Identity view in Source Control. `windowTitle`: prefixes the window title with `bgTone.titleEmoji` (the native title bar cannot show an image). Legacy: read only when pulpfixer.json has no `bgTone` section; new values are written to pulpfixer.json."
         },
         "bgTone.titleEmoji": {
           "type": "string",
@@ -206,6 +208,16 @@
           "id": "bgTone.identityItem",
           "name": "Repo",
           "when": "bgTone.itemVisible"
+        }
+      ],
+      "scm": [
+        {
+          "id": "bgTone.identityCardScm",
+          "name": "Repo Identity",
+          "type": "webview",
+          "when": "bgTone.scmCardVisible",
+          "visibility": "collapsed",
+          "contextualTitle": "Repo Identity"
         }
       ]
     }

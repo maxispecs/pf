@@ -10,6 +10,7 @@ import type { SettingsTab } from './settingsPanel.ts';
 import {
 	IDENTITY_CARD_VIEW,
 	IDENTITY_ITEM_VIEW,
+	IDENTITY_SCM_CARD_VIEW,
 	IdentityCardProvider,
 	IdentityItemProvider,
 	updateIdentityContext,
@@ -26,6 +27,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	const logos = new LogoService();
 	const actions = new ActionsService();
 	const card = new IdentityCardProvider(context, logos, actions);
+	const scmCard = new IdentityCardProvider(context, logos, actions);
 	const item = new IdentityItemProvider(logos);
 
 	const reapply = () => {
@@ -57,6 +59,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	const refreshViews = () => {
 		void updateIdentityContext(logos);
 		card.refresh();
+		scmCard.refresh();
 		item.refresh();
 	};
 	const refreshLogo = () => {
@@ -67,6 +70,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		logos,
 		actions,
 		card,
+		scmCard,
 		item,
 		statusItem,
 		logos.onDidChange(refreshViews),
@@ -82,10 +86,12 @@ export function activate(context: vscode.ExtensionContext): void {
 			// pulpfixer.json also holds the commands and `actions` the buttons come from.
 			actions.refreshSoon();
 			card.refresh();
+			scmCard.refresh();
 		}),
 		vscode.window.onDidChangeActiveColorTheme(() => void applyTone(context)),
 
 		vscode.window.registerWebviewViewProvider(IDENTITY_CARD_VIEW, card),
+		vscode.window.registerWebviewViewProvider(IDENTITY_SCM_CARD_VIEW, scmCard),
 		vscode.window.registerTreeDataProvider(IDENTITY_ITEM_VIEW, item),
 		vscode.window.registerWebviewPanelSerializer(SETTINGS_PANEL_TYPE, {
 			async deserializeWebviewPanel(panel) {

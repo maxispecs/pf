@@ -47,7 +47,7 @@ customization keys are left alone.
 | `bgTone.accentBorder` | `false` | Paint the raw color on the title bar bottom border and the active tab border. |
 | `bgTone.palette` | `[]` | Extra picker colors, e.g. `[{ "label": "Brand", "color": "#ff6600" }]`. |
 | `bgTone.logo` | `""` | Image inside the repo, relative to the repo root (png, svg, jpg, jpeg, webp, gif, ico). |
-| `bgTone.logoLocations` | `["identityCard", "explorerItem"]` | Where to show the identity: `identityCard`, `explorerItem`, `windowTitle`. |
+| `bgTone.logoLocations` | `["identityCard", "explorerItem", "scmCard"]` | Where to show the identity: `identityCard`, `explorerItem`, `scmCard` (the Repo Identity card in Source Control), `windowTitle`. |
 | `bgTone.titleEmoji` | `""` | Emoji or short text (max 8 characters) used as the window title prefix. |
 | `bgTone.showLastAgent` | `true` | Show the last 3 Cursor agent chats (title, status, time since) on the Repo Identity card. |
 | `bgTone.showActions` | `true` | Show the repo's featured actions as icon buttons on the Repo Identity card (personal setting). |
@@ -90,6 +90,7 @@ Choose an image that lives inside the repo (the picker refuses files outside it,
   `~/.cursor/projects/<repo>/agent-transcripts` and titles are read (read-only) from Cursor's global state database
   with the system `sqlite3` command; if that is unavailable the chat's first request is shown instead. Local
   windows only, turn off with `bgTone.showLastAgent`),
+- the same card in the **Source Control** view (`scmCard`), so the repo and its action buttons stay in view while you commit,
 - an **Explorer item** that uses the logo as its icon,
 - the **tab icon** of the Repo Settings page,
 - the **window title**, as an emoji or text prefix (`bgTone.titleEmoji`).

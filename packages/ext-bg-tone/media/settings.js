@@ -438,6 +438,7 @@
 	const LOCATION_LABELS = [
 		['identityCard', 'Repo Identity view', 'A card in the Explorer with the logo, repo name and tone.'],
 		['explorerItem', 'Explorer item', 'A tree item that uses the logo as its icon.'],
+		['scmCard', 'Repo Identity in Source Control', 'The same card in the Source Control view.'],
 		['windowTitle', 'Window title', 'Prefix the window title with the emoji or text below.'],
 	];
 

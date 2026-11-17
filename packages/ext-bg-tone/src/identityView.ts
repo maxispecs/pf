@@ -11,6 +11,7 @@ const AGENT_POLL_MS = 10_000;
 const TITLE_TTL_MS = 60_000;
 
 export const IDENTITY_CARD_VIEW = 'bgTone.identityCard';
+export const IDENTITY_SCM_CARD_VIEW = 'bgTone.identityCardScm';
 export const IDENTITY_ITEM_VIEW = 'bgTone.identityItem';
 
 function nonce(): string {
@@ -28,10 +29,16 @@ export async function updateIdentityContext(logos: LogoService): Promise<void> {
 	const hasLogo = logos.logo !== undefined;
 	const hasColor = config.color !== '' && config.enabled;
 	const hasFolder = !!vscode.workspace.workspaceFolders?.length;
+	const hasIdentity = hasFolder && (hasLogo || hasColor);
 	await vscode.commands.executeCommand(
 		'setContext',
 		'bgTone.cardVisible',
-		hasFolder && config.logoLocations.includes('identityCard') && (hasLogo || hasColor),
+		hasIdentity && config.logoLocations.includes('identityCard'),
+	);
+	await vscode.commands.executeCommand(
+		'setContext',
+		'bgTone.scmCardVisible',
+		hasIdentity && config.logoLocations.includes('scmCard'),
 	);
 	await vscode.commands.executeCommand(
 		'setContext',
@@ -40,7 +47,7 @@ export async function updateIdentityContext(logos: LogoService): Promise<void> {
 	);
 }
 
-/** The "Repo Identity" card: the repo logo, name and tone color at the top of the Explorer. */
+/** The "Repo Identity" card: the repo logo, name and tone color. One instance per view (Explorer, Source Control). */
 export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.Disposable {
 	private view: vscode.WebviewView | undefined;
 	private readonly disposables: vscode.Disposable[] = [];

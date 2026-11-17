@@ -4,10 +4,10 @@ import * as path from 'node:path';
 export const LOGO_EXTENSIONS: readonly string[] = ['.png', '.svg', '.jpg', '.jpeg', '.webp', '.gif', '.ico'];
 
 /** Places the logo can be shown. `windowTitle` uses the emoji/text prefix, never the image itself. */
-export type LogoLocation = 'identityCard' | 'explorerItem' | 'windowTitle';
+export type LogoLocation = 'identityCard' | 'explorerItem' | 'scmCard' | 'windowTitle';
 
-export const ALL_LOGO_LOCATIONS: readonly LogoLocation[] = ['identityCard', 'explorerItem', 'windowTitle'];
-export const DEFAULT_LOGO_LOCATIONS: readonly LogoLocation[] = ['identityCard', 'explorerItem'];
+export const ALL_LOGO_LOCATIONS: readonly LogoLocation[] = ['identityCard', 'explorerItem', 'scmCard', 'windowTitle'];
+export const DEFAULT_LOGO_LOCATIONS: readonly LogoLocation[] = ['identityCard', 'explorerItem', 'scmCard'];
 
 export type LogoPathResult =
 	| { ok: true; path: string }
