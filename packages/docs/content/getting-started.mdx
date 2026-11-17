@@ -29,6 +29,58 @@ scripts/install.sh --dry-run      # show what would happen
 
 One global install brings everything: the `pulpfixer` package depends on `@pulpfixer/kit` and the built-in plugins.
 
+### After installing
+
+`pf setup` only prepares pf itself. The rest of a fresh machine is a few optional steps, each one command and each safe to rerun:
+
+| Step | Command | What it does |
+|------|---------|--------------|
+| Check the machine | `pf doctor` | Checks the install, the registry, skills and agents, your config and the repo you are in |
+| Cursor settings | `pf sys apply cursor` | Installs the standard Cursor extensions and sets the standard `settings.json` values. Additive: nothing is uninstalled, your other settings stay, and the old file is backed up first. Shows the plan and asks (`--dry-run` to preview, `--yes` without a terminal) |
+| The pulpfixer suite | `pf sys apply suite` | Installs the suite extensions into Cursor, today [Background Tone](/plugins/bg-tone) (a per-repo color tint and logo, plus action buttons for the repo). Reload the Cursor window afterwards |
+| Skills | `pf skill install --all` | Installs the registry skills into `~/.pf/skills` (`pf skill available` lists them; `--to claude`, `--to cursor` or `--to agents` puts them where that agent looks). pf also ships a few skills of its own (`pf-repo`, `ship-staging`, `fix-failing`, `deploy-setup`, `troubleshoot`), and `pf update` keeps the `ver` and `pnpm` skills current on its own |
+| Plugins | `pf plugin available`, then `pf plugin install <name>` | Optional registry plugins (`@pf-plugins/<name>`) that add commands. The AWS, YubiKey and system plugins are built in |
+| Your repos | `pf rp` (in each repo) | Links the repo to this machine, wires pf's versioning and pnpm helpers into it, sets the Background Tone logo and offers the suite install if Cursor lacks it |
+
+Put together, a new machine is:
+
+```bash
+pf setup && pf doctor
+pf sys apply cursor      # Cursor extensions and settings
+pf sys apply suite       # Background Tone
+pf skill install --all   # skills
+```
+
+The presets, the suite extensions and the skills are all fetched at their latest version, so these commands also work as the way to bring a machine back to the standard. Afterwards `pf update` (`pf u`) keeps pf, its plugins, the skills and the suite extensions you have installed current. It updates the `ver` and `pnpm` skills (installing them when missing) and registry skills you already have, but never installs a missing suite extension. See the [System plugin](/plugins/system), [Background Tone](/plugins/bg-tone) and [Skills](/concepts/skills) pages.
+
+## Shortcuts at a glance
+
+Most of what you do day to day is two or three letters. A shortcut is a short name for a full command, and anything you add passes through to it. `pf s` lists them all.
+
+```bash
+pf r                  # = pf dev: run the repo, whatever its stack
+pf il                 # = pf install local: the repo's own local install target
+pf ds                 # = pf deploy staging: finds the target itself
+pf d "fix login"      # deploy (staging, else production) with a message
+pf gp                 # = pf git push: the primary remote, then the backup remotes
+pf ps                 # = pf publish staging: runs the repo's publish:cellars, asks first
+pf docs               # = pf doc: run the repo's docs site
+pf a                  # = pf agent: the coding agent, with pf's tools
+pf t                  # = pf troubleshoot: the agent plus read-only AWS access
+pf v                  # = pf ver: list versions, bump them
+pf rp                 # = pf repo: hook pf into this repo
+pf u                  # = pf update: pf, plugins, skills, suite extensions
+```
+
+Every command that runs something takes `--dry-run`, so you can see what a shortcut does first:
+
+```bash
+pf ds --dry-run
+pf r --dry-run
+```
+
+Production is never a surprise: `pf dp` only runs a production script the repo defines, and always asks. The full table, with notes, is on the [Shortcuts](/commands/shortcuts) page.
+
 ## First run
 
 ```bash
