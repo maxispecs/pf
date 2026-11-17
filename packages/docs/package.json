@@ -1,6 +1,6 @@
 {
   "name": "@pulpfixer/docs",
-  "version": "1.23.0",
+  "version": "1.24.0",
   "private": true,
   "description": "pf documentation site (Nextra). Private: never published.",
   "license": "UNLICENSED",
@@ -9,6 +9,7 @@
     "dev": "next dev --port 4400",
     "build": "next build",
     "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind",
+    "build:static": "DOCS_EXPORT=1 next build && pagefind --site out --output-path out/_pagefind",
     "start": "next start --port 4400",
     "typecheck": "next typegen && tsc -p tsconfig.json"
   },

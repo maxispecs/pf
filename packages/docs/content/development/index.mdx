@@ -86,3 +86,7 @@ cd ~/some/repo && ~/dev/agents/pulpfixer/pf dev --dry-run
 ## Docs
 
 Pages live in `packages/docs/content/` as MDX, with a `_meta.ts` per folder that sets the sidebar order and titles. When you change a command, plugin or the agent, update the matching page. The agent guide also exists in `packages/pulpfixer/docs/agent.md`, so keep the two in step.
+
+### Hosting on AWS Amplify
+
+The site is hosted as a static export. `amplify.yml` at the repo root builds it with `pnpm run build:static` (`DOCS_EXPORT=1 next build`, then the Pagefind index into `out/_pagefind`) and serves `packages/docs/out`. In the Amplify console, connect the repo, tick "My app is a monorepo" and set the app root to `packages/docs`. Without `DOCS_EXPORT`, `pf docs` and `pnpm docs:build` behave as before (a Next server).
