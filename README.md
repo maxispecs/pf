@@ -1,4 +1,5 @@
-# pulpfixer monorepo
+# pulpfixer
+## dev helper and agent
 
 ```text
          ⢀⣤⣤⣀⡀ ⣠
