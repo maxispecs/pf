@@ -186,7 +186,7 @@ export function entriesFor(ctx: Context): Entry[] {
     const push = ctx.repo.hasGit ? readRepo(ctx.repo.root) : null;
     if (push) {
       const cfg = loadLocalConfig(push.root).git?.push ?? {};
-      const primary = resolvePrimary(cfg, push.upstreamRemote);
+      const primary = resolvePrimary(cfg, push.upstreamRemote, push.remotes);
       const extra = (cfg.secondary ?? []).filter((r) => r !== primary).length;
       if (push.remotes.length) {
         fromRepo.push({

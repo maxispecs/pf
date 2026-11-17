@@ -82,6 +82,16 @@ test('the primary is the configured remote, else the branch upstream, else origi
   assert.equal(resolvePrimary({}), 'origin');
 });
 
+test('the primary is recognised from the remotes: origin, else the one remote that is not a backup', () => {
+  assert.equal(resolvePrimary({}, undefined, ['github']), 'github', 'a sole remote is the primary');
+  assert.equal(resolvePrimary({}, undefined, ['origin', 'github']), 'origin');
+  assert.equal(resolvePrimary({ secondary: ['bitbucket'] }, undefined, ['github', 'bitbucket']), 'github');
+  assert.equal(resolvePrimary({ secondary: ['bitbucket'] }, undefined, ['bitbucket']), 'origin', 'a backup alone is not a primary');
+  assert.equal(resolvePrimary({}, undefined, ['a', 'b']), 'origin', 'two candidates: nothing says which');
+  assert.equal(resolvePrimary({ primary: 'b' }, undefined, ['a']), 'b', 'the configured one always wins');
+  assert.equal(resolvePrimary({}, 'up', ['a']), 'up');
+});
+
 test('planPush: nothing configured pushes the primary only', () => {
   const p = planPush(facts({ args: ['--tags'] }));
   assert.ok(p.ok);
@@ -101,7 +111,7 @@ test('planPush: secondaries follow the primary, never get -u, and --no-secondary
 
 test('planPush: a missing remote, or a detached HEAD, is an error with a hint', () => {
   const noPrimary = planPush(facts({ remotes: [] }));
-  assert.ok(!noPrimary.ok && /git remote add origin/.test(noPrimary.error));
+  assert.ok(!noPrimary.ok && /pf git primary origin <url>/.test(noPrimary.error));
   const missing = planPush(facts({ config: { secondary: ['backup'] } }));
   assert.ok(!missing.ok && /"backup"/.test(missing.error) && /pf git backup add/.test(missing.error));
   const detached = planPush(facts({ branch: null }));
@@ -257,4 +267,87 @@ test('pf git: unknown subcommands, and a backup remote needs a terminal or argum
   assert.equal(pf(dir, 'git', 'primary').code, 1, 'no remote named and no terminal');
   assert.equal(pf(dir, 'git', 'backup', 'add', 'x', '-oProxyCommand=evil').code, 1, 'a URL cannot be an option');
   assert.equal(pf(mkRepo({ 'pulpfixer.json': '{}' }), 'git', 'status').code, 1);
+});
+
+/** A checkout with one commit and no remote at all. */
+function mkBareCheckout() {
+  const dir = mkRepo({ 'a.txt': 'a\n' });
+  git(dir, 'init', '-b', 'main');
+  git(dir, 'add', '.');
+  git(dir, 'commit', '-m', 'one');
+  const bare = (name: string) => {
+    const p = path.join(mkRepo({}), `${name}.git`);
+    git(dir, 'init', '--bare', '-b', 'main', p);
+    return p;
+  };
+  return { dir, bare };
+}
+
+const cfgOf = (dir: string) => JSON.parse(fs.readFileSync(path.join(dir, '.pf', 'config.json'), 'utf8')).git?.push;
+
+test('a repo whose only remote is not called origin pushes there: it is the primary', () => {
+  const { dir, bare } = mkBareCheckout();
+  const gh = bare('gh');
+  git(dir, 'remote', 'add', 'gh', gh);
+  const show = pf(dir, 'git', 'status');
+  assert.match(show.out, /primary:\s+gh/);
+  assert.ok(!/not a git remote/.test(show.out), show.out);
+  assert.equal(pf(dir, 'gp').code, 0);
+  assert.equal(head(gh), git(dir, 'rev-parse', 'main'));
+  // A backup added to it is a backup, not a rival primary.
+  const backup = bare('backup');
+  assert.equal(pf(dir, 'git', 'backup', 'add', 'backup', backup).code, 0);
+  assert.equal(pf(dir, 'gp').code, 0);
+  assert.equal(head(backup), git(dir, 'rev-parse', 'main'));
+});
+
+test('a backup with no primary behind it is refused, and the primary can be added with its URL', () => {
+  const { dir, bare } = mkBareCheckout();
+  const main = bare('main');
+  const backup = bare('backup');
+  // No remote at all: a backup of nothing makes no sense.
+  const early = pf(dir, 'git', 'backup', 'add', 'backup', backup);
+  assert.equal(early.code, 1, early.out);
+  assert.match(early.out, /no primary remote yet/);
+  assert.throws(() => git(dir, 'remote', 'get-url', 'backup'), 'nothing was added');
+  // pf gp says what to do.
+  const push = pf(dir, 'gp');
+  assert.equal(push.code, 1);
+  assert.match(push.out, /pf git primary origin <url>/);
+  // Set the primary (adds the git remote), then the backup, then one push reaches both.
+  assert.equal(pf(dir, 'git', 'primary', 'origin', main).code, 0);
+  assert.equal(git(dir, 'remote', 'get-url', 'origin'), main);
+  assert.deepEqual(cfgOf(dir), { primary: 'origin' });
+  assert.equal(pf(dir, 'git', 'backup', 'add', 'backup', backup).code, 0);
+  assert.deepEqual(cfgOf(dir), { primary: 'origin', secondary: ['backup'] });
+  assert.equal(pf(dir, 'gp').code, 0);
+  assert.equal(head(main), git(dir, 'rev-parse', 'main'));
+  assert.equal(head(backup), git(dir, 'rev-parse', 'main'));
+});
+
+test('a backup that was added before any primary: status warns, and naming it the primary repairs the setup', () => {
+  const { dir, bare } = mkBareCheckout();
+  const bb = bare('bitbucket');
+  git(dir, 'remote', 'add', 'bitbucket', bb);
+  fs.mkdirSync(path.join(dir, '.pf'));
+  fs.writeFileSync(path.join(dir, '.pf', 'config.json'), JSON.stringify({ git: { push: { secondary: ['bitbucket'] } } }));
+  const show = pf(dir, 'git', 'status');
+  assert.equal(show.code, 0, show.out);
+  assert.match(show.out, /no primary remote yet/);
+  const push = pf(dir, 'gp');
+  assert.equal(push.code, 1);
+  assert.match(push.out, /no primary remote yet/);
+  assert.equal(pf(dir, 'git', 'primary', 'bitbucket').code, 0);
+  assert.deepEqual(cfgOf(dir), { primary: 'bitbucket' }, 'it stops being a backup');
+  assert.equal(pf(dir, 'gp').code, 0);
+  assert.equal(head(bb), git(dir, 'rev-parse', 'main'));
+});
+
+test('pf git primary: an unknown remote needs a URL, an existing one refuses one', () => {
+  const { dir, bare } = mkCheckout();
+  assert.equal(pf(dir, 'git', 'primary', 'nope').code, 1);
+  assert.equal(pf(dir, 'git', 'primary', 'origin', bare('x')).code, 1);
+  assert.equal(pf(dir, 'git', 'primary', 'nope', '-oEvil').code, 1);
+  assert.equal(pf(dir, 'git', 'primary', 'nope', bare('y'), '--dry-run').code, 0);
+  assert.throws(() => git(dir, 'remote', 'get-url', 'nope'));
 });

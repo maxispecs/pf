@@ -1,12 +1,12 @@
 {
   "stack": {
-    "version": "2.53",
-    "since": "2026-11-16"
+    "version": "2.54",
+    "since": "2026-11-17"
   },
   "packages": {
     "packages/docs": {
-      "version": "1.18",
-      "since": "2026-11-16",
+      "version": "1.19",
+      "since": "2026-11-17",
       "type": "node"
     },
     "packages/ext-bg-tone": {
@@ -45,8 +45,8 @@
       "type": "node"
     },
     "packages/pulpfixer": {
-      "version": "6.6",
-      "since": "2026-11-16",
+      "version": "6.7",
+      "since": "2026-11-17",
       "type": "node"
     }
   }

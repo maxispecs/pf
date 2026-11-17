@@ -66,6 +66,12 @@ function needRepo(ctx: Context): Repo | null {
 
 const secondaryOf = (config: GitPushConfig): string[] => config.secondary ?? [];
 
+/** The primary remote name: configured, the branch upstream, `origin`, or the one remote that is not a backup. */
+const primaryOf = (repo: Repo, config: GitPushConfig): string => resolvePrimary(config, repo.upstreamRemote, repo.remotes);
+
+/** Is the primary a git remote of this repo? */
+const hasPrimary = (repo: Repo, config: GitPushConfig): boolean => repo.remotes.includes(primaryOf(repo, config));
+
 async function push(ctx: Context, args: string[]): Promise<number> {
   const c = err();
   const rest = [...args];
@@ -73,7 +79,13 @@ async function push(ctx: Context, args: string[]): Promise<number> {
   const noSecondary = takeFlag(rest, '--no-secondary');
   const repo = needRepo(ctx);
   if (!repo) return 1;
-  const config = loadLocalConfig(repo.root).git?.push ?? {};
+  let config = loadLocalConfig(repo.root).git?.push ?? {};
+  if (!dryRun && interactive()) {
+    // No primary remote yet (a new repo, or only a backup): set it up now instead of failing.
+    const set = await ensurePrimary(repo, config, dryRun);
+    if ('code' in set) return set.code;
+    config = set.config;
+  }
 
   const plan = planPush({ config, branch: repo.branch, upstreamRemote: repo.upstreamRemote, remotes: repo.remotes, args: rest, secondary: !noSecondary });
   if (!plan.ok) return fail(plan.error);
@@ -105,7 +117,7 @@ const USAGE = [
   'pf git [push | status | backup | primary]',
   'pf git push [--dry-run] [--no-secondary] [git push args]',
   'pf git backup [add [<remote>] [<url>] | remove [<remote>]] [--dry-run]',
-  'pf git primary [<remote> | --unset] [--dry-run]',
+  'pf git primary [<remote> [<url>] | --unset] [--dry-run]',
 ];
 
 function printUsage(): void {
@@ -115,7 +127,7 @@ function printUsage(): void {
 
 function status(repo: Repo, config: GitPushConfig): void {
   const c = err();
-  const primary = resolvePrimary(config, repo.upstreamRemote);
+  const primary = primaryOf(repo, config);
   const source = config.primary ? 'set in .pf/config.json' : repo.upstreamRemote ? 'the branch upstream' : 'the default';
   const line = (r: string, extra = '') => `${c.bold(r)}${display(repo.root, r) ? c.dim(`  ${display(repo.root, r)}`) : ''}${extra}${repo.remotes.includes(r) ? '' : c.dim('  (not a git remote here)')}`;
   const rows = [`${c.dim('primary:')}   ${line(primary, c.dim(`  (${source})`))}`];
@@ -123,6 +135,9 @@ function status(repo: Repo, config: GitPushConfig): void {
   if (secondary.length) for (const r of secondary) rows.push(`${c.dim('backup:')}    ${line(r)}`);
   else rows.push(`${c.dim('backup:')}    ${c.dim('none, pf gp pushes the primary only')}`);
   process.stdout.write(`${rows.join('\n')}\n`);
+  if (!repo.remotes.includes(primary)) {
+    process.stderr.write(`${badgeLabel('warning', c)} no primary remote yet. Set it with ${termLine('pf git primary <remote> [<url>]', c)}\n`);
+  }
   process.stderr.write(`${c.dim('Kept in .pf/config.json (this machine only, not committed). Add a backup remote with')} ${termLine('pf git backup', c)}\n`);
 }
 
@@ -145,23 +160,94 @@ const sameWithout = (cmd: string): void => {
 const invalidName = (name: string | undefined): string | null =>
   !name || !REMOTE_NAME.test(name) ? `"${name ?? ''}" is not a usable remote name (letters, digits, ".", "_" and "-")` : null;
 
+type Setup = { config: GitPushConfig } | { code: number };
+
+/** `git remote add` (skipped in a dry run); the name joins this run's view of the repo's remotes. */
+function addRemote(repo: Repo, name: string, url: string, dryRun: boolean): number {
+  const c = err();
+  if (url.startsWith('-')) return fail(`"${url}" is not a usable remote URL`);
+  if (!dryRun) {
+    const r = git(repo.root, 'remote', 'add', name, url);
+    if (!r.ok) return fail(`git remote add failed: ${r.stderr.trim()}`);
+  }
+  repo.remotes.push(name);
+  process.stderr.write(`${dryRun ? c.dim('would add') : 'added'} git remote ${c.bold(name)} ${c.dim(normalizeRemote(url) ?? 'the given URL')}\n`);
+  return 0;
+}
+
+/** Make `name` the primary remote (adding the git remote first when `url` is given); a backup that becomes the primary stops being one. */
+function setPrimary(repo: Repo, current: GitPushConfig, name: string, url: string | undefined, dryRun: boolean): Setup {
+  const bad = invalidName(name);
+  if (bad) return { code: fail(`${bad}. Usage: ${USAGE[3]}`) };
+  if (!repo.remotes.includes(name)) {
+    if (!url) return { code: fail(`this repo has no git remote "${name}" (it has: ${repo.remotes.join(', ') || 'none'}). Give its URL to add it: pf git primary ${name} <url>`) };
+    const code = addRemote(repo, name, url, dryRun);
+    if (code) return { code };
+  } else if (url) {
+    return { code: fail(`this repo already has a git remote "${name}", so the URL was not used. Drop it, or change the remote with git remote set-url`) };
+  }
+  const secondary = secondaryOf(current).filter((r) => r !== name);
+  const next: GitPushConfig = { primary: name, ...(secondary.length ? { secondary } : {}) };
+  const code = save(repo, next, dryRun);
+  if (code) return { code };
+  done(`primary remote is now ${err().bold(name)}`, dryRun);
+  return { config: next };
+}
+
+/** Ask which remote is the primary: one the repo has, or a new one (name and URL). Needs a terminal. */
+async function choosePrimary(repo: Repo, current: GitPushConfig, dryRun: boolean): Promise<Setup> {
+  const now = primaryOf(repo, current);
+  const backups = new Set(secondaryOf(current));
+  let name: string | null = '';
+  if (repo.remotes.length) {
+    name = await pick<string>('Primary remote (pushed to first)', [
+      ...repo.remotes.map((r) => ({ value: r, label: r, hint: [display(repo.root, r), backups.has(r) ? '(a backup now)' : r === now ? '(now)' : ''].filter(Boolean).join('  ') })),
+      { value: '', label: 'a new remote', hint: 'name it and give its URL' },
+    ], { search: false, ...(repo.remotes.includes(now) ? { initial: now } : {}) });
+    if (name === null) return { code: 130 };
+  }
+  if (name) {
+    sameWithout(`pf git primary ${name}`);
+    return setPrimary(repo, current, name, undefined, dryRun);
+  }
+  const newName = await ask('Name of the primary git remote', {
+    initial: repo.remotes.includes('origin') ? '' : 'origin',
+    validate: (v) => invalidName(v.trim()) ?? (repo.remotes.includes(v.trim()) ? `this repo has a git remote "${v.trim()}" already: pick it from the list` : null),
+  });
+  if (!newName) return { code: 130 };
+  const url = await ask(`URL of ${newName}`, {
+    placeholder: 'git@host:team/repo.git',
+    validate: (v) => (!v.trim() ? 'a URL is needed' : v.trim().startsWith('-') ? 'not a usable remote URL' : null),
+  });
+  if (!url) return { code: 130 };
+  sameWithout(`pf git primary ${newName} ${url}`);
+  return setPrimary(repo, current, newName, url, dryRun);
+}
+
+/** A repo needs a primary before it can have backups or be pushed: set it up when it has none (terminal only). */
+async function ensurePrimary(repo: Repo, current: GitPushConfig, dryRun: boolean): Promise<Setup> {
+  if (hasPrimary(repo, current)) return { config: current };
+  const c = err();
+  const missing = primaryOf(repo, current);
+  process.stderr.write(`${badgeLabel('warning', c)} ${repo.remotes.length ? `no primary remote yet: this repo has no "${missing}" and nothing says which remote to push to first` : 'this repo has no remote yet, so set up the primary first'}\n`);
+  return choosePrimary(repo, current, dryRun);
+}
+
 /** Make `name` a backup remote: add the git remote first when `url` is given. */
 function addBackup(repo: Repo, current: GitPushConfig, name: string, url: string | undefined, dryRun: boolean): number {
   const c = err();
-  const primary = resolvePrimary(current, repo.upstreamRemote);
+  const primary = primaryOf(repo, current);
   const bad = invalidName(name);
   if (bad) return fail(`${bad}. Usage: ${USAGE[2]}`);
   if (name === primary) return fail(`"${name}" is the primary remote already`);
+  if (!repo.remotes.includes(primary)) {
+    return fail(`this repo has no primary remote yet, and a backup copies the primary. Set it first: pf git primary <remote> [<url>] (it has: ${repo.remotes.join(', ') || 'no remotes'})`);
+  }
   if (secondaryOf(current).includes(name)) return done(`${name} is already a backup remote`, dryRun);
   if (!repo.remotes.includes(name)) {
     if (!url) return fail(`this repo has no git remote "${name}". Give its URL: pf git backup add ${name} <url>`);
-    if (url.startsWith('-')) return fail(`"${url}" is not a usable remote URL`);
-    if (!dryRun) {
-      const r = git(repo.root, 'remote', 'add', name, url);
-      if (!r.ok) return fail(`git remote add failed: ${r.stderr.trim()}`);
-    }
-    const shown = normalizeRemote(url) ?? 'the given URL';
-    process.stderr.write(`${dryRun ? c.dim('would add') : 'added'} git remote ${c.bold(name)} ${c.dim(shown)}\n`);
+    const code = addRemote(repo, name, url, dryRun);
+    if (code) return code;
   } else if (url) {
     return fail(`this repo already has a git remote "${name}", so the URL was not used. Drop it, or change the remote with git remote set-url`);
   }
@@ -172,7 +258,7 @@ function addBackup(repo: Repo, current: GitPushConfig, name: string, url: string
 
 /** The interactive "add a backup remote": pick an existing remote or name a new one and give its URL. */
 async function backupWizard(repo: Repo, current: GitPushConfig, dryRun: boolean): Promise<number> {
-  const primary = resolvePrimary(current, repo.upstreamRemote);
+  const primary = primaryOf(repo, current);
   const taken = new Set([primary, ...secondaryOf(current)]);
   const free = repo.remotes.filter((r) => !taken.has(r));
   let name: string | null = '';
@@ -216,7 +302,9 @@ async function backup(ctx: Context, args: string[]): Promise<number> {
       process.stderr.write(`${badgeLabel('error', err())} adding a backup remote needs a terminal, or give it: ${termLine('pf git backup add <remote> [<url>]', err())}\n`);
       return 2;
     }
-    return backupWizard(repo, current, dryRun);
+    const set = await ensurePrimary(repo, current, dryRun);
+    if ('code' in set) return set.code;
+    return backupWizard(repo, set.config, dryRun);
   }
 
   if (action === 'add') return addBackup(repo, current, name!, url, dryRun);
@@ -244,7 +332,6 @@ async function backup(ctx: Context, args: string[]): Promise<number> {
 }
 
 async function primary(ctx: Context, args: string[]): Promise<number> {
-  const c = err();
   const rest = [...args];
   const dryRun = takeFlag(rest, '--dry-run', '-n');
   const unset = takeFlag(rest, '--unset');
@@ -257,25 +344,14 @@ async function primary(ctx: Context, args: string[]): Promise<number> {
     const code = save(repo, keep, dryRun);
     return code === 0 ? done('primary remote unset: pf gp uses the branch upstream, else origin', dryRun) : code;
   }
-  let name = rest[0];
+  const [name, url] = rest;
   if (!name) {
-    const now = resolvePrimary(current, repo.upstreamRemote);
-    if (!interactive() || repo.remotes.length === 0) return fail(`name the remote: ${USAGE[3]} (this repo has: ${repo.remotes.join(', ') || 'no remotes'})`);
-    const chosen = await pick<string>('Push to first', repo.remotes.map((r) => ({ value: r, label: r, hint: r === now ? `${display(repo.root, r)}  (now)`.trim() : display(repo.root, r) })), {
-      search: false,
-      initial: repo.remotes.includes(now) ? now : repo.remotes[0]!,
-    });
-    if (!chosen) return 130;
-    name = chosen;
-    sameWithout(`pf git primary ${name}`);
+    if (!interactive()) return fail(`name the remote: ${USAGE[3]} (this repo has: ${repo.remotes.join(', ') || 'no remotes'})`);
+    const set = await choosePrimary(repo, current, dryRun);
+    return 'code' in set ? set.code : 0;
   }
-  const bad = invalidName(name);
-  if (bad) return fail(`${bad}. Usage: ${USAGE[3]}`);
-  if (!repo.remotes.includes(name)) return fail(`this repo has no git remote "${name}" (it has: ${repo.remotes.join(', ') || 'none'})`);
-  const secondary = secondaryOf(current).filter((r) => r !== name);
-  const next: GitPushConfig = { primary: name, ...(secondary.length ? { secondary } : {}) };
-  const code = save(repo, next, dryRun);
-  return code === 0 ? done(`primary remote is now ${c.bold(name)}`, dryRun) : code;
+  const set = setPrimary(repo, current, name, url, dryRun);
+  return 'code' in set ? set.code : 0;
 }
 
 type MenuAction = 'push' | 'status' | 'backup-add' | 'backup-remove' | 'primary';
@@ -286,12 +362,14 @@ async function menu(ctx: Context): Promise<number> {
   if (!repo) return 1;
   const config = loadLocalConfig(repo.root).git?.push ?? {};
   const items: { value: MenuAction; label: string; hint: string }[] = [
-    { value: 'push', label: 'Push', hint: `to ${[resolvePrimary(config, repo.upstreamRemote), ...secondaryOf(config)].join(', then ')}` },
+    { value: 'push', label: 'Push', hint: `to ${[primaryOf(repo, config), ...secondaryOf(config)].join(', then ')}` },
     { value: 'status', label: 'Remotes', hint: 'the primary and backup remotes' },
     { value: 'backup-add', label: 'Add a backup remote', hint: 'pf gp pushes there too' },
   ];
   if (secondaryOf(config).length) items.push({ value: 'backup-remove', label: 'Remove a backup remote', hint: 'stop pushing there' });
-  if (repo.remotes.length > 1) items.push({ value: 'primary', label: 'Set the primary remote', hint: 'the one pushed to first' });
+  const missing = !hasPrimary(repo, config);
+  if (missing) items.unshift({ value: 'primary', label: 'Set up the primary remote', hint: 'none yet, so pf gp cannot push' });
+  else if (repo.remotes.length > 1) items.push({ value: 'primary', label: 'Set the primary remote', hint: 'the one pushed to first' });
   const chosen = await pick<MenuAction>('Git', items, { search: false });
   if (!chosen) return 130;
   if (chosen === 'push') {

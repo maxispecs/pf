@@ -66,12 +66,13 @@ pf git backup add backup git@example.com:team/repo.git   # add the git remote an
 pf git backup add mirror       # an existing git remote becomes a backup
 pf git backup remove backup    # stop pushing there (the git remote stays)
 pf git primary gh              # push to "gh" first
+pf git primary origin git@example.com:team/repo.git   # add the git remote and make it the primary
 pf git primary --unset
 ```
 
-Add a backup remote with `pf git backup` (or "Add a backup remote" in the menu): it offers the git remotes the repo has that are not used yet, or a new one; for a new one it asks for the name (default `backup`) and the URL, runs `git remote add` and records it. From then on `pf gp` pushes to the primary, then the backup. Without a terminal give the arguments (`pf git backup add <remote> <url>`). Each interactive step prints the command that does the same thing.
+Add a backup remote with `pf git backup` (or "Add a backup remote" in the menu): it offers the git remotes the repo has that are not used yet, or a new one; for a new one it asks for the name (default `backup`) and the URL, runs `git remote add` and records it. A backup copies the primary, so a repo with no primary yet (no remote, or only a backup) is set up first: the wizard, `pf gp` and `pf git primary` in a terminal ask which remote is the primary, or for a name (default `origin`) and URL for a new one, and a backup that becomes the primary stops being a backup. Without a terminal `pf git backup add` refuses until `pf git primary <remote> [<url>]` has been run. From then on `pf gp` pushes to the primary, then the backup. Without a terminal give the arguments (`pf git backup add <remote> <url>`). Each interactive step prints the command that does the same thing.
 
-- **Primary**: the one in `.pf/config.json`, else the branch's upstream remote, else `origin`. The first push of a branch (no upstream yet) is `git push <primary> -u HEAD`, since a plain `git push origin` would fail there.
+- **Primary**: the one in `.pf/config.json`, else the branch's upstream remote, else `origin`, else the one remote that is not a backup (so a repo whose only remote is `github` pushes there). `pf git status` warns when none of these is a git remote of the repo. The first push of a branch (no upstream yet) is `git push <primary> -u HEAD`, since a plain `git push origin` would fail there.
 - **Backup remotes** get the same push as the primary: the current branch, by name. Nothing is deleted on them and there is no `--mirror`. `-u` goes to the primary only, so a backup never becomes the branch's upstream.
 - A failing primary push stops everything. A failing backup is reported and the other backups still run; `pf gp` then exits with 1.
 - Extra arguments are git push options or refspecs, never a remote name, and go to every push. `pf git push` only pushes: it does not stage or commit.
