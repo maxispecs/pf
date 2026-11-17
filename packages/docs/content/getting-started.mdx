@@ -6,16 +6,17 @@ title: Getting started
 
 ## Install
 
-From the cellars registry (needs `NPM_TOKEN`; the token comes from the frontend team):
+One line, with Node >= 18 and npm. No token is needed: pf and all its packages are public on the cellars registry.
 
 ```bash
-npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/
-pf setup
+npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup
 ```
 
-`pf setup` sets the machine up: the registry, shell completions and cleanup of the legacy `pulpfixer` 1.x package (its data in `~/.pulpfixer` is left alone).
+`--registry` applies to this install only, so your default npm registry is left alone. `pf setup` sets the machine up: shell completions, the optional registry auth line and cleanup of the legacy `pulpfixer` 1.x package (its data in `~/.pulpfixer` is left alone). Add `--yes` (`pf setup --yes`) to accept every step without prompts, for example in a provisioning script.
 
-On a machine that has nothing yet, use the installer from a checkout of the repo:
+An `NPM_TOKEN` (from the frontend team) is only needed to publish packages or to install private registry plugins.
+
+From a checkout of the repo, the installer does the same and more:
 
 ```bash
 scripts/install.sh                # latest published version

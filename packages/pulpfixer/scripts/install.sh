@@ -26,8 +26,9 @@
 # (managed with `pf plugin`); `pf update` updates pf, those plugins and registry skills together.
 #
 # Needs Node >= 18 and npm (--host installs Node with dnf/yum/apt when it is missing).
-# Installing from the registry needs NPM_TOKEN (token from #frontend) or an existing auth line
-# for the registry in ~/.npmrc; --host reads it from SSM or Secrets Manager with the instance role.
+# pf and its packages are public on cellars, so installing needs no token. An auth line in
+# ~/.npmrc (NPM_TOKEN, token from #frontend) is only for publishing and private registry plugins;
+# --host reads the token from SSM or Secrets Manager with the instance role.
 # A token is never written or printed.
 set -euo pipefail
 
@@ -125,18 +126,16 @@ NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
 [ "$NODE_MAJOR" -ge 18 ] || die "Node $(node -v) is too old: pf needs Node >= 18."
 ok "Node $(node -v), npm $(npm -v)"
 
-# 2. Registry auth (presence only, never the token)
+# 2. Registry auth (optional; presence only, never the token)
 REG_HOST="${REGISTRY#*://}"; REG_HOST="${REG_HOST%%/*}"
 NPMRC="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
 if [ "$FROM_SOURCE" = 0 ] && [ "$HOST" = 0 ]; then
   if [ -f "$NPMRC" ] && grep -q "^//${REG_HOST}/:_authToken=" "$NPMRC"; then
     ok "registry auth line for $REG_HOST found in $NPMRC"
   elif [ -n "${NPM_TOKEN:-}" ]; then
-    warn "no auth line for $REG_HOST in $NPMRC: pf setup will add one that reads \$NPM_TOKEN"
-  elif [ "$DRY" = 1 ]; then
-    warn "no registry auth found (a real install needs NPM_TOKEN or an auth line in $NPMRC)"
+    ok "no auth line for $REG_HOST in $NPMRC (not needed: pf is public); pf setup can add one that reads \$NPM_TOKEN"
   else
-    die "no registry auth. Export NPM_TOKEN (token from #frontend) and rerun, or add '//${REG_HOST}/:_authToken=\${NPM_TOKEN}' to $NPMRC."
+    ok "no registry auth needed: pf is public on $REG_HOST"
   fi
 fi
 

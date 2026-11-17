@@ -37,7 +37,7 @@ export const doctorCommand: Command = {
     r.ok(`pf v${displayVersion()} running from ${packageRoot()}`);
 
     const installs = pfOnPath();
-    if (installs.length === 0) r.warn('`pf` is not on PATH (running from a checkout?). Install it: scripts/install.sh');
+    if (installs.length === 0) r.warn('`pf` is not on PATH (running from a checkout?). Install it: npm install -g ' + PACKAGE_NAME + ' --registry ' + REGISTRY_URL);
     for (const [i, p] of installs.entries()) {
       const tag = p.legacy ? `legacy pulpfixer ${p.version}` : p.version ? `pulpfixer ${p.version}` : 'unknown';
       if (p.legacy) fail(`${p.path} is ${tag}${i === 0 ? ' and wins on PATH' : ''}: run pf setup to replace it`);
@@ -51,12 +51,9 @@ export const doctorCommand: Command = {
 
     r.step('Registry');
     if (npmrcHasCellarsAuth()) r.ok(`auth line for ${REGISTRY_URL} in ${userNpmrc()}`);
-    else r.warn(`no auth line for ${REGISTRY_URL} in ${userNpmrc()} (pf setup adds it)`);
+    else r.info(`no auth line for ${REGISTRY_URL} in ${userNpmrc()}: not needed to install or update pf (pf setup adds it)`);
     if (process.env.NPM_TOKEN) r.ok('NPM_TOKEN is set');
-    else {
-      r.warn('NPM_TOKEN is not set');
-      r.info('Needed to install or update from cellars. Token from #frontend');
-    }
+    else r.info('NPM_TOKEN is not set: only publishing and private registry plugins need it (token from #frontend)');
     if (offline) r.info('registry check skipped (--offline)');
     else {
       const latest = fetchLatest(15_000);

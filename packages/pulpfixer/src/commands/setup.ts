@@ -78,10 +78,10 @@ export const setupCommand: Command = {
             problems++;
           }
         }
-      } else r.warn('skipped: installs and updates from cellars need the auth line');
+      } else r.info('skipped: pf installs and updates without it (publishing and private plugins need it)');
     } else {
-      r.warn('no cellars auth: export NPM_TOKEN (token from #frontend), then rerun pf setup');
-      problems++;
+      r.ok('no cellars auth needed: pf and its packages are public');
+      r.info('To publish or use private registry plugins: export NPM_TOKEN (token from #frontend), then rerun pf setup');
     }
     r.info(`pf installs and updates with --registry ${REGISTRY_URL}, so your default npm registry is left alone`);
 

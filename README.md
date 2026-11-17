@@ -8,7 +8,7 @@
         ⠛⠈⠉⠙⣿⡿⠋⣿⣿⡇          p u l p f i x e r
          ⢀   ⢀⣀⣽⡏           the wolf of dev street
         ⢀⣌⠢⢄  ⠘⣿⠁           ░▒▓███████████████████████████████▓▒░
-      ⣀⣴⣿⣿⡕⢄⠈⢻⣿⣷⣄           pf v3
+      ⣀⣴⣿⣿⡕⢄⠈⢻⣿⣷⣄           pf :: third edition
   ⣀⣤⣶⣿⣟⣿⣿⣿⣿⣿⢦⣀⡿⢹⣿⣷⣦⣄⣀
 ⠒⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡌⢫⡇ ⣿⣿⣿⣷⣽⡷
    ⠉⠻⢿⣿⣿⣿⣿⣿⣿⣿⡄⠡ ⢻⣿⣿⣿⠇
@@ -16,6 +16,16 @@
        ⠈⠻⣿⡿⠋⠉   ⠁⢿⡿
          ⠉        ⠃
 ```
+
+## Install
+
+```bash
+npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup
+```
+
+Needs Node >= 18 and npm, no token: pf and its packages are public on the cellars registry. `--registry` applies to this install only. Then run `pf` in any repo; `pf update` keeps it current. More options (from source, plugins, dry run) are in [Getting started](packages/docs/content/getting-started.mdx).
+
+## This repo
 
 `pf` is a developer CLI for any repo, in any language. This repo is a pnpm workspace; the docs site is [packages/docs](packages/docs) (Nextra, run it with `pf docs` or `pnpm docs:dev`), and the user-facing reference is also in [packages/pulpfixer/README.md](packages/pulpfixer/README.md). The agent (tools, project profiles, scoped AWS access, writing agent tools in a plugin) is documented in [packages/pulpfixer/docs/agent.md](packages/pulpfixer/docs/agent.md).
 

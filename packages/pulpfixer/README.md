@@ -12,14 +12,15 @@ Every invocation prints its version (`pf v2.0`) on stderr.
 
 ## Install
 
-From the cellars registry (needs `NPM_TOKEN`, token from #frontend):
+One line, with Node >= 18 and npm (no token: pf and its packages are public on cellars):
 
 ```bash
-npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/
-pf setup
+npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup
 ```
 
-Or on a machine that has nothing yet, from a checkout of this repo:
+`--registry` applies to this install only, so your default npm registry is left alone. Use `pf setup --yes` to accept every step without prompts. An `NPM_TOKEN` (token from #frontend) is only needed to publish or to install private registry plugins.
+
+Or from a checkout of this repo:
 
 ```bash
 scripts/install.sh                # latest published version
