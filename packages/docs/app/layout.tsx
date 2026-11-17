@@ -14,7 +14,7 @@ const logo = (
   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
     {/* eslint-disable-next-line @next/next/no-img-element */}
     <img src="/logo.png" alt="pulpfixer" width={28} height={28} style={{ borderRadius: 6 }} />
-    <strong>pf</strong>
+    <strong>pulpfixer</strong>
   </span>
 )
 

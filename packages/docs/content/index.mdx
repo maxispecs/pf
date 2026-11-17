@@ -24,6 +24,18 @@ Every invocation prints a banner with its version (`pf v4.39`) on **stderr**, so
 
 Needs Node >= 18 and npm, no token, no `sudo` (a user-owned npm prefix is set up when the global directory is not writable). See [Getting started](/getting-started#install) for the other ways.
 
+After installing, a few optional steps finish the machine, each one command and safe to rerun:
+
+```bash
+pf doctor                # check the machine
+pf sys apply cursor      # standard Cursor extensions and settings
+pf sys apply suite       # the pulpfixer suite: the Background Tone extension for Cursor
+pf skill install --all   # agent skills from the registry
+pf rp                    # in a repo: hook pf's helpers in (and offer the suite)
+```
+
+`pf update` keeps pf, its plugins, skills and installed suite extensions current. Details are in [After installing](/getting-started#after-installing).
+
 ## Features
 
 | Feature | What it gives you | Read more |

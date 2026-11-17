@@ -25,6 +25,18 @@
 
 Needs Node >= 18 and npm, no token: pf and its packages are public on the cellars registry. The first part only runs when npm's global directory is not writable (Homebrew Node: `EACCES`): it switches npm to a user-owned prefix, `~/.npm-global`, so no `sudo` is needed. `--registry` applies to this install only. Then run `pf` in any repo; `pf update` keeps it current. More options (from source, plugins, dry run) are in [Getting started](packages/docs/content/getting-started.mdx).
 
+After installing, a few optional steps finish the machine, each one command and safe to rerun:
+
+```bash
+pf doctor                # check the machine
+pf sys apply cursor      # standard Cursor extensions and settings
+pf sys apply suite       # the pulpfixer suite: the Background Tone extension for Cursor
+pf skill install --all   # agent skills from the registry
+pf rp                    # in a repo: hook pf's helpers in (and offer the suite)
+```
+
+`pf update` keeps pf, its plugins, skills and installed suite extensions current. Details are in [After installing](packages/docs/content/getting-started.mdx#after-installing).
+
 ## This repo
 
 `pf` is a developer CLI for any repo, in any language. This repo is a pnpm workspace; the docs site is [packages/docs](packages/docs) (Nextra, run it with `pf docs` or `pnpm docs:dev`), and the user-facing reference is also in [packages/pulpfixer/README.md](packages/pulpfixer/README.md). The agent (tools, project profiles, scoped AWS access, writing agent tools in a plugin) is documented in [packages/pulpfixer/docs/agent.md](packages/pulpfixer/docs/agent.md).
