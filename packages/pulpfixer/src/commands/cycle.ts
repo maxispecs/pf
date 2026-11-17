@@ -10,10 +10,10 @@ import { CYCLE_USAGE, findCheckout, runDevCycle } from '../devcycle.js';
 function cycleCommand(name: string): Command {
   return {
     name,
-    summary: 'Dev cycle in the pulpfixer checkout: bump, commit, publish to staging, update pf',
+    summary: 'Dev cycle in the pulpfixer checkout: bump, commit, publish to staging, push, update pf',
     group: 'Tools',
     hidden: true, // only meaningful in one repo: keep it out of the help everywhere else (the ./pf menu lists it)
-    usage: `pf ${name} [--message <msg>] [--yes] [--dry-run]  (only inside the pulpfixer repo)`,
+    usage: `pf ${name} [--message <msg>] [--no-push] [--yes] [--dry-run]  (only inside the pulpfixer repo)`,
     async run(ctx, args) {
       const root = findCheckout(ctx.workdir);
       if (!root) {

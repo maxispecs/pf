@@ -1,6 +1,0 @@
-{
-  "name": "old",
-  "commands": {
-    "dev": "node app.js"
-  }
-}

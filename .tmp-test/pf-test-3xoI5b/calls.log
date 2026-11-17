@@ -1,2 +1,0 @@
-sts get-caller-identity --output json --profile acme-ro --region eu-west-1
-ecs describe-services --cluster web --services api --output json --profile acme-ro --region eu-west-1

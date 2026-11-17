@@ -1,4 +1,0 @@
-serve:
-	echo
-setup:
-	echo

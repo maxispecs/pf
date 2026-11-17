@@ -99,8 +99,9 @@
 				const row = h('div', 'agent');
 				row.title = run.title;
 				const time = h('span', 'agent-time');
-				row.append(h('span', 'agent-title', run.title), time);
-				agentTimes.push({ el: time, run });
+				const dot = h('span', 'agent-dot');
+				row.append(dot, h('span', 'agent-title', run.title), time);
+				agentTimes.push({ el: time, dot, run });
 				list.append(row);
 			}
 			children.push(list);
@@ -121,9 +122,41 @@
 		return Math.round(hrs / 24) + 'd ago';
 	}
 
+	/** A finished chat keeps its status circle for this long; older chats get none (the slot stays empty). */
+	const FRESH_MS = 30 * 60 * 1000;
+
+	/** The circle: pulsing while the chat is running, solid green / red for a chat that just finished. */
+	function dotClass(run) {
+		if (run.status === 'running') {
+			return 'agent-dot agent-dot-running';
+		}
+		if (Date.now() - run.updatedAt > FRESH_MS) {
+			return 'agent-dot';
+		}
+		if (run.status === 'success') {
+			return 'agent-dot agent-dot-done';
+		}
+		return run.status === 'error' ? 'agent-dot agent-dot-error' : 'agent-dot';
+	}
+
+	function dotLabel(run) {
+		const cls = dotClass(run);
+		return cls.includes('running') ? 'Running'
+			: cls.includes('done') ? 'Finished'
+			: cls.includes('error') ? 'Finished with an error'
+			: '';
+	}
+
 	function updateAgentTime() {
-		for (const { el, run } of agentTimes) {
+		for (const { el, dot, run } of agentTimes) {
 			el.textContent = run.status === 'running' ? 'running' : ago(run.updatedAt);
+			dot.className = dotClass(run);
+			const label = dotLabel(run);
+			if (label) {
+				dot.title = label;
+			} else {
+				dot.removeAttribute('title');
+			}
 		}
 	}
 

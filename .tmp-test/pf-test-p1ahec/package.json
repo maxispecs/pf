@@ -1,7 +1,0 @@
-{
-  "name": "x",
-  "scripts": {
-    "deploy:staging": "sst deploy --stage staging",
-    "deploy:production": "sst deploy --stage prod"
-  }
-}

@@ -1,1 +1,0 @@
-export default { app() { return { region: "eu-central-1" }; } }

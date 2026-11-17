@@ -1,7 +1,0 @@
-{
-  "commands": {
-    "deploy": {
-      "run": "./tl d"
-    }
-  }
-}

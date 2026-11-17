@@ -1,5 +1,22 @@
 # pulpfixer monorepo
 
+```text
+         ⢀⣤⣤⣀⡀ ⣠
+         ⣦⡙⠿⠿⠿⣿⣿⣇
+         ⣿⣿⣿⣿⣿⣿⣿⣿⣆
+      ⠠⠶⡆⠉⠉⣉⣉⣉⣩⣭⣿⣿⣷⠶
+        ⠛⠈⠉⠙⣿⡿⠋⣿⣿⡇          p u l p f i x e r
+         ⢀   ⢀⣀⣽⡏           the wolf of dev street
+        ⢀⣌⠢⢄  ⠘⣿⠁           ░▒▓███████████████████████████████▓▒░
+      ⣀⣴⣿⣿⡕⢄⠈⢻⣿⣷⣄           pf v3
+  ⣀⣤⣶⣿⣟⣿⣿⣿⣿⣿⢦⣀⡿⢹⣿⣷⣦⣄⣀
+⠒⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡌⢫⡇ ⣿⣿⣿⣷⣽⡷
+   ⠉⠻⢿⣿⣿⣿⣿⣿⣿⣿⡄⠡ ⢻⣿⣿⣿⠇
+      ⠙⢿⣿⣿⣿⣿⣿⣷⡀⢣⠸⣿⣿⡏
+       ⠈⠻⣿⡿⠋⠉   ⠁⢿⡿
+         ⠉        ⠃
+```
+
 `pf` is a developer CLI for any repo, in any language. This repo is a pnpm workspace; the docs site is [packages/docs](packages/docs) (Nextra, run it with `pf docs` or `pnpm docs:dev`), and the user-facing reference is also in [packages/pulpfixer/README.md](packages/pulpfixer/README.md). The agent (tools, project profiles, scoped AWS access, writing agent tools in a plugin) is documented in [packages/pulpfixer/docs/agent.md](packages/pulpfixer/docs/agent.md).
 
 | Package | Name | What |

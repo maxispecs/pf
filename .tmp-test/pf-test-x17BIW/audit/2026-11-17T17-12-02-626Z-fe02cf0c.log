@@ -1,7 +1,0 @@
-{"id":"fe02cf0c","startedAt":"2026-11-17T17:12:02.626Z","kind":"agent","cwd":"/Users/w/dev/agents/pulpfixer/.tmp-test/pf-test-0FsJ14","user":"w","pf":"6.7.0"}
-{"at":"2026-11-17T17:12:02.628Z","event":"aws-request","profile":"acme","scopes":["identity","ec2"],"regions":["eu-west-1"],"ttlMinutes":30,"reason":"disk full on web-1"}
-{"at":"2026-11-17T17:12:02.628Z","event":"aws-decision","profile":"acme","approved":true,"action":"accept"}
-{"at":"2026-11-17T17:12:02.629Z","event":"tool","tool":"pf_aws_request_access","args":{"scopes":["ec2"],"reason":"disk full on web-1"},"ok":true}
-{"at":"2026-11-17T17:12:02.629Z","event":"aws-request","profile":"acme","scopes":["identity","ec2"],"regions":["eu-west-1"],"ttlMinutes":30,"reason":"again"}
-{"at":"2026-11-17T17:12:02.629Z","event":"aws-decision","profile":"acme","approved":false,"action":"decline"}
-{"at":"2026-11-17T17:12:02.629Z","event":"tool","tool":"pf_aws_request_access","args":{"scopes":["ec2"],"reason":"again"},"ok":false}

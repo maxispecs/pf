@@ -1,7 +1,0 @@
-{
-  "commands": {
-    "install:local": {
-      "run": "echo mine"
-    }
-  }
-}

@@ -43,4 +43,4 @@ Never publish unless you were asked to.
 
 ## The dev cycle
 
-`./pf cycle [--message m] [--yes] [--dry-run]` in the checkout bumps changed packages (core goes along), commits, runs `pnpm run publish:cellars`, then `pf u --yes` so the global pf updates itself.
+`./pf cycle [--message m] [--no-push] [--yes] [--dry-run]` in the checkout bumps changed packages (core goes along), commits, runs `pnpm run publish:cellars`, pushes with `pf git push` (the primary remote, then the backup remotes; `--no-push` skips it, and a failed push does not stop the update but makes the cycle exit 1), then runs `pf u --yes` so the global pf updates itself.

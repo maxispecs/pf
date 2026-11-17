@@ -26,9 +26,9 @@ export function localEntries(root: string, ctx: Context = buildContext(root)): E
   return [
     {
       name: 'cycle',
-      summary: 'Dev cycle: bump versions, commit, publish to staging, update the global pf',
+      summary: 'Dev cycle: bump versions, commit, publish to staging, push, update the global pf',
       group: 'Global pf',
-      detail: 'bump if changed, commit, pnpm publish:cellars, pf u; asks first',
+      detail: 'bump if changed, commit, pnpm publish:cellars, pf git push (--no-push skips), pf u; asks first',
       cli: './pf cycle',
       run: () => runDevCycle(root),
     },

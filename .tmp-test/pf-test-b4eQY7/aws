@@ -1,8 +1,0 @@
-#!/bin/sh
-echo "$@" >> "/Users/w/dev/agents/pulpfixer/.tmp-test/pf-test-b4eQY7/calls.log"
-case "$1 $2" in
-  "sts get-caller-identity") printf '%s' '{"Account":"123456789012","Arn":"arn:aws:sts::123456789012:assumed-role/ro/me","UserId":"X"}' ;;
-  "ecs describe-services") printf '%s' '{"services":[{"serviceName":"api","status":"ACTIVE"}],"taskDefinition":{"environment":[{"name":"DB_PASSWORD","value":"hunter2"}]}}' ;;
-  "ecs update-service") printf '%s' '{"service":{"serviceName":"api","desiredCount":2}}' ;;
-  *) echo "unexpected" >&2; exit 1 ;;
-esac

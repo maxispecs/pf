@@ -173,13 +173,14 @@ export function findCheckout(dir: string): string | null {
   }
 }
 
-export const CYCLE_USAGE = './pf cycle [--message <msg>] [--yes] [--dry-run]';
+export const CYCLE_USAGE = './pf cycle [--message <msg>] [--no-push] [--yes] [--dry-run]';
 
 /** Run the whole cycle. Returns the exit code. */
 export async function runDevCycle(root: string, args: string[] = []): Promise<number> {
   const rest = [...args];
   const dryRun = takeFlag(rest, '--dry-run', '-n');
   const yes = takeFlag(rest, '--yes', '-y');
+  const push = !takeFlag(rest, '--no-push');
   const message = takeOption(rest, '--message') ?? takeOption(rest, '-m');
   const c = err();
   const r = reporter(out());
@@ -210,6 +211,7 @@ export async function runDevCycle(root: string, args: string[] = []): Promise<nu
   if (bumps.length) steps.push(`pnpm ver bump ${bumps.map((b) => `${b.pkg.rel} minor`).join(' ')}`);
   if (willCommit) steps.push(`git commit  ${dirty.length ? `(${dirty.length} changed file(s) now${bumps.length ? ', plus the bump' : ''})` : '(the bump)'}`);
   if (toPublish.length) steps.push(`pnpm run publish:cellars  (${toPublish.map((p) => p.name).join(', ')})`);
+  if (push) steps.push('pf git push  (the primary remote, then the backups; --no-push skips)');
   steps.push('pf u --yes  (update the global pf)');
 
   process.stderr.write(`\n${c.bold('Dev cycle')} ${c.dim(`(${REGISTRY_URL})`)}\n`);
@@ -266,6 +268,14 @@ export async function runDevCycle(root: string, args: string[] = []): Promise<nu
     r.info('nothing new to publish');
   }
 
+  // A failed push never stops the update: the publish already happened. It still makes the cycle exit non-zero.
+  let pushCode = 0;
+  if (push) {
+    r.step('Push to the repos');
+    pushCode = await run({ argv: ['pf', 'git', 'push'] });
+    if (pushCode !== 0) r.warn('pf git push failed: run it again after the update (the rest of the cycle continues)');
+  }
+
   r.step('Update the global pf');
   const core = readJson<{ version?: string }>(root, 'packages', 'pulpfixer', 'package.json')?.version;
   if (toPublish.length && core && !(await waitForRegistry(core))) {
@@ -273,6 +283,7 @@ export async function runDevCycle(root: string, args: string[] = []): Promise<nu
   }
   const code = await runCmd({ argv: ['pf', 'u', '--yes'], cwd: root });
   if (code !== 0) return fail('pf u failed', code);
+  if (pushCode !== 0) return fail('published and updated, but the push failed', pushCode);
   r.ok('done');
   return 0;
 }

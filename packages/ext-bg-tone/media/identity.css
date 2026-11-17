@@ -41,6 +41,16 @@ body {
 	font-size: 1.05em;
 	color: var(--vscode-descriptionForeground);
 }
+/* Status circle. The slot is always reserved so titles line up; it is only filled for live or just-finished chats. */
+.agent-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: transparent; }
+.agent-dot-running {
+	background: var(--vscode-progressBar-background, var(--vscode-charts-blue, #3794ff));
+	animation: agent-pulse 1.4s ease-in-out infinite;
+}
+.agent-dot-done { background: var(--vscode-testing-iconPassed, var(--vscode-charts-green, #388a34)); }
+.agent-dot-error { background: var(--vscode-testing-iconFailed, var(--vscode-charts-red, #f14c4c)); }
+@keyframes agent-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .agent-dot-running { animation: none; } }
 .agent-title { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-time { flex: none; font-size: 0.8em; opacity: 0.8; }
 .actions {
