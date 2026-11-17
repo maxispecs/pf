@@ -32,8 +32,11 @@ customization keys are left alone.
 - **Quick pick**: the color-palette icon in the Explorer header (or the status bar item at the bottom left)
   opens a list of about 40 colors plus your own palette, and a link to the full settings page.
 - **Repo Settings page**: the gear icon in the Explorer header, or **Background Tone: Open Repo Settings**.
-  It has the full palette, a hex input, an intensity slider, per-area toggles and base colors, the logo
-  picker and a live preview. Everything it saves lands in the repo's `pulpfixer.json`.
+  Its cards are grouped in tabs: **Color** (palette, hex input, intensity slider, per-area toggles and base
+  colors, live preview), **Logo** (the logo picker, where it shows, the window title prefix) and **Actions**
+  (the featured repo actions). Everything it saves lands in the repo's `pulpfixer.json`.
+- **Version**: the Repo Identity card shows the repo's stack version (from `versions.json`, as kept by
+  `pnpm ver`) in small text beside the name; a repo without that file shows none.
 
 ## Settings
 

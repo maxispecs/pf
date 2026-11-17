@@ -27,7 +27,7 @@ type InboundMessage =
 	| { type: 'refreshActions' }
 	| { type: 'openSettingsJson' };
 
-export type SettingsTab = 'appearance' | 'actions';
+export type SettingsTab = 'tone' | 'logo' | 'actions';
 
 function nonce(): string {
 	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

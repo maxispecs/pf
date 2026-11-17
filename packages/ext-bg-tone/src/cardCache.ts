@@ -22,6 +22,8 @@ export interface CardActions {
 /** What the card shows, independent of any one webview. */
 export interface CardSnapshot {
 	name: string;
+	/** The repo's stack version (`versions.json`), shown small beside the name; empty when the repo has none. */
+	version: string;
 	color: string;
 	logo: CardLogo | null;
 	agents: CardAgent[];
@@ -31,6 +33,7 @@ export interface CardSnapshot {
 /** The parts known right now; `undefined` means "not loaded yet", so the cached value stands in. */
 export interface FreshCard {
 	name: string;
+	version: string;
 	color: string;
 	logo: CardLogo | null | undefined;
 	agents: CardAgent[] | undefined;
@@ -42,6 +45,7 @@ export const NO_ACTIONS: CardActions = { buttons: [], canEdit: false, hint: '' }
 export function composeSnapshot(fresh: FreshCard, cached: CardSnapshot | undefined): CardSnapshot {
 	return {
 		name: fresh.name,
+		version: fresh.version,
 		color: fresh.color,
 		logo: fresh.logo !== undefined ? fresh.logo : cached?.logo ?? null,
 		agents: fresh.agents ?? cached?.agents ?? [],
@@ -59,7 +63,7 @@ export function parseSnapshot(raw: unknown): CardSnapshot | undefined {
 		return undefined;
 	}
 	const logo = s.logo && typeof s.logo.uri === 'string' && typeof s.logo.mtime === 'number' ? s.logo : null;
-	return { name: s.name, color: s.color, logo, agents: s.agents, actions: s.actions };
+	return { name: s.name, version: typeof s.version === 'string' ? s.version : '', color: s.color, logo, agents: s.agents, actions: s.actions };
 }
 
 /** Escapes a value for a double-quoted HTML attribute. */

@@ -163,19 +163,7 @@
 			ui.banner,
 			ui.tabBar,
 
-			h('div', { class: 'tab-panel', role: 'tabpanel', 'data-tab': 'actions' },
-				h('section', { class: 'card' },
-					h('h2', { text: 'Repo actions' }),
-					h('p', { class: 'hint muted small' },
-						'The actions pf offers in this repo (its menu). Tick the ones to show as buttons on the Repo Identity card. ',
-						'The choice is saved in the ', h('code', { text: 'actions' }), ' section of ', h('code', { text: 'pulpfixer.json' }), ', so it is committed.'),
-					ui.actionsNotice,
-					ui.actionsList,
-					h('div', { class: 'row' },
-						h('button', { text: 'Refresh', title: 'Ask pf for the list again', onclick: () => post({ type: 'refreshActions' }) }),
-						h('button', { text: 'Open pulpfixer.json', onclick: () => post({ type: 'openSettingsJson' }) })))),
-
-			h('div', { class: 'tab-panel', role: 'tabpanel', 'data-tab': 'appearance' },
+			h('div', { class: 'tab-panel', role: 'tabpanel', 'data-tab': 'tone' },
 
 			h('section', { class: 'card' },
 				h('h2', { text: 'Color' }),
@@ -204,6 +192,12 @@
 							h('span', { class: 'muted small', text: 'Draw the raw color on the title bar bottom border and the active tab.' }))))),
 
 			h('section', { class: 'card' },
+				h('h2', { text: 'Preview' }),
+				ui.mock,
+				ui.previewNote)),
+
+			h('div', { class: 'tab-panel', role: 'tabpanel', 'data-tab': 'logo' },
+			h('section', { class: 'card' },
 				h('h2', { text: 'Repo logo' }),
 				h('p', { class: 'hint muted small' },
 					'Pick an image that lives inside this repo. The path is stored relative to the repo root, so everyone who clones it sees the same logo.'),
@@ -214,33 +208,43 @@
 						h('div', { class: 'row tight' },
 							h('button', { class: 'primary', text: 'Choose image from repo...', onclick: () => post({ type: 'pickLogo' }) }),
 							ui.clearLogo),
-						ui.logoMessage)),
+						ui.logoMessage))),
+
+			h('section', { class: 'card' },
 				h('h2', { text: 'Show the logo in' }),
 				ui.locations,
 				h('div', { class: 'row' }, h('span', { text: 'Window title prefix' }), ui.emoji, ui.emojiChips),
-				h('p', { class: 'muted small', text: 'The native title bar can only show text, so the window title uses this emoji or text instead of the image. The logo itself shows in the Repo Identity view, the Explorer item and this tab\u2019s icon.' })),
+				h('p', { class: 'muted small', text: 'The native title bar can only show text, so the window title uses this emoji or text instead of the image. The logo itself shows in the Repo Identity view, the Explorer item and this tab\u2019s icon.' }))),
 
-			h('section', { class: 'card' },
-				h('h2', { text: 'Preview' }),
-				ui.mock,
-				ui.previewNote),
+			h('div', { class: 'tab-panel', role: 'tabpanel', 'data-tab': 'actions' },
+				h('section', { class: 'card' },
+					h('h2', { text: 'Repo actions' }),
+					h('p', { class: 'hint muted small' },
+						'The actions pf offers in this repo (its menu). Tick the ones to show as buttons on the Repo Identity card. ',
+						'The choice is saved in the ', h('code', { text: 'actions' }), ' section of ', h('code', { text: 'pulpfixer.json' }), ', so it is committed.'),
+					ui.actionsNotice,
+					ui.actionsList,
+					h('div', { class: 'row' },
+						h('button', { text: 'Refresh', title: 'Ask pf for the list again', onclick: () => post({ type: 'refreshActions' }) })))),
 
-			h('div', { class: 'row', style: { 'margin-top': '16px' } },
+			h('div', { class: 'row footer' },
 				h('button', { text: 'Open pulpfixer.json', onclick: () => post({ type: 'openSettingsJson' }) }),
-				h('button', { class: 'danger', text: 'Reset all for this repo', onclick: () => post({ type: 'reset' }) }))),
+				h('button', { class: 'danger', text: 'Reset all for this repo', onclick: () => post({ type: 'reset' }) })),
 		);
 	}
 
 	// ---------- tabs ----------
 
+	// Each tab holds the cards of one topic. An unknown id (including the old 'appearance') opens the first.
 	const TABS = [
-		['appearance', 'Appearance'],
+		['tone', 'Color'],
+		['logo', 'Logo'],
 		['actions', 'Actions'],
 	];
 
 	function showTab(tab, remember) {
 		if (!TABS.some(t => t[0] === tab)) {
-			tab = 'appearance';
+			tab = TABS[0][0];
 		}
 		for (const button of ui.tabBar.querySelectorAll('[role="tab"]')) {
 			const active = button.dataset.tab === tab;

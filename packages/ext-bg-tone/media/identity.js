@@ -101,7 +101,14 @@
 		const logo = logoBox(state);
 
 		const info = h('div', 'info');
-		info.append(h('div', 'name', state.name));
+		const name = h('div', 'name', state.name);
+		if (state.version) {
+			// Small text right after the name, like a <sub>.
+			const version = h('sub', 'version', 'v' + state.version);
+			version.title = 'Stack version ' + state.version;
+			name.append(version);
+		}
+		info.append(name);
 
 		const card = h('div', 'card');
 		card.append(logo, info);

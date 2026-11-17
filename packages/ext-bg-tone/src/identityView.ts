@@ -7,6 +7,8 @@ import { CardActions, CardAgent, CardCache, CardSnapshot, composeSnapshot, escap
 import { primaryFolder, readConfig, repoName } from './settings.ts';
 import { identityVisible } from './repoConfig.ts';
 import { isPfRepo } from './store.ts';
+import { VERSIONS_FILE, parseStackVersion } from './stackVersion.ts';
+import * as fs from 'node:fs';
 
 /** How often the card re-reads the agent transcripts (cheap: one directory scan, two small reads). */
 const AGENT_POLL_MS = 10_000;
@@ -51,6 +53,19 @@ export async function updateIdentityContext(logos: LogoService): Promise<void> {
 	);
 }
 
+/** The stack version from the repo's versions.json (read fresh: it is a tiny local file); empty without one. */
+function stackVersion(): string {
+	const folder = primaryFolder();
+	if (folder?.uri.scheme !== 'file') {
+		return '';
+	}
+	try {
+		return parseStackVersion(fs.readFileSync(path.join(folder.uri.fsPath, VERSIONS_FILE), 'utf8')) ?? '';
+	} catch {
+		return '';
+	}
+}
+
 /** The "Repo Identity" card: the repo logo, name and tone color. One instance per view (Explorer, Source Control). */
 export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.Disposable {
 	private view: vscode.WebviewView | undefined;
@@ -66,6 +81,15 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		private readonly cache: CardCache,
 	) {
 		this.disposables.push(this.actions.onDidChange(() => this.refresh()));
+		// `pnpm ver bump` rewrites versions.json: redraw the version beside the name.
+		const folder = primaryFolder();
+		if (folder) {
+			const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, VERSIONS_FILE));
+			watcher.onDidChange(() => this.refresh());
+			watcher.onDidCreate(() => this.refresh());
+			watcher.onDidDelete(() => this.refresh());
+			this.disposables.push(watcher);
+		}
 	}
 
 	resolveWebviewView(view: vscode.WebviewView): void {
@@ -141,6 +165,7 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		return composeSnapshot(
 			{
 				name: repoName(),
+				version: stackVersion(),
 				color: config.enabled && /^#[0-9a-f]{6}$/i.test(config.color) ? config.color : '',
 				logo: this.logos.loaded ? (logo ? { uri: logo.uri.toString(), mtime: logo.mtime } : null) : undefined,
 				agents: config.showLastAgent ? agents : [],

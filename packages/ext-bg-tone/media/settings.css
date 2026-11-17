@@ -223,3 +223,6 @@ label.check .text { display: flex; flex-direction: column; }
 .action-row:first-child { border-top: none; }
 .action-row .codicon { font-size: 16px; flex: none; }
 .action-row .text { flex: 1; min-width: 0; }
+
+/* Open / reset buttons under every tab. */
+.footer { margin-top: 16px; }
