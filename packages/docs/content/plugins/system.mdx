@@ -25,7 +25,7 @@ pf sys apply cursor                 # the same, then ask, then apply
 pf sys apply cursor --yes           # no question (required without a terminal)
 pf sys apply cursor --dry-run       # show the plan and the commands, change nothing
 pf sys apply cursor --offline       # use the cached preset
-pf sys apply suite                  # install or update the pulpfixer suite extensions in Cursor (Background Tone)
+pf sys apply suite                  # the whole setup: the Cursor standard plus the suite extensions (Background Tone)
 pf sys update                       # update only the suite extensions that are already installed (--check, --dry-run, --offline)
 pf sys capture cursor --setting editor.fontSize   # print a preset.json built from this machine
 ```
@@ -43,15 +43,18 @@ pf finds Cursor's `cursor` command on PATH, or inside `/Applications/Cursor.app`
 
 ## The suite
 
-`@pulpfixer/preset-suite` is a preset whose `preset.json` lists extension **packages** instead of marketplace ids:
+`@pulpfixer/preset-suite` is the whole setup: it **includes** the `cursor` preset (so `pf sys apply suite` also installs the standard Cursor extensions and sets its settings, and there is no separate Cursor step) and lists extension **packages** instead of marketplace ids:
 
 ```json
 {
   "app": "cursor",
-  "summary": "The pulpfixer suite: Cursor extensions that go with pf",
+  "summary": "The pulpfixer suite: the standard Cursor setup plus the extensions that go with pf",
+  "includes": ["cursor"],
   "packages": ["@pulpfixer/ext-bg-tone"]
 }
 ```
+
+`includes` names other presets for the same app. pf fetches each one (the latest, like any preset), and merges them under the including preset: extensions and packages are added together, and for a setting the including preset's value wins. An include that cannot be fetched, is for another app or loops back is an error and nothing is applied, so a half setup never passes for a complete one. A pf from before `includes` ignores the field and applies the suite without the included preset.
 
 Only `@pulpfixer/ext-<name>` packages are accepted. Each ships one `.vsix` and names it in its `package.json` (`"pf": { "extension": { "id": "local.bg-tone", "vsix": "bg-tone.vsix" } }`, a plain file name inside the package). pf installs the latest version into `~/.pf/sys/presets`, and `pf sys apply suite` installs the `.vsix` with `cursor --install-extension <file> --force` when the extension is missing or older than the package. `pf sys diff suite` shows that without changing anything. An extension that is as new or newer is left alone. `pf update` runs `pf sys update`, which updates the suite extensions you already have and never installs a missing one. `pf rp` offers the install for a repo. A package that cannot be fetched is reported and the rest still applies (exit code 1).
 
@@ -68,7 +71,7 @@ Only `@pulpfixer/ext-<name>` packages are accepted. Each ships one `.vsix` and n
 }
 ```
 
-`app` picks the adapter, `extensions` are `publisher.name` ids, `settings` are top-level `settings.json` keys with the value they must have, and `packages` (optional) are suite extension packages, as above.
+`app` picks the adapter, `extensions` are `publisher.name` ids, `settings` are top-level `settings.json` keys with the value they must have, `packages` (optional) are suite extension packages, as above, and `includes` (optional) are presets for the same app applied along with this one.
 
 ## Changing the Cursor standard
 

@@ -9,7 +9,7 @@ import { APPS, findApp, type AppAdapter, type AppState } from './apps/index.js';
 import { fetchExtension, type ExtensionInfo } from './extensions.js';
 import { parseJsonc, sameJson, setTopLevelKeys } from './jsonc.js';
 import { describePlan, isEmptyPlan, planPreset, settingsToWrite, type Plan, type VsixChange } from './plan.js';
-import { fetchPreset, presetPackage, type FetchedPreset } from './presets.js';
+import { fetchPreset, mergeIncluded, presetPackage, type FetchedPreset, type Preset } from './presets.js';
 
 export const short = (v: string): string => v.replace(/^(\d+\.\d+)\.0$/, '$1');
 
@@ -48,17 +48,53 @@ export function fetchPackages(names: string[], offline: boolean, say: (title: st
   return { packages, errors };
 }
 
+const MAX_INCLUDE_DEPTH = 4;
+
+/** Print which package a fetched preset came from. */
+function sayFetched(fetched: FetchedPreset, indent = ''): void {
+  const c = out();
+  const where = fetched.source === 'registry' ? `latest from the registry${fetched.previous ? `, was v${short(fetched.previous)}` : ''}` : 'cached copy';
+  process.stdout.write(`${indent}${c.bold(`${presetPackage(fetched.name)} v${short(fetched.version)}`)} ${c.dim(`(${where})`)}\n`);
+  if (fetched.note) process.stderr.write(`${badgeLabel('warning', err())} ${fetched.note}: using the cached copy\n`);
+}
+
+/**
+ * Fetch and merge the presets a preset includes (the suite includes `cursor`). Returns the merged preset, or why one
+ * could not be used. An include for another app, a loop, or one that cannot be fetched is an error: a half-applied
+ * standard would look like a complete one.
+ */
+export function resolveIncludes(fetched: FetchedPreset, offline: boolean, chain: string[] = [fetched.name]): Preset | string {
+  let merged = fetched.preset;
+  for (const name of fetched.preset.includes ?? []) {
+    if (chain.includes(name)) return `${presetPackage(fetched.name)} includes ${presetPackage(name)}, which includes it back`;
+    if (chain.length >= MAX_INCLUDE_DEPTH) return `${presetPackage(fetched.name)} includes presets nested more than ${MAX_INCLUDE_DEPTH} deep`;
+    const got = fetchPreset(name, { offline });
+    if ('error' in got) return `${presetPackage(fetched.name)} includes ${presetPackage(name)}: ${got.error}`;
+    if (got.preset.app !== fetched.preset.app) return `${presetPackage(name)} is for ${got.preset.app}, but ${presetPackage(fetched.name)} is for ${fetched.preset.app}`;
+    sayFetched(got, '  + ');
+    const inner = resolveIncludes(got, offline, [...chain, name]);
+    if (typeof inner === 'string') return inner;
+    merged = mergeIncluded(merged, inner);
+  }
+  const { includes: _includes, ...rest } = merged;
+  return rest;
+}
+
 /** Fetch a preset, read the app it configures and work out the plan. Prints why when it cannot. */
 export function prepare(name: string, offline: boolean): Target | null {
   const c = out();
-  const fetched = fetchPreset(name, { offline });
-  if ('error' in fetched) {
-    fail(fetched.error);
+  const first = fetchPreset(name, { offline });
+  if ('error' in first) {
+    fail(first.error);
     return null;
   }
-  const where = fetched.source === 'registry' ? `latest from the registry${fetched.previous ? `, was v${short(fetched.previous)}` : ''}` : 'cached copy';
-  process.stdout.write(`${c.bold(`${presetPackage(name)} v${short(fetched.version)}`)} ${c.dim(`(${where})`)}\n`);
-  if (fetched.note) process.stderr.write(`${badgeLabel('warning', err())} ${fetched.note}: using the cached copy\n`);
+  sayFetched(first);
+  const resolved = resolveIncludes(first, offline);
+  if (typeof resolved === 'string') {
+    fail(resolved);
+    return null;
+  }
+  const fetched: FetchedPreset = { ...first, preset: resolved };
   const app = findApp(fetched.preset.app);
   if (!app) {
     fail(`this pf has no adapter for "${fetched.preset.app}" (apps: ${APPS.map((a) => a.id).join(', ')}). Run: pf update`);

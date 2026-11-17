@@ -9,12 +9,26 @@ title: Getting started
 One line, with Node >= 18 and npm. No token is needed: pf and all its packages are public on the cellars registry.
 
 ```bash
+[ -w "$(npm root -g)" ] || { mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global && export PATH="$HOME/.npm-global/bin:$PATH" && echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.$(basename "$SHELL")rc; }; npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup --yes && pf skill install --all && pf sys apply suite --yes
+```
+
+This is the full install: pf, then `pf setup --yes` (the machine), `pf skill install --all` (the agent skills) and `pf sys apply suite --yes` (the pulpfixer suite: the standard Cursor extensions and settings, plus [Background Tone](/plugins/bg-tone)). The suite step needs Cursor on the machine; without it that last step reports so and everything before it is already done.
+
+### Only pf
+
+To install just pf, without the skills and the suite:
+
+```bash
 [ -w "$(npm root -g)" ] || { mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global && export PATH="$HOME/.npm-global/bin:$PATH" && echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.$(basename "$SHELL")rc; }; npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup
 ```
 
-The first part only runs when npm's global directory is not writable by you (typical with Homebrew's Node: `EACCES ... rename '/opt/homebrew/lib/node_modules/pulpfixer'`). It switches npm to a user-owned prefix, `~/.npm-global`, and puts its `bin` on your `PATH` (`~/.zshrc` or `~/.bashrc`), so the install never needs `sudo` and Homebrew's directories stay untouched. Where the global directory is writable it does nothing. Open a new terminal afterwards, or `source` your rc file. The plain command is `npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup`.
+Add the rest later with `pf skill install --all` and `pf sys apply suite`.
 
-`--registry` applies to this install only, so your default npm registry is left alone. `pf setup` sets the machine up: shell completions, the optional registry auth line and cleanup of the legacy `pulpfixer` 1.x package (its data in `~/.pulpfixer` is left alone). Add `--yes` (`pf setup --yes`) to accept every step without prompts, for example in a provisioning script.
+### What the one-liners do
+
+The first part only runs when npm's global directory is not writable by you (typical with Homebrew's Node: `EACCES ... rename '/opt/homebrew/lib/node_modules/pulpfixer'`). It switches npm to a user-owned prefix, `~/.npm-global`, and puts its `bin` on your `PATH` (`~/.zshrc` or `~/.bashrc`), so the install never needs `sudo` and Homebrew's directories stay untouched. Where the global directory is writable it does nothing. Open a new terminal afterwards, or `source` your rc file. The plain command is `npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/`.
+
+`--registry` applies to this install only, so your default npm registry is left alone. `pf setup` sets the machine up: shell completions, the optional registry auth line and cleanup of the legacy `pulpfixer` 1.x package (its data in `~/.pulpfixer` is left alone). `--yes` accepts every step without prompts, so the full one-liner runs through; the only-pf one asks.
 
 An `NPM_TOKEN` (from the frontend team) is only needed to publish packages or to install private registry plugins.
 
@@ -31,27 +45,17 @@ One global install brings everything: the `pulpfixer` package depends on `@pulpf
 
 ### After installing
 
-`pf setup` only prepares pf itself. The rest of a fresh machine is a few optional steps, each one command and each safe to rerun:
+The full one-liner already ran the first two steps below (after the only-pf one, they are how you add them). Every step is one command and safe to rerun:
 
 | Step | Command | What it does |
 |------|---------|--------------|
-| Check the machine | `pf doctor` | Checks the install, the registry, skills and agents, your config and the repo you are in |
-| Cursor settings | `pf sys apply cursor` | Installs the standard Cursor extensions and sets the standard `settings.json` values. Additive: nothing is uninstalled, your other settings stay, and the old file is backed up first. Shows the plan and asks (`--dry-run` to preview, `--yes` without a terminal) |
-| The pulpfixer suite | `pf sys apply suite` | Installs the suite extensions into Cursor, today [Background Tone](/plugins/bg-tone) (a per-repo color tint and logo, plus action buttons for the repo). Reload the Cursor window afterwards |
+| The pulpfixer suite | `pf sys apply suite` | Applies the standard Cursor setup (extensions and `settings.json` values) and installs the suite extensions, today [Background Tone](/plugins/bg-tone) (a per-repo color tint and logo, plus action buttons for the repo). Additive: nothing is uninstalled, your other settings stay, and the old file is backed up first. Shows the plan and asks (`--yes` skips the question and is needed without a terminal, `--dry-run` previews). Reload the Cursor window afterwards |
 | Skills | `pf skill install --all` | Installs the registry skills into `~/.pf/skills` (`pf skill available` lists them; `--to claude`, `--to cursor` or `--to agents` puts them where that agent looks). pf also ships a few skills of its own (`pf-repo`, `ship-staging`, `fix-failing`, `deploy-setup`, `troubleshoot`), and `pf update` keeps the `ver` and `pnpm` skills current on its own |
+| Check the machine | `pf doctor` | Checks the install, the registry, skills and agents, your config and the repo you are in |
 | Plugins | `pf plugin available`, then `pf plugin install <name>` | Optional registry plugins (`@pf-plugins/<name>`) that add commands. The AWS, YubiKey and system plugins are built in |
 | Your repos | `pf rp` (in each repo) | Links the repo to this machine, wires pf's versioning and pnpm helpers into it, sets the Background Tone logo and offers the suite install if Cursor lacks it |
 
-Put together, a new machine is:
-
-```bash
-pf setup && pf doctor
-pf sys apply cursor      # Cursor extensions and settings
-pf sys apply suite       # Background Tone
-pf skill install --all   # skills
-```
-
-The presets, the suite extensions and the skills are all fetched at their latest version, so these commands also work as the way to bring a machine back to the standard. Afterwards `pf update` (`pf u`) keeps pf, its plugins, the skills and the suite extensions you have installed current. It updates the `ver` and `pnpm` skills (installing them when missing) and registry skills you already have, but never installs a missing suite extension. See the [System plugin](/plugins/system), [Background Tone](/plugins/bg-tone) and [Skills](/concepts/skills) pages.
+The suite and the skills are fetched at their latest version, so these commands also work as the way to bring a machine back to the standard. The Cursor standard on its own (without Background Tone) is `pf sys apply cursor`. Afterwards `pf update` (`pf u`) keeps pf, its plugins, the skills and the suite extensions you have installed current. It updates the `ver` and `pnpm` skills (installing them when missing) and registry skills you already have, but never installs a missing suite extension. See the [System plugin](/plugins/system), [Background Tone](/plugins/bg-tone) and [Skills](/concepts/skills) pages.
 
 ## Shortcuts at a glance
 

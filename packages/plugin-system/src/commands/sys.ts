@@ -13,7 +13,7 @@ const USAGE = `Usage:
   pf sys diff <preset>                   fetch the latest preset and show what would change
   pf sys apply <preset> [--yes] [--dry-run] [--offline]
                                          fetch the latest preset and apply it (additive)
-  pf sys apply suite                     install or update the pulpfixer suite extensions in Cursor
+  pf sys apply suite                     the whole setup: the Cursor standard plus the pulpfixer suite extensions
   pf sys update [--check] [--dry-run] [--offline]
                                          update the suite extensions that are already installed
   pf sys capture <app> [--setting <key>]...

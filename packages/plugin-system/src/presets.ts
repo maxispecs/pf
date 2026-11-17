@@ -23,6 +23,12 @@ export interface Preset {
    * from the registry. Only this scope is accepted, so a preset still names nothing outside pf's own suite.
    */
   packages: string[];
+  /**
+   * Other presets (names, for the same app) applied first: their extensions, settings and packages are merged in,
+   * and this preset's own settings win. The suite includes `cursor`, so `pf sys apply suite` is the whole setup.
+   * A pf that does not know the field applies the preset without the included ones.
+   */
+  includes?: string[];
 }
 
 export const PRESET_SCOPE = '@pulpfixer';
@@ -64,6 +70,14 @@ export function validatePreset(value: unknown): Preset | string {
       if (!packages.includes(p)) packages.push(p);
     }
   }
+  const includes: string[] = [];
+  if (o.includes !== undefined) {
+    if (!Array.isArray(o.includes)) return '"includes" must be an array of preset names';
+    for (const n of o.includes) {
+      if (typeof n !== 'string' || !NAME_RE.test(n)) return `"${String(n)}" is not a preset name in "includes"`;
+      if (!includes.includes(n)) includes.push(n);
+    }
+  }
   const settings: Record<string, unknown> = {};
   if (o.settings !== undefined) {
     if (!o.settings || typeof o.settings !== 'object' || Array.isArray(o.settings)) return '"settings" must be an object';
@@ -72,7 +86,27 @@ export function validatePreset(value: unknown): Preset | string {
       settings[k] = v;
     }
   }
-  return { app: o.app, summary: typeof o.summary === 'string' ? o.summary : '', extensions, settings, packages };
+  return { app: o.app, summary: typeof o.summary === 'string' ? o.summary : '', extensions, settings, packages, ...(includes.length ? { includes } : {}) };
+}
+
+/**
+ * Merge an included preset under its includer: extensions and packages are unioned (included first), settings
+ * are layered so the includer's values win. The result has no `includes` left.
+ */
+export function mergeIncluded(base: Preset, included: Preset): Preset {
+  const union = (a: string[], b: string[], same: (x: string, y: string) => boolean): string[] => {
+    const out = [...a];
+    for (const x of b) if (!out.some((y) => same(x, y))) out.push(x);
+    return out;
+  };
+  const ci = (x: string, y: string) => x.toLowerCase() === y.toLowerCase();
+  return {
+    app: base.app,
+    summary: base.summary,
+    extensions: union(included.extensions, base.extensions, ci),
+    settings: { ...included.settings, ...base.settings },
+    packages: union(included.packages, base.packages, (x, y) => x === y),
+  };
 }
 
 /** The npm prefix presets are installed into. */

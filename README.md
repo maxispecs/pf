@@ -20,22 +20,20 @@
 ## Install
 
 ```bash
+[ -w "$(npm root -g)" ] || { mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global && export PATH="$HOME/.npm-global/bin:$PATH" && echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.$(basename "$SHELL")rc; }; npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup --yes && pf skill install --all && pf sys apply suite --yes
+```
+
+That installs pf, sets the machine up, installs the agent skills and applies the pulpfixer suite to Cursor (the standard extensions and settings, and Background Tone).
+
+Just pf, without the skills and the suite:
+
+```bash
 [ -w "$(npm root -g)" ] || { mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global && export PATH="$HOME/.npm-global/bin:$PATH" && echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.$(basename "$SHELL")rc; }; npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup
 ```
 
 Needs Node >= 18 and npm, no token: pf and its packages are public on the cellars registry. The first part only runs when npm's global directory is not writable (Homebrew Node: `EACCES`): it switches npm to a user-owned prefix, `~/.npm-global`, so no `sudo` is needed. `--registry` applies to this install only. Then run `pf` in any repo; `pf update` keeps it current. More options (from source, plugins, dry run) are in [Getting started](packages/docs/content/getting-started.mdx).
 
-After installing, a few optional steps finish the machine, each one command and safe to rerun:
-
-```bash
-pf doctor                # check the machine
-pf sys apply cursor      # standard Cursor extensions and settings
-pf sys apply suite       # the pulpfixer suite: the Background Tone extension for Cursor
-pf skill install --all   # agent skills from the registry
-pf rp                    # in a repo: hook pf's helpers in (and offer the suite)
-```
-
-`pf update` keeps pf, its plugins, skills and installed suite extensions current. Details are in [After installing](packages/docs/content/getting-started.mdx#after-installing).
+Afterwards, `pf doctor` checks the machine and `pf rp` (in a repo) hooks pf's helpers in. `pf update` keeps pf, its plugins, skills and installed suite extensions current. Details are in [After installing](packages/docs/content/getting-started.mdx#after-installing).
 
 ## This repo
 

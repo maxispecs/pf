@@ -10,7 +10,21 @@ import { findApp } from '../src/apps/index.js';
 import { systemVersions } from '../src/versions.js';
 import { parseJsonc, sameJson, setTopLevelKeys } from '../src/jsonc.js';
 import { capturePreset, describePlan, isEmptyPlan, planPreset, settingsToWrite } from '../src/plan.js';
-import { cachedPreset, fetchPreset, installArgv, isPresetName, parseSearch, pickPresetPackages, presetOfPackage, presetPackage, validatePreset } from '../src/presets.js';
+import { resolveIncludes } from '../src/apply.js';
+import {
+  cachedPreset,
+  fetchPreset,
+  installArgv,
+  isPresetName,
+  mergeIncluded,
+  parseSearch,
+  pickPresetPackages,
+  presetOfPackage,
+  presetPackage,
+  validatePreset,
+  type FetchedPreset,
+  type Preset,
+} from '../src/presets.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -235,6 +249,58 @@ test('capturePreset builds a sorted preset and reports settings that are not set
 
 // ---- the suite: extension packages ----
 
+test('validatePreset reads "includes" and rejects bad names', () => {
+  assert.deepEqual((validatePreset({ app: 'cursor', includes: ['cursor', 'cursor', 'x-y'] }) as { includes: string[] }).includes, ['cursor', 'x-y']);
+  assert.match(validatePreset({ app: 'cursor', includes: 'cursor' }) as string, /array/);
+  assert.match(validatePreset({ app: 'cursor', includes: ['../x'] }) as string, /not a preset name/);
+});
+
+test('mergeIncluded layers the included preset under the includer', () => {
+  const base = { app: 'cursor', summary: 'suite', extensions: ['B.two', 'c.three'], settings: { a: 2 }, packages: ['@pulpfixer/ext-bg-tone'], includes: ['cursor'] };
+  const inc = { app: 'cursor', summary: 'std', extensions: ['b.two', 'a.one'], settings: { a: 1, z: 1 }, packages: [] };
+  assert.deepEqual(mergeIncluded(base, inc), {
+    app: 'cursor',
+    summary: 'suite',
+    extensions: ['b.two', 'a.one', 'c.three'],
+    settings: { a: 2, z: 1 },
+    packages: ['@pulpfixer/ext-bg-tone'],
+  });
+});
+
+test('resolveIncludes merges cached presets, and refuses a loop or another app', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-sys-'));
+  const prev = process.env.PF_HOME;
+  process.env.PF_HOME = home;
+  const write = (name: string, preset: unknown) => {
+    const dir = path.join(home, 'sys', 'presets', 'node_modules', '@pulpfixer', `preset-${name}`);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: `@pulpfixer/preset-${name}`, version: '1.0.0' }));
+    fs.writeFileSync(path.join(dir, 'preset.json'), JSON.stringify(preset));
+  };
+  const get = (name: string) => fetchPreset(name, { offline: true }) as FetchedPreset;
+  try {
+    write('cursor', { app: 'cursor', extensions: ['a.one'], settings: { x: 1 } });
+    write('suite', { app: 'cursor', includes: ['cursor'], settings: { y: 2 }, packages: ['@pulpfixer/ext-bg-tone'] });
+    const merged = resolveIncludes(get('suite'), true) as Preset;
+    assert.deepEqual(merged, { app: 'cursor', summary: '', extensions: ['a.one'], settings: { x: 1, y: 2 }, packages: ['@pulpfixer/ext-bg-tone'] });
+
+    write('a', { app: 'cursor', includes: ['b'] });
+    write('b', { app: 'cursor', includes: ['a'] });
+    assert.match(resolveIncludes(get('a'), true) as string, /includes it back/);
+
+    write('other', { app: 'code', includes: [] });
+    write('mixed', { app: 'cursor', includes: ['other'] });
+    assert.match(resolveIncludes(get('mixed'), true) as string, /is for code/);
+
+    write('lonely', { app: 'cursor', includes: ['missing'] });
+    assert.match(resolveIncludes(get('lonely'), true) as string, /includes @pulpfixer\/preset-missing/);
+  } finally {
+    if (prev === undefined) delete process.env.PF_HOME;
+    else process.env.PF_HOME = prev;
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
 test('validatePreset accepts only @pulpfixer/ext-<name> packages', () => {
   const ok = validatePreset({ app: 'cursor', packages: ['@pulpfixer/ext-bg-tone', '@pulpfixer/ext-bg-tone', '@pulpfixer/ext-x1'] });
   assert.deepEqual((ok as { packages: string[] }).packages, ['@pulpfixer/ext-bg-tone', '@pulpfixer/ext-x1']);
@@ -249,6 +315,8 @@ test('the suite preset ships the Background Tone extension package', () => {
   const suite = validatePreset(raw);
   assert.equal(typeof suite, 'object');
   assert.deepEqual((suite as { packages: string[] }).packages, ['@pulpfixer/ext-bg-tone']);
+  // the suite is the whole setup: it pulls the standard Cursor preset in
+  assert.deepEqual((suite as { includes: string[] }).includes, ['cursor']);
 });
 
 test('--show-versions output gives ids and versions, and parseExtensions still reads it', () => {
