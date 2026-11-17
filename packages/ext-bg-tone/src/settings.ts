@@ -19,6 +19,7 @@ export interface BgToneConfig {
 	logoLocations: LogoLocation[];
 	titleEmoji: string;
 	showLastAgent: boolean;
+	showLastCommits: boolean;
 	showActions: boolean;
 	palette: unknown;
 }
@@ -48,6 +49,7 @@ export function readConfig(): BgToneConfig {
 		titleEmoji: normalizeTitlePrefix(getValue<unknown>('titleEmoji', '')),
 		// Personal, not repo data: a VS Code setting.
 		showLastAgent: vscode.workspace.getConfiguration('bgTone').get<boolean>('showLastAgent', true) !== false,
+		showLastCommits: vscode.workspace.getConfiguration('bgTone').get<boolean>('showLastCommits', true) !== false,
 		showActions: vscode.workspace.getConfiguration('bgTone').get<boolean>('showActions', true) !== false,
 		palette: getValue<unknown>('palette', undefined),
 	};

@@ -13,6 +13,12 @@ export interface CardAgent {
 	updatedAt: number;
 }
 
+export interface CardCommit {
+	hash: string;
+	title: string;
+	updatedAt: number;
+}
+
 export interface CardActions {
 	buttons: Array<{ id: string; label: string; icon: string }>;
 	canEdit: boolean;
@@ -29,6 +35,8 @@ export interface CardSnapshot {
 	color: string;
 	logo: CardLogo | null;
 	agents: CardAgent[];
+	/** The last commits (`git log`); only the Source Control card draws them, the Explorer card draws `agents`. */
+	commits: CardCommit[];
 	actions: CardActions;
 }
 
@@ -40,6 +48,7 @@ export interface FreshCard {
 	color: string;
 	logo: CardLogo | null | undefined;
 	agents: CardAgent[] | undefined;
+	commits: CardCommit[] | undefined;
 	actions: CardActions | undefined;
 }
 
@@ -53,6 +62,7 @@ export function composeSnapshot(fresh: FreshCard, cached: CardSnapshot | undefin
 		color: fresh.color,
 		logo: fresh.logo !== undefined ? fresh.logo : cached?.logo ?? null,
 		agents: fresh.agents ?? cached?.agents ?? [],
+		commits: fresh.commits ?? cached?.commits ?? [],
 		actions: fresh.actions ?? cached?.actions ?? NO_ACTIONS,
 	};
 }
@@ -69,7 +79,8 @@ export function parseSnapshot(raw: unknown): CardSnapshot | undefined {
 	const logo = s.logo && typeof s.logo.uri === 'string' && typeof s.logo.mtime === 'number' ? s.logo : null;
 	const version = typeof s.version === 'string' ? s.version : '';
 	const changes = typeof s.changes === 'number' && Number.isInteger(s.changes) && s.changes >= 0 ? s.changes : null;
-	return { name: s.name, version, changes, color: s.color, logo, agents: s.agents, actions: s.actions };
+	const commits = Array.isArray(s.commits) ? s.commits : [];
+	return { name: s.name, version, changes, color: s.color, logo, agents: s.agents, commits, actions: s.actions };
 }
 
 /** Escapes a value for a double-quoted HTML attribute. */

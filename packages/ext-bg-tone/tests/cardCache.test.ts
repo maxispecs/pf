@@ -9,6 +9,7 @@ const cached: CardSnapshot = {
 	color: '#111111',
 	logo: { uri: 'file:///repo/logo.svg', mtime: 1 },
 	agents: [{ title: 'Fix login', status: 'success', updatedAt: 5 }],
+	commits: [{ hash: 'abc1234', title: 'Fix login bug', updatedAt: 6 }],
 	actions: { buttons: [{ id: 'dev', label: 'Run', icon: 'play' }], canEdit: true, hint: '' },
 };
 
@@ -24,26 +25,28 @@ function memento(initial?: unknown) {
 }
 
 test('composeSnapshot keeps the cached parts that have not loaded yet', () => {
-	const s = composeSnapshot({ name: 'new', version: '3.6', changes: undefined, color: '#222222', logo: undefined, agents: undefined, actions: undefined }, cached);
+	const s = composeSnapshot({ name: 'new', version: '3.6', changes: undefined, color: '#222222', logo: undefined, agents: undefined, commits: undefined, actions: undefined }, cached);
 	assert.equal(s.name, 'new');
 	assert.equal(s.version, '3.6');
 	assert.equal(s.changes, 4);
 	assert.equal(s.color, '#222222');
 	assert.deepEqual(s.logo, cached.logo);
 	assert.deepEqual(s.agents, cached.agents);
+	assert.deepEqual(s.commits, cached.commits);
 	assert.deepEqual(s.actions, cached.actions);
 });
 
 test('composeSnapshot: a loaded "nothing" replaces the cache', () => {
-	const s = composeSnapshot({ name: 'n', version: '', changes: null, color: '', logo: null, agents: [], actions: NO_ACTIONS }, cached);
+	const s = composeSnapshot({ name: 'n', version: '', changes: null, color: '', logo: null, agents: [], commits: [], actions: NO_ACTIONS }, cached);
 	assert.equal(s.logo, null);
 	assert.deepEqual(s.agents, []);
+	assert.deepEqual(s.commits, []);
 	assert.deepEqual(s.actions, NO_ACTIONS);
 });
 
 test('composeSnapshot without a cache falls back to empty parts', () => {
-	const s = composeSnapshot({ name: 'n', version: '', changes: null, color: '', logo: undefined, agents: undefined, actions: undefined }, undefined);
-	assert.deepEqual(s, { name: 'n', version: '', changes: null, color: '', logo: null, agents: [], actions: NO_ACTIONS });
+	const s = composeSnapshot({ name: 'n', version: '', changes: null, color: '', logo: undefined, agents: undefined, commits: undefined, actions: undefined }, undefined);
+	assert.deepEqual(s, { name: 'n', version: '', changes: null, color: '', logo: null, agents: [], commits: [], actions: NO_ACTIONS });
 });
 
 test('parseSnapshot accepts a stored snapshot and rejects anything else', () => {

@@ -107,6 +107,12 @@
           "scope": "window",
           "markdownDescription": "Show the last 3 Cursor agent chats for this repo (title, status and how long ago) on the Repo Identity card. Chats come from `~/.cursor/projects/.../agent-transcripts` and tab titles are read from Cursor's state database via the system `sqlite3` command; local windows only."
         },
+        "bgTone.showLastCommits": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "markdownDescription": "Show the last 3 commits of this repo (message and how long ago) on the Repo Identity card in the Source Control view. Read with `git log`; local windows only. The Explorer card shows agent chats instead (`bgTone.showLastAgent`)."
+        },
         "bgTone.showActions": {
           "type": "boolean",
           "default": true,

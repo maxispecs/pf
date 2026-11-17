@@ -76,6 +76,7 @@ body {
 .agent-dot-error { background: var(--vscode-testing-iconFailed, var(--vscode-charts-red, #f14c4c)); }
 @keyframes agent-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 @media (prefers-reduced-motion: reduce) { .agent-dot-running { animation: none; } }
+.commit-icon { flex: none; font-size: 12px; opacity: 0.7; }
 .agent-title { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-time { flex: none; font-size: 0.8em; opacity: 0.8; }
 .actions {

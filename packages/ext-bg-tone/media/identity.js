@@ -153,6 +153,19 @@
 			}
 			children.push(list);
 		}
+		const commits = Array.isArray(state.commits) ? state.commits : [];
+		if (commits.length) {
+			const list = h('div', 'agents');
+			for (const commit of commits) {
+				const row = h('div', 'agent');
+				row.title = commit.hash + ' ' + commit.title;
+				const time = h('span', 'agent-time');
+				row.append(h('span', 'codicon codicon-git-commit commit-icon'), h('span', 'agent-title', commit.title), time);
+				agentTimes.push({ el: time, run: { status: 'success', updatedAt: commit.updatedAt }, commit: true });
+				list.append(row);
+			}
+			children.push(list);
+		}
 		updateAgentTime();
 		root.replaceChildren(...children);
 	}
@@ -197,6 +210,9 @@
 	function updateAgentTime() {
 		for (const { el, dot, run } of agentTimes) {
 			el.textContent = run.status === 'running' ? 'running' : ago(run.updatedAt);
+			if (!dot) {
+				continue; // a commit row has no status circle
+			}
 			dot.className = dotClass(run);
 			const label = dotLabel(run);
 			if (label) {

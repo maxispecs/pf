@@ -28,8 +28,8 @@ export function activate(context: vscode.ExtensionContext): void {
 	const logos = new LogoService();
 	const actions = new ActionsService();
 	const cardCache = new CardCache(context.workspaceState);
-	const card = new IdentityCardProvider(context, logos, actions, cardCache);
-	const scmCard = new IdentityCardProvider(context, logos, actions, cardCache);
+	const card = new IdentityCardProvider(context, logos, actions, cardCache, 'chats');
+	const scmCard = new IdentityCardProvider(context, logos, actions, cardCache, 'commits');
 	const item = new IdentityItemProvider(logos);
 
 	const reapply = () => {

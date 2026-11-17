@@ -55,6 +55,7 @@ customization keys are left alone.
 | `bgTone.logoLocations` | `["identityCard", "explorerItem", "scmCard"]` | Where to show the identity: `identityCard`, `explorerItem`, `scmCard` (the Repo Identity card in Source Control), `windowTitle`. |
 | `bgTone.titleEmoji` | `""` | Emoji or short text (max 8 characters) used as the window title prefix. |
 | `bgTone.showLastAgent` | `true` | Show the last 3 Cursor agent chats (title, status, time since) on the Repo Identity card. |
+| `bgTone.showLastCommits` | `true` | Show the last 3 commits (message, time since) on the Repo Identity card in Source Control, in place of the agent chats. |
 | `bgTone.showActions` | `true` | Show the repo's featured actions as icon buttons on the Repo Identity card (personal setting). |
 | `bgTone.pfPath` | `pf` | The `pf` command the buttons run. Machine scope: a repo's workspace settings cannot change it. |
 
@@ -95,7 +96,9 @@ Choose an image that lives inside the repo (the picker refuses files outside it,
   `~/.cursor/projects/<repo>/agent-transcripts` and titles are read (read-only) from Cursor's global state database
   with the system `sqlite3` command; if that is unavailable the chat's first request is shown instead. Local
   windows only, turn off with `bgTone.showLastAgent`),
-- the same card in the **Source Control** view (`scmCard`), so the repo and its action buttons stay in view while you commit,
+- the same card in the **Source Control** view (`scmCard`), so the repo and its action buttons stay in view while you commit;
+  there the list shows the last 3 commits (message and how long ago, from `git log`) instead of agent chats, turn off with
+  `bgTone.showLastCommits`,
 - an **Explorer item** that uses the logo as its icon,
 - the **tab icon** of the Repo Settings page,
 - the **window title**, as an emoji or text prefix (`bgTone.titleEmoji`).

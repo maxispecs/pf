@@ -3,7 +3,7 @@ import { LogoService } from './logoService.ts';
 import * as path from 'node:path';
 import { AgentRun, readChatTitles, readRecentAgentRuns } from './agentRuns.ts';
 import type { ActionsService } from './actionsService.ts';
-import { CardActions, CardAgent, CardCache, CardSnapshot, composeSnapshot, escapeAttribute, NO_ACTIONS } from './cardCache.ts';
+import { CardActions, CardAgent, CardCache, CardCommit, CardSnapshot, composeSnapshot, escapeAttribute, NO_ACTIONS } from './cardCache.ts';
 import { primaryFolder, readConfig, repoName } from './settings.ts';
 import { identityVisible } from './repoConfig.ts';
 import { isPfRepo } from './store.ts';
@@ -11,6 +11,7 @@ import { VERSIONS_FILE, parseStackVersion } from './stackVersion.ts';
 import * as fs from 'node:fs';
 import { execFile } from 'node:child_process';
 import { countChangedFiles } from './gitChanges.ts';
+import { LOG_ARGS_FORMAT, parseRecentCommits } from './gitLog.ts';
 
 /** How often the card re-reads the agent transcripts (cheap: one directory scan, two small reads). */
 const AGENT_POLL_MS = 10_000;
@@ -90,6 +91,16 @@ async function uncommittedFiles(): Promise<number | null> {
 	return result.ok ? countChangedFiles(result.stdout) : null;
 }
 
+/** The last 3 commits of the primary folder (`git log`); empty without a local git repo, git, or any commit. */
+async function recentCommits(): Promise<CardCommit[]> {
+	const folder = primaryFolder();
+	if (folder?.uri.scheme !== 'file') {
+		return [];
+	}
+	const result = await runGit(folder.uri.fsPath, ['log', '-n', '3', LOG_ARGS_FORMAT], 5000);
+	return result.ok ? parseRecentCommits(result.stdout, 3) : [];
+}
+
 /**
  * Commits every uncommitted file: asks for a message first (the dialog is the confirmation), then
  * `git add -A` and `git commit`. Hooks run as usual (no `--no-verify`); a failure is shown, nothing is retried.
@@ -136,6 +147,9 @@ async function commitAll(): Promise<boolean> {
 	});
 }
 
+/** What the list under the card shows: the Explorer card lists agent chats, the Source Control card the last commits. */
+export type CardList = 'chats' | 'commits';
+
 /** The "Repo Identity" card: the repo logo, name and tone color. One instance per view (Explorer, Source Control). */
 export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.Disposable {
 	private view: vscode.WebviewView | undefined;
@@ -150,6 +164,7 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		private readonly logos: LogoService,
 		private readonly actions: ActionsService,
 		private readonly cache: CardCache,
+		private readonly list: CardList = 'chats',
 	) {
 		this.disposables.push(this.actions.onDidChange(() => this.refresh()));
 		// The uncommitted-files count follows edits (the poll covers commits, checkouts and other tools).
@@ -183,7 +198,7 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		};
 		view.title = repoName();
 		// The page paints this right away; the fresh state replaces it when it is ready.
-		view.webview.html = this.html(view.webview, this.snapshot(undefined));
+		view.webview.html = this.html(view.webview, this.shown(this.snapshot(undefined)));
 		this.stopPolling();
 		this.pollTimer = setInterval(() => {
 			if (view.visible) {
@@ -240,22 +255,24 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		// The header stays readable while the card is collapsed (the logo itself needs the body).
 		view.title = repoName();
 		view.description = undefined;
-		const [runs, changes] = await Promise.all([
-			readConfig().showLastAgent ? this.recentAgents() : Promise.resolve([]),
+		const config = readConfig();
+		const [runs, commits, changes] = await Promise.all([
+			this.list === 'chats' && config.showLastAgent ? this.recentAgents() : Promise.resolve(undefined),
+			this.list === 'commits' && config.showLastCommits ? recentCommits() : Promise.resolve(undefined),
 			uncommittedFiles(),
 		]);
 		if (generation !== this.generation || this.view !== view) {
 			return; // a newer refresh superseded this one, or the view went away
 		}
-		const snapshot = this.snapshot(runs.map(({ title, status, updatedAt }) => ({ title, status, updatedAt })), changes);
+		const snapshot = this.snapshot(runs?.map(({ title, status, updatedAt }) => ({ title, status, updatedAt })), commits, changes);
 		if (this.logos.loaded && this.actions.status.type !== 'loading') {
 			this.cache.set(snapshot);
 		}
-		void view.webview.postMessage({ type: 'state', state: webviewState(view.webview, snapshot) });
+		void view.webview.postMessage({ type: 'state', state: webviewState(view.webview, this.shown(snapshot)) });
 	}
 
 	/** The card from what is known now, with the cached values for the parts that have not loaded yet. */
-	private snapshot(agents: CardAgent[] | undefined, changes?: number | null): CardSnapshot {
+	private snapshot(agents: CardAgent[] | undefined, commits?: CardCommit[], changes?: number | null): CardSnapshot {
 		const config = readConfig();
 		const logo = this.logos.logo;
 		return composeSnapshot(
@@ -265,11 +282,18 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 				changes,
 				color: config.enabled && /^#[0-9a-f]{6}$/i.test(config.color) ? config.color : '',
 				logo: this.logos.loaded ? (logo ? { uri: logo.uri.toString(), mtime: logo.mtime } : null) : undefined,
-				agents: config.showLastAgent ? agents : [],
+				// Only this card's own list is loaded; the other one stays as cached (and is never drawn here).
+				agents: this.list === 'chats' && !config.showLastAgent ? [] : agents,
+				commits: this.list === 'commits' && !config.showLastCommits ? [] : commits,
 				actions: !config.showActions ? NO_ACTIONS : this.actions.status.type === 'loading' ? undefined : this.actionsState(),
 			},
 			this.cache.snapshot,
 		);
+	}
+
+	/** The snapshot as this card draws it: the list of the other kind is dropped. */
+	private shown(snapshot: CardSnapshot): CardSnapshot {
+		return this.list === 'chats' ? { ...snapshot, commits: [] } : { ...snapshot, agents: [] };
 	}
 
 	/** What the card draws for the actions row: the featured buttons, whether to offer editing, and a hint when pf is the problem. */
