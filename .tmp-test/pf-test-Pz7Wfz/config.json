@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "acme": {
+      "aws": {
+        "profile": "acme-ro"
+      }
+    }
+  },
+  "defaultProfile": "acme"
+}

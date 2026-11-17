@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "install:cursor": "a",
+    "install:local": "b",
+    "install": "c",
+    "build": "d"
+  }
+}

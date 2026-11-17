@@ -1,0 +1,21 @@
+{
+  "grants": [
+    {
+      "session": "fe02cf0c",
+      "pid": 1277,
+      "profile": "acme",
+      "awsProfile": "acme-ro",
+      "scopes": [
+        "identity",
+        "ec2"
+      ],
+      "regions": [
+        "eu-west-1"
+      ],
+      "grantedAt": "2026-11-17T17:12:02.628Z",
+      "expiresAt": "2026-11-17T17:42:02.628Z",
+      "reason": "disk full on web-1",
+      "approvedBy": "dialog"
+    }
+  ]
+}

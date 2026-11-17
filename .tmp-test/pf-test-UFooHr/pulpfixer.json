@@ -1,0 +1,14 @@
+{
+  "profile": " acme ",
+  "agent": {
+    "aws": {
+      "scopes": [
+        "ec2",
+        3,
+        ""
+      ],
+      "regions": "eu-west-1",
+      "maxTtlMinutes": -5
+    }
+  }
+}

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+if [ -z "$GWHOME" ]; then echo no; exit 1; fi
+if [ "$1" = "update" ]; then git pull; fi

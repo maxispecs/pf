@@ -1,0 +1,11 @@
+{
+  "agent": {
+    "aws": {
+      "actions": [
+        "ecs update-service",
+        7,
+        ""
+      ]
+    }
+  }
+}

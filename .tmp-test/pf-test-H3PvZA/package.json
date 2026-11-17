@@ -1,0 +1,11 @@
+{
+  "name": "demo",
+  "scripts": {
+    "dev": "node app.js",
+    "build": "tsc",
+    "deploy:staging": "echo staging",
+    "publish:staging": "echo publish",
+    "docs": "echo docs",
+    "install:local": "echo install"
+  }
+}

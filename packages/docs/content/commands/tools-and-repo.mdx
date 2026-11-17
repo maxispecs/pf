@@ -33,7 +33,7 @@ pf actions feature build --dry-run
 
 | Id | Runs | Icon | Featured by default |
 |----|------|------|---------------------|
-| `dev` | `pf dev` | `play` | yes |
+| `dev` | `pf dev` | `play` | no |
 | `deploy:staging` | `pf deploy staging` | `rocket` | yes |
 | `deploy:production` | `pf deploy production` | `cloud` | yes |
 | `deploy` | `pf deploy` (a repo's own deploy) | `rocket` | yes |
@@ -42,7 +42,7 @@ pf actions feature build --dry-run
 | `build`, `test`, `lint` | `pf build`, ... | `package`, `beaker`, `checklist` | no |
 | `install`, `install:<to>` | `pf install [<to>]` | `desktop-download` | no |
 | `tools` | `pf tools` | `tools` | no |
-| `git:push` | `pf git push` | `repo-push` | no (the repo needs a git remote) |
+| `git:push` | `pf git push` (`pf gp`) | `repo-push` | yes (the repo needs a git remote) |
 | a custom command | `pf <name>` | `terminal` | only with `"featured": true` |
 
 Only what the repo really has is listed, so a repo without a staging target has no deploy button. Production deploy and publish still ask before they run, because the button just runs `pf` in a terminal. Set `featured` and `icon` in [pulpfixer.json](/concepts/pulpfixer-json#actions); `pf actions feature` and `unfeature` write the `actions` section there, keeping the rest of the file. An older pf has no `actions` command, so the card shows a hint to update it.

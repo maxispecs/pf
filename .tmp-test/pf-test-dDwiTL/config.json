@@ -1,0 +1,11 @@
+{
+  "agent": "codex",
+  "plugins": {
+    "aws": {
+      "exchange": {
+        "bucket": "b"
+      }
+    }
+  },
+  "profiles": {}
+}

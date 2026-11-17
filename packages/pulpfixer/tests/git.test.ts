@@ -232,7 +232,7 @@ test('git and gp are commands, and the repo gets a git:push action', () => {
   assert.ok(entryNames.includes('git push') && entryNames.includes('git'));
   const action = listActions(ctx).find((a) => a.id === 'git:push');
   assert.deepEqual(action?.argv, ['git', 'push']);
-  assert.equal(action?.featured, false);
+  assert.equal(action?.featured, true, 'the push button is featured by default');
   assert.equal(action?.icon, 'repo-push');
   const noRemote = mkRepo({});
   git(noRemote, 'init', '-b', 'main');

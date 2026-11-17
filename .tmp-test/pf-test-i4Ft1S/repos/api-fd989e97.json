@@ -1,0 +1,12 @@
+{
+  "id": "api-fd989e97",
+  "name": "api",
+  "paths": [
+    "/Users/w/dev/agents/pulpfixer/.tmp-test/pf-test-ZShTwn"
+  ],
+  "remote": "github.com/evil/clone",
+  "revision": 1,
+  "linkedAt": "2026-11-17T17:12:02.414Z",
+  "updatedAt": "2026-11-17T17:12:02.414Z",
+  "settings": {}
+}

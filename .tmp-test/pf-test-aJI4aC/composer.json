@@ -1,0 +1,7 @@
+{
+  "require-dev": {
+    "pestphp/pest": "*",
+    "laravel/pint": "*",
+    "phpstan/phpstan": "*"
+  }
+}

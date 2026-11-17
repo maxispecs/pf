@@ -1,0 +1,7 @@
+{
+  "id": "api-11be256d",
+  "profile": "acme",
+  "commands": {
+    "seed": "./seed.sh"
+  }
+}

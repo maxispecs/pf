@@ -1,0 +1,12 @@
+{
+  "id": "api-11be256d",
+  "name": "api",
+  "paths": [
+    "/Users/w/dev/agents/pulpfixer/.tmp-test/pf-test-qoWvrh"
+  ],
+  "remote": "github.com/acme/api",
+  "revision": 1,
+  "linkedAt": "2026-11-17T17:12:02.404Z",
+  "updatedAt": "2026-11-17T17:12:02.404Z",
+  "settings": {}
+}

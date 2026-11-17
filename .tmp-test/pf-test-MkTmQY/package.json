@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "install-local": "a",
+    "install:local": "b"
+  }
+}

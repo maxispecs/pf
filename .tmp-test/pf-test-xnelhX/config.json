@@ -1,0 +1,6 @@
+{
+  "skillDirs": [
+    "~/skills"
+  ],
+  "agent": "claude"
+}

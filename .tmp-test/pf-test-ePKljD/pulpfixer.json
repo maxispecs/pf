@@ -1,0 +1,15 @@
+{
+  "commands": {
+    "seed": {
+      "run": "./seed.sh",
+      "icon": "database",
+      "featured": true
+    },
+    "bad": {
+      "run": "x",
+      "icon": "Not An Icon",
+      "featured": "yes"
+    },
+    "plain": "echo hi"
+  }
+}

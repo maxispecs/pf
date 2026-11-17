@@ -1,0 +1,15 @@
+{
+  "id": "api-75a1c4d8",
+  "name": "api",
+  "paths": [
+    "/Users/w/dev/agents/pulpfixer/.tmp-test/pf-test-wvMPQj",
+    "/Users/w/dev/agents/pulpfixer/.tmp-test/pf-test-iEnmL3"
+  ],
+  "remote": "github.com/acme/api-v2",
+  "revision": 1,
+  "linkedAt": "2026-11-17T17:12:02.409Z",
+  "updatedAt": "2026-11-17T17:12:02.411Z",
+  "settings": {
+    "secretRef": "vault:acme"
+  }
+}

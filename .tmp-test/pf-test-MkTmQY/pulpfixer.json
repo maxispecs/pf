@@ -1,0 +1,7 @@
+{
+  "commands": {
+    "install:cursor": {
+      "run": "echo cursor"
+    }
+  }
+}

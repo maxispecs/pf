@@ -1,0 +1,7 @@
+service: billing
+provider:
+  name: aws
+  region: us-east-2
+functions:
+  hello:
+    handler: h.main

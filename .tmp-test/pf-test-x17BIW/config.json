@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "acme": {
+      "aws": {
+        "profile": "acme-ro",
+        "region": "eu-west-1"
+      }
+    }
+  }
+}

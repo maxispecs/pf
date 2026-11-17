@@ -1,0 +1,9 @@
+{
+  "id": "api-1234abcd",
+  "commands": {
+    "deploy": {
+      "run": "./tl d",
+      "message": true
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "demo",
+  "scripts": {
+    "dev": "vite",
+    "test": "vitest"
+  }
+}

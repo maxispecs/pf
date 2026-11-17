@@ -1,0 +1,10 @@
+{
+  "profile": "acme",
+  "agent": {
+    "aws": {
+      "scopes": [
+        "ec2"
+      ]
+    }
+  }
+}

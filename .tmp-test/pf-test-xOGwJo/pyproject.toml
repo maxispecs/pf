@@ -1,0 +1,4 @@
+[tool.poetry]
+name="x"
+[tool.pytest.ini_options]
+[tool.ruff]

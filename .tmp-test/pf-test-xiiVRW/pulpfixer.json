@@ -1,0 +1,17 @@
+{
+  "actions": {
+    "install": {
+      "featured": false
+    },
+    "deploy:staging": {
+      "icon": "cloud-upload",
+      "featured": true
+    },
+    "junk": "text",
+    "empty": {},
+    "wrong": {
+      "featured": "no",
+      "icon": "BAD"
+    }
+  }
+}

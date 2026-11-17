@@ -38,9 +38,10 @@ const repo = (config: unknown = undefined, scripts: Record<string, string> = SCR
 
 const ids = (dir: string, all = true) => actionsDocument(buildContext(dir), all).actions.map((a) => a.id);
 
-test('run, deploy, publish and docs are featured by default; install and build are not', () => {
+test('deploy, publish and docs are featured by default; run, install and build are not', () => {
   const dir = repo();
-  assert.deepEqual(ids(dir, false).sort(), ['deploy:staging', 'dev', 'doc', 'publish:staging']);
+  assert.deepEqual(ids(dir, false).sort(), ['deploy:staging', 'doc', 'publish:staging']);
+  assert.ok(ids(dir).includes('dev'));
   assert.ok(ids(dir).includes('build'));
   assert.ok(ids(dir).includes('install:local'));
 });
@@ -75,10 +76,10 @@ test('a custom command is featured only when it says so, with its own icon and l
 test('the actions section beats the defaults and a custom command', () => {
   const dir = repo({
     commands: { seed: { run: 'x', featured: true, icon: 'database' } },
-    actions: { dev: { featured: false }, build: { featured: true, icon: 'tools' }, seed: { icon: 'flame' } },
+    actions: { 'deploy:staging': { featured: false }, build: { featured: true, icon: 'tools' }, seed: { icon: 'flame' } },
   });
   const byId = Object.fromEntries(listActions(buildContext(dir)).map((a) => [a.id, a]));
-  assert.equal(byId.dev?.featured, false);
+  assert.equal(byId['deploy:staging']?.featured, false);
   assert.equal(byId.build?.featured, true);
   assert.equal(byId.build?.icon, 'tools');
   assert.equal(byId.seed?.featured, true);
@@ -95,7 +96,7 @@ test('pf actions --json prints the document on stdout only', () => {
   const doc = JSON.parse(r.out);
   assert.equal(doc.schema, 1);
   assert.equal(typeof doc.repo, 'string');
-  assert.deepEqual(doc.actions.map((a: { id: string }) => a.id).sort(), ['deploy:staging', 'dev', 'doc', 'publish:staging']);
+  assert.deepEqual(doc.actions.map((a: { id: string }) => a.id).sort(), ['deploy:staging', 'doc', 'publish:staging']);
   const all = JSON.parse(pf(repo(), 'actions', '--all', '--json').out);
   assert.ok(all.actions.length > doc.actions.length);
 });
@@ -103,17 +104,17 @@ test('pf actions --json prints the document on stdout only', () => {
 test('pf actions feature / unfeature write the actions section and keep the rest of the file', () => {
   const dir = repo({ id: 'demo-1', commands: { seed: 'x' } });
   assert.equal(pf(dir, 'actions', 'feature', 'build', 'seed', '--icon', 'package').code, 0);
-  assert.equal(pf(dir, 'actions', 'unfeature', 'dev').code, 0);
+  assert.equal(pf(dir, 'actions', 'unfeature', 'deploy:staging').code, 0);
   const cfg = loadRepoConfig(dir);
   assert.equal(cfg.id, 'demo-1');
   assert.equal(cfg.commands.seed?.run, 'x');
   assert.deepEqual(cfg.actions, {
     build: { featured: true, icon: 'package' },
     seed: { featured: true, icon: 'package' },
-    dev: { featured: false },
+    'deploy:staging': { featured: false },
   });
   const featured = ids(dir, false);
-  assert.ok(featured.includes('build') && featured.includes('seed') && !featured.includes('dev'));
+  assert.ok(featured.includes('build') && featured.includes('seed') && !featured.includes('deploy:staging'));
 });
 
 test('feature keeps an icon set earlier, and --dry-run writes nothing', () => {

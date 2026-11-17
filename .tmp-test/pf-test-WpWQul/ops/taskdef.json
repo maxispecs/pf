@@ -1,0 +1,12 @@
+{
+  "family": "x",
+  "containerDefinitions": [
+    {
+      "logConfiguration": {
+        "options": {
+          "awslogs-group": "/ecs/billing"
+        }
+      }
+    }
+  ]
+}

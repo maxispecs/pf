@@ -1,0 +1,1 @@
+{"code":"const PLUGIN_API=1;export{PLUGIN_API};\n","warnings":[],"map":{"version":3,"mappings":"AAKO,MAAM,WAAa","names":[],"ignoreList":[],"sources":["/Users/w/dev/agents/pulpfixer/packages/kit/src/plugin.ts"],"sourcesContent":[null]}}

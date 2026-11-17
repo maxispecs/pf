@@ -1,0 +1,1 @@
+# usage: ./a deploy [message]

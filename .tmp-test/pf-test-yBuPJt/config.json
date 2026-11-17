@@ -1,0 +1,20 @@
+{
+  "profiles": {
+    "acme": {
+      "aws": {
+        "profile": "acme-ro",
+        "account": "123456789012",
+        "region": "eu-west-1"
+      },
+      "agent": {
+        "aws": {
+          "scopes": [
+            "identity",
+            "ecs",
+            "logs"
+          ]
+        }
+      }
+    }
+  }
+}

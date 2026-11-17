@@ -1,0 +1,12 @@
+{
+  "commands": {
+    "deploy": {
+      "run": "./al d",
+      "message": true
+    },
+    "deploy:staging": {
+      "run": "x",
+      "message": "yes"
+    }
+  }
+}

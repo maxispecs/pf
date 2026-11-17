@@ -1,0 +1,13 @@
+{
+  "commands": {
+    "deploy:staging": {
+      "run": "echo stg"
+    },
+    "deploy:production": {
+      "run": "echo prd"
+    },
+    "deploy": {
+      "run": "echo bare"
+    }
+  }
+}

@@ -1,0 +1,3 @@
+[project]
+dependencies=["fastapi"]
+[tool.uv]
