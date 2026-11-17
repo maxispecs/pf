@@ -25,10 +25,17 @@
 
 That installs pf, sets the machine up, installs the agent skills and applies the pulpfixer suite to Cursor (the standard extensions and settings, and Background Tone).
 
-Just pf, without the skills and the suite:
+### Just pf, without the skills and the suite:
 
 ```bash
 [ -w "$(npm root -g)" ] || { mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global && export PATH="$HOME/.npm-global/bin:$PATH" && echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.$(basename "$SHELL")rc; }; npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup
+```
+
+#### Add-ons
+
+```bash
+pf skill install --all    # agent skills
+pf sys apply              # install pulpfixer suite
 ```
 
 Needs Node >= 18 and npm, no token: pf and its packages are public on the cellars registry. The first part only runs when npm's global directory is not writable (Homebrew Node: `EACCES`): it switches npm to a user-owned prefix, `~/.npm-global`, so no `sudo` is needed. `--registry` applies to this install only. Then run `pf` in any repo; `pf update` keeps it current. More options (from source, plugins, dry run) are in [Getting started](packages/docs/content/getting-started.mdx).

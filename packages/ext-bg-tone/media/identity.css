@@ -37,7 +37,21 @@ body {
 	white-space: nowrap;
 }
 .version { overflow: hidden; text-overflow: ellipsis; }
-.changes { display: inline-flex; align-items: center; gap: 3px; flex: none; }
+.changes {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	flex: none;
+	padding: 0 3px;
+	border: none;
+	border-radius: 3px;
+	background: transparent;
+	font: inherit;
+	color: var(--vscode-textLink-foreground);
+	cursor: pointer;
+}
+.changes:hover { background: var(--vscode-toolbar-hoverBackground); color: var(--vscode-textLink-activeForeground); text-decoration: underline; }
+.changes:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
 .changes .codicon { font-size: 12px; }
 .agents {
 	margin-top: 6px;

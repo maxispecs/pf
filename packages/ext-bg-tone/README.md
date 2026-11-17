@@ -37,7 +37,8 @@ customization keys are left alone.
   (the featured repo actions). Everything it saves lands in the repo's `pulpfixer.json`.
 - **Version**: the Repo Identity card shows the repo's stack version (from `versions.json`, as kept by
   `pnpm ver`) on the line below the name; a repo without that file shows none. Beside it the card shows how many files
-  have uncommitted changes (`git status`, untracked files included), hidden at zero or outside a git repo.
+  have uncommitted changes (`git status`, untracked files included), hidden at zero or outside a git repo. The number is a link: it asks for a commit message, then
+  stages everything (`git add -A`) and commits (hooks run; nothing is pushed). Only in a trusted workspace.
 
 ## Settings
 

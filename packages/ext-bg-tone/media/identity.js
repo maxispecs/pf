@@ -113,9 +113,11 @@
 				meta.append(version);
 			}
 			if (hasChanges) {
-				const label = state.changes + (state.changes === 1 ? ' uncommitted file' : ' uncommitted files');
-				const changes = h('span', 'changes');
+				const label = state.changes + (state.changes === 1 ? ' uncommitted file' : ' uncommitted files') + ' - click to commit them';
+				const changes = h('button', 'changes');
+				changes.type = 'button';
 				changes.title = label;
+				changes.addEventListener('click', () => vscode.postMessage({ type: 'commit' }));
 				changes.setAttribute('aria-label', label);
 				changes.append(h('span', 'codicon codicon-git-commit'), h('span', 'changes-count', String(state.changes)));
 				meta.append(changes);

@@ -68,19 +68,71 @@ function stackVersion(): string {
 	}
 }
 
-/** Files with uncommitted changes in the primary folder (`git status`); null without a local git repo or git. */
-function uncommittedFiles(): Promise<number | null> {
-	const folder = primaryFolder();
-	if (folder?.uri.scheme !== 'file') {
-		return Promise.resolve(null);
-	}
+/** Runs git in the primary folder (no shell: the arguments go straight to git). */
+function runGit(cwd: string, args: string[], timeout: number): Promise<{ ok: boolean; stdout: string; stderr: string }> {
 	return new Promise(resolve => {
 		execFile(
 			'git',
-			['status', '--porcelain=v1', '-z', '--untracked-files=all'],
-			{ cwd: folder.uri.fsPath, timeout: 5000, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
-			(error, stdout) => resolve(error ? null : countChangedFiles(stdout)),
+			args,
+			{ cwd, timeout, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
+			(error, stdout, stderr) => resolve({ ok: !error, stdout, stderr: stderr || (error ? error.message : '') }),
 		);
+	});
+}
+
+/** Files with uncommitted changes in the primary folder (`git status`); null without a local git repo or git. */
+async function uncommittedFiles(): Promise<number | null> {
+	const folder = primaryFolder();
+	if (folder?.uri.scheme !== 'file') {
+		return null;
+	}
+	const result = await runGit(folder.uri.fsPath, ['status', '--porcelain=v1', '-z', '--untracked-files=all'], 5000);
+	return result.ok ? countChangedFiles(result.stdout) : null;
+}
+
+/**
+ * Commits every uncommitted file: asks for a message first (the dialog is the confirmation), then
+ * `git add -A` and `git commit`. Hooks run as usual (no `--no-verify`); a failure is shown, nothing is retried.
+ */
+async function commitAll(): Promise<boolean> {
+	const folder = primaryFolder();
+	if (folder?.uri.scheme !== 'file') {
+		return false;
+	}
+	if (!vscode.workspace.isTrusted) {
+		void vscode.window.showWarningMessage('Background Tone: trust this workspace to commit from the card.');
+		return false;
+	}
+	const cwd = folder.uri.fsPath;
+	const count = await uncommittedFiles();
+	if (!count) {
+		void vscode.window.showInformationMessage('Background Tone: nothing to commit.');
+		return false;
+	}
+	const noun = count === 1 ? '1 file' : `${count} files`;
+	const message = await vscode.window.showInputBox({
+		title: `Commit ${noun}`,
+		prompt: `Stages everything (git add -A, untracked files included) and commits it. Commit message:`,
+		value: `Update ${noun}`,
+		validateInput: value => (value.trim() === '' ? 'A commit message is required.' : undefined),
+	});
+	if (message === undefined) {
+		return false;
+	}
+	return vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Committing ${noun}...` }, async () => {
+		const add = await runGit(cwd, ['add', '-A'], 30_000);
+		if (!add.ok) {
+			void vscode.window.showErrorMessage(`Background Tone: git add failed: ${add.stderr.trim().split('\n')[0]}`);
+			return false;
+		}
+		const commit = await runGit(cwd, ['commit', '-m', message.trim()], 120_000);
+		if (!commit.ok) {
+			const detail = (commit.stdout + '\n' + commit.stderr).trim().split('\n').filter(Boolean).slice(-3).join(' ');
+			void vscode.window.showErrorMessage(`Background Tone: git commit failed: ${detail}`.slice(0, 300));
+			return true; // files may be staged now: redraw
+		}
+		void vscode.window.showInformationMessage(`Background Tone: committed ${noun}.`);
+		return true;
 	});
 }
 
@@ -156,6 +208,9 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 			} else if (m?.type === 'run' && typeof m.id === 'string') {
 				// Only an id comes from the page; what runs is looked up in pf's own list.
 				this.actions.runAction(m.id);
+			} else if (m?.type === 'commit') {
+				// No payload is trusted: the count, the message prompt and the git calls are all the extension's own.
+				void commitAll().then(changed => changed && this.refresh());
 			} else if (m?.type === 'editActions') {
 				void vscode.commands.executeCommand('bgTone.openSettings', 'actions');
 			}

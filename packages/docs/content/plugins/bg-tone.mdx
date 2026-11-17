@@ -6,7 +6,7 @@ title: Background Tone (pulpfixer suite)
 
 Background Tone is a Cursor and VS Code extension that tints the side bar, title bar and more per repo, and shows a repo logo (a card at the top of the Explorer and in Source Control, an Explorer item, the tab icon of its settings page, an optional emoji in the window title). With several windows open you can tell which repo is which.
 
-The Repo Identity card also shows the repo's stack version (the one in `versions.json`, kept by `pnpm ver`) on the line below the repo name, with the number of files that have uncommitted changes next to it (hidden at zero or outside a git repo). The Repo Settings page groups its cards in three tabs: **Color** (palette, intensity, areas to tint, preview), **Logo** (the logo and where it shows) and **Actions**.
+The Repo Identity card also shows the repo's stack version (the one in `versions.json`, kept by `pnpm ver`) on the line below the repo name, with the number of files that have uncommitted changes next to it (hidden at zero or outside a git repo). Click the number to commit them: it asks for a commit message, then runs `git add -A` and `git commit` (hooks run, nothing is pushed, trusted workspaces only). The Repo Settings page groups its cards in three tabs: **Color** (palette, intensity, areas to tint, preview), **Logo** (the logo and where it shows) and **Actions**.
 
 It is the first extension of the **pulpfixer suite**: the extensions that go with pf, installed and kept current by the [system plugin](/plugins/system).
 
