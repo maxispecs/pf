@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { clearDbDrivers, dbDriver } from '@pulpfixer/kit/db';
 import { allCommands } from '../src/commands/index.js';
-import { loadFailures, loadInstalledPlugins, loadedPlugins, registerPluginDrivers, validatePlugin } from '../src/plugins/loader.js';
+import { loadFailures, loadInstalledPlugin, loadInstalledPlugins, loadedPlugins, registerPluginDrivers, validatePlugin } from '../src/plugins/loader.js';
 import { builtinRows } from '../src/plugins/manage.js';
 import { BUILTIN_PLUGINS } from '../src/plugins/index.js';
 import { builtinOfPackage, builtinPackage, bundledVersion, candidatePackages, entryOf, installArgv, installedPlugins, isPluginPackage, isQueryPackage, parseSpec, pickBuiltinPackages, pickPluginPackages, pluginOfPackage, uninstallArgv } from '../src/plugins/registry.js';
@@ -126,6 +126,23 @@ test('a driver plugin needs api 2, is validated, and is registered when it loads
     clearDbDrivers();
     registerPluginDrivers(loadedPlugins().map((l) => l.plugin));
     assert.ok(dbDriver('fakedb'));
+  } finally {
+    delete process.env.PF_HOME;
+    clearDbDrivers();
+    await loadInstalledPlugins();
+  }
+});
+
+test('a driver plugin installed during a run is loaded and registered on its own', async () => {
+  clearDbDrivers();
+  process.env.PF_HOME = homeWith({});
+  try {
+    await loadInstalledPlugins();
+    assert.match((await loadInstalledPlugin('db-fakedb'))!, /not installed/);
+    process.env.PF_HOME = homeWith({ '@pulpfixer/db-fakedb': DRIVER_JS('api: 2,') });
+    assert.equal(await loadInstalledPlugin('db-fakedb'), null);
+    assert.equal(dbDriver('fakedb')?.label, 'Fake');
+    assert.deepEqual(loadedPlugins().map((l) => l.package), ['@pulpfixer/db-fakedb']);
   } finally {
     delete process.env.PF_HOME;
     clearDbDrivers();

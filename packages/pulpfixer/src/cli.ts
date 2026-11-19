@@ -12,6 +12,8 @@ import { err, out } from '@pulpfixer/kit/ui/palette';
 import { badge, h2, promptLine, termLine } from '@pulpfixer/kit/ui/text';
 import { BUILTIN_PLUGINS } from './plugins/index.js';
 import { loadInstalledPlugins, registerPluginDrivers } from './plugins/loader.js';
+import { installDbDriver } from './plugins/manage.js';
+import { setDbDriverInstaller } from '@pulpfixer/kit/db';
 import { cachedLatest, refreshInBackground } from './update/check.js';
 import { version } from '@pulpfixer/kit/version';
 
@@ -79,6 +81,7 @@ export async function main(argv: string[]): Promise<number> {
   const first = argv[0];
   registerPluginDrivers(BUILTIN_PLUGINS);
   await loadInstalledPlugins(BUILTIN_PLUGINS.map((p) => p.name));
+  setDbDriverInstaller(installDbDriver);
   // Set by the ./pf launcher. Read it once and drop it so commands pf starts (a global pf) don't inherit it.
   const local = localRoot();
   delete process.env.PF_LOCAL;

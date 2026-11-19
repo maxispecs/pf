@@ -15,20 +15,26 @@ The built-in `db` plugin gives every database the same shape: saved connections 
 On an older Node, pf still runs and lists the SQLite driver; only connecting to a SQLite file fails, and says which Node it needs. The plugin and the drivers hold no secrets, so anyone can install them. Queries that touch company data live in separate packages, see [Writing a query package](/plugins/writing-a-query-package).
 
 ```bash
-pf plugin install db-mysql        # a driver, once
-pf db add billing                 # a connection, asking what the driver needs
-pf db                             # list the connections
+pf db                             # in a terminal: the connections and a menu to add, test, remove, install drivers
+pf db add billing --driver mysql  # a connection; the mysql driver installs itself the first time
+pf db list                        # list the connections
 ```
 
 ## pf db
 
 ```bash
-pf db [list] [--json]             # name, driver, a safe summary, where each secret comes from
+pf db                             # terminal: menu of actions; without one, the same as pf db list
+pf db list [--json]               # name, driver, a safe summary, where each secret comes from
 pf db add [name] [--driver mysql] [--form dsn] [--<field> value ...] [--secret-from keychain|env:NAME|prompt] [--no-test] [--yes]
-pf db remove <name> [--yes]       # also deletes its keychain entries
-pf db test [name]                 # connect and run SELECT 1
+pf db remove [name] [--yes]       # also deletes its keychain entries; no name in a terminal: pick one
+pf db test [name]                 # connect and run SELECT 1; several connections in a terminal: pick one
 pf db drivers                     # built-in and installed drivers, and the ones you can install
+pf db install [driver...]         # install @pulpfixer/db-<driver> (same as pf plugin install db-<driver>)
 ```
+
+In a terminal, bare `pf db` shows the connections and then a menu: add, test or remove a connection, install a driver, show the drivers. After each action it shows the list again, until you pick **Done** (or press esc).
+
+A driver that pf knows (`postgres`, `mysql`) but that is not installed yet installs itself when you need it: when you pick it in `pf db add`, name it with `--driver`, or test a connection that uses it. pf installs `@pulpfixer/db-<driver>` from the registry into `~/.pf/plugins` and uses it at once. `pf plugin remove db-<driver>` removes it again.
 
 ### Adding a connection
 
@@ -37,7 +43,7 @@ The **driver** says what to ask. A driver offers one or more *forms*, and each f
 - MySQL and PostgreSQL: `params` (host, port, user, password, database, TLS) or `dsn` (one connection string).
 - SQLite: `file` (the file, read-only or not).
 
-In a terminal `pf db add` first asks which driver, listing the drivers you can still install too (picking one of those prints its `pf plugin install` command), then asks for each field of the form you pick, then connects once to check the values. Without a terminal and without `--driver`, the only driver there is (SQLite, until you install another) is used. Without a terminal, give everything as flags. A field's flag is its key in kebab case:
+In a terminal `pf db add` first asks which driver, listing the drivers you can still install too (picking one of those installs it), then asks for each field of the form you pick, then connects once to check the values. Without a terminal and without `--driver`, the only driver there is (SQLite, until you install another) is used. Without a terminal, give everything as flags. A field's flag is its key in kebab case:
 
 ```bash
 pf db add billing --driver mysql --host db.internal --user report --database billing --secret-from env:BILLING_DB_PASSWORD

@@ -1,0 +1,36 @@
+{
+  "summary": "A query package: @pulpfixer/query-<name>, named queries on one pf db connection, published to cellars",
+  "dir": "query-{{name}}",
+  "params": {
+    "name": {
+      "prompt": "Query package name",
+      "help": "pf <name> runs it; lowercase letters, digits and dashes",
+      "pattern": "[a-z0-9]+(-[a-z0-9]+)*"
+    },
+    "summary": {
+      "prompt": "One-line summary",
+      "default": "Queries on the {{name}} database"
+    },
+    "connection": {
+      "prompt": "pf db connection it uses",
+      "help": "the name users give pf db add",
+      "default": "{{name}}",
+      "pattern": "[a-z0-9][a-z0-9_-]{0,39}"
+    },
+    "driver": {
+      "prompt": "Database",
+      "choices": ["postgres", "mysql", "sqlite"]
+    }
+  },
+  "rename": {
+    "_package.json": "package.json",
+    "_gitignore": ".gitignore",
+    "_npmrc": ".npmrc"
+  },
+  "next": [
+    "pnpm install",
+    "pf a   (ask the agent to write the queries: it follows AGENTS.md and the query-package skill)",
+    "pnpm test",
+    "pf ps  (publish @pulpfixer/query-{{name}} to cellars; asks first)"
+  ]
+}

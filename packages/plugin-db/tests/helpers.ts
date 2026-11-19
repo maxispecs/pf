@@ -5,6 +5,7 @@ import {
   clearDbDrivers,
   makeSession,
   registerDbDrivers,
+  setDbDriverInstaller,
   type CompiledQuery,
   type ConnectionParams,
   type DbDriver,
@@ -18,6 +19,7 @@ export function freshHome(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-db-test-'));
   process.env.PF_HOME = dir;
   clearDbDrivers();
+  setDbDriverInstaller(null);
   setKeychain(null);
   return dir;
 }

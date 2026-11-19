@@ -144,7 +144,7 @@ export interface RemotePlugin {
   description: string;
 }
 
-function npmError(stderr: string): string {
+export function npmError(stderr: string): string {
   const m = stderr.match(/npm (?:error|ERR!) (?:code )?(E\w+|\d{3}[^\n]*)/)?.[1];
   return (m ?? stderr.trim().split('\n')[0] ?? '').trim() || 'registry unreachable';
 }

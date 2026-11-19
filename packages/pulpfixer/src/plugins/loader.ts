@@ -64,6 +64,21 @@ async function loadOne(info: InstalledPlugin): Promise<LoadedPlugin | string> {
   }
 }
 
+/** Import one plugin installed after startup and register its database drivers. Returns why it failed, or null. */
+export async function loadInstalledPlugin(name: string): Promise<string | null> {
+  const info = installedPlugins().find((p) => p.name === name);
+  if (!info) return `${name} is not installed`;
+  const r = await loadOne(info);
+  failures = failures.filter((f) => f.package !== info.package);
+  if (typeof r === 'string') {
+    failures.push({ package: info.package, version: info.version, error: r });
+    return r;
+  }
+  loaded = [...loaded.filter((l) => l.package !== info.package), r];
+  registerPluginDrivers([r.plugin]);
+  return null;
+}
+
 /**
  * Import every installed plugin, once, before commands are looked up. A plugin that fails to load
  * (or reuses a built-in plugin's name) is skipped and reported by `pf plugin list`; it never stops pf.

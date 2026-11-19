@@ -1,6 +1,6 @@
 import os from 'node:os';
 import path from 'node:path';
-import { dbDriver, dbDrivers, findForm, type ConnectionField, type ConnectionForm, type DbDriver } from '@pulpfixer/kit/db';
+import { dbDriver, dbDriverInstaller, dbDrivers, findForm, type ConnectionField, type ConnectionForm, type DbDriver } from '@pulpfixer/kit/db';
 import type { Command } from '@pulpfixer/kit/types';
 import { err, out } from '@pulpfixer/kit/ui/palette';
 import { pick } from '@pulpfixer/kit/ui/picker';
@@ -53,7 +53,7 @@ export function parseField(f: ConnectionField, raw: string): Parsed {
   return { value: s };
 }
 
-function showList(args: string[]): number {
+function showList(args: string[], hint = true): number {
   const json = takeFlag(args, '--json');
   const conns = loadConnections();
   const names = Object.keys(conns).sort();
@@ -64,7 +64,7 @@ function showList(args: string[]): number {
   const c = out();
   if (names.length === 0) {
     process.stdout.write(`${c.dim('No database connections yet.')}\n`);
-    say(`${err().dim('Add one with')} ${termLine('pf db add', err())}`);
+    if (hint) say(`${err().dim('Add one with')} ${termLine('pf db add', err())}`);
     return 0;
   }
   const rows = names.map((name) => {
@@ -90,35 +90,57 @@ function showDrivers(): number {
   const installed = dbDrivers();
   const rows = installed.map((d) => [d.id, d.dialect, d.label, d.forms.map((f) => f.id).join(', '), c.green(isBuiltin(d) ? 'built in' : 'installed')]);
   for (const k of KNOWN_DRIVERS) {
-    if (!dbDriver(k.id)) rows.push([k.id, '', k.label, '', `pf plugin install db-${k.id}`]);
+    if (!dbDriver(k.id)) rows.push([k.id, '', k.label, '', `pf db install ${k.id}`]);
   }
   process.stdout.write(table(['driver', 'dialect', 'database', 'forms', 'status'], rows, c) + '\n');
   return 0;
 }
 
+const missingDrivers = () => KNOWN_DRIVERS.filter((k) => !dbDriver(k.id));
+
+/** Driver `id`, installed first when it is a known driver that is missing. Returns an exit code (already printed) on failure. */
+async function ensureDriver(id: string): Promise<DbDriver | number> {
+  const have = dbDriver(id);
+  if (have) return have;
+  const known = KNOWN_DRIVERS.find((k) => k.id === id);
+  if (!known) return fail(`there is no "${id}" database driver`, 'pf db drivers');
+  const install = dbDriverInstaller();
+  if (!install) return fail(`the "${id}" database driver is not installed`, `pf plugin install db-${id}`);
+  say(err().dim(`Installing the ${known.label} driver (@pulpfixer/db-${id})...`));
+  const problem = await install(id);
+  const d = dbDriver(id);
+  if (problem || !d) return fail(`could not install the "${id}" driver${problem ? `: ${problem}` : ''}`, `pf plugin install db-${id}`);
+  say(`${err().green('✓')} ${known.label} driver installed`);
+  return d;
+}
+
 /** Pick the driver from `--driver`, or ask. Returns a message (already printed) on failure. */
 async function chooseDriver(id: string | undefined): Promise<DbDriver | number> {
-  if (id) {
-    const d = dbDriver(id);
-    if (d) return d;
-    const known = KNOWN_DRIVERS.some((k) => k.id === id);
-    return fail(`the "${id}" database driver is not installed`, known ? `pf plugin install db-${id}` : `pf db drivers`);
-  }
+  if (id) return ensureDriver(id);
   const all = dbDrivers();
   if (all.length === 0) return fail('no database driver is installed', 'pf db drivers');
-  const missing = KNOWN_DRIVERS.filter((k) => !dbDriver(k.id));
+  const missing = missingDrivers();
   if (!interactive()) {
     if (all.length === 1) return all[0]!;
     return usageError(`say which driver: pf db add <name> --driver ${all.map((d) => d.id).join('|')}`);
   }
   if (all.length === 1 && missing.length === 0) return all[0]!;
+  const installs = dbDriverInstaller() ? 'installs it' : 'not installed';
   const chosen = await pick<DbDriver | string>('Database driver', [
     ...all.map((d) => ({ value: d, label: d.id, hint: d.label })),
-    ...missing.map((k) => ({ value: k.id, label: k.id, hint: `${k.label} (not installed)` })),
+    ...missing.map((k) => ({ value: k.id, label: k.id, hint: `${k.label} (${installs})` })),
   ]);
   if (chosen === null) return (say(err().dim('cancelled')), 130);
-  if (typeof chosen === 'string') return fail(`the "${chosen}" database driver is not installed`, `pf plugin install db-${chosen}`);
-  return chosen;
+  return typeof chosen === 'string' ? ensureDriver(chosen) : chosen;
+}
+
+/** Ask which saved connection; null when cancelled or there are none. */
+async function pickConnection(title: string): Promise<string | null> {
+  const conns = loadConnections();
+  const items = Object.keys(conns)
+    .sort()
+    .map((name) => ({ value: name, label: name, hint: conns[name]!.driver }));
+  return pick(title, items);
 }
 
 /** The form to use: `--form`, else the one that fits the flags given, else ask (several) or the first. */
@@ -330,8 +352,14 @@ export async function testConnection(name: string, conn: Connection): Promise<nu
 async function remove(args: string[]): Promise<number> {
   const rest = [...args];
   const yes = takeFlag(rest, '--yes', '-y');
-  const name = rest[0];
-  if (!name) return usageError('say which connection: pf db remove <name>');
+  let name = rest[0];
+  if (!name) {
+    if (!interactive()) return usageError('say which connection: pf db remove <name>');
+    if (Object.keys(loadConnections()).length === 0) return fail('there are no connections to remove', 'pf db add');
+    const chosen = await pickConnection('Remove which connection?');
+    if (!chosen) return (say(err().dim('cancelled')), 130);
+    name = chosen;
+  }
   const conn = getConnection(name);
   if (!conn) return fail(`there is no connection "${name}"`, 'pf db list');
   const keys = Object.entries(conn.secrets).filter(([, r]) => r.from === 'keychain');
@@ -354,10 +382,16 @@ async function test(args: string[]): Promise<number> {
   if (!name) {
     const names = Object.keys(conns);
     if (names.length === 1) name = names[0]!;
-    else return usageError(names.length ? `which one? pf db test <${names.join('|')}>` : 'there are no connections: pf db add');
+    else if (names.length && interactive()) {
+      const chosen = await pickConnection('Test which connection?');
+      if (!chosen) return (say(err().dim('cancelled')), 130);
+      name = chosen;
+    } else return usageError(names.length ? `which one? pf db test <${names.join('|')}>` : 'there are no connections: pf db add');
   }
   const conn = conns[name];
   if (!conn) return fail(`there is no connection "${name}"`, 'pf db list');
+  const driver = await ensureDriver(conn.driver);
+  if (typeof driver === 'number') return driver;
   try {
     const ms = await testConnection(name, conn);
     say(`${err().green('✓')} ${name} works ${err().dim(`(${ms} ms)`)}`);
@@ -367,24 +401,75 @@ async function test(args: string[]): Promise<number> {
   }
 }
 
+/** `pf db install [driver...]`: install known drivers; in a terminal with none named, pick one. */
+async function installDrivers(args: string[]): Promise<number> {
+  let ids = args.filter((a) => !a.startsWith('-'));
+  if (ids.length === 0) {
+    const missing = missingDrivers();
+    if (missing.length === 0) return (say(`${err().green('✓')} every known driver is installed ${err().dim('(pf db drivers)')}`), 0);
+    if (!interactive()) return usageError(`say which driver: pf db install <${missing.map((k) => k.id).join('|')}>`);
+    const chosen = await pick('Install which driver?', missing.map((k) => ({ value: k.id, label: k.id, hint: k.label })));
+    if (!chosen) return (say(err().dim('cancelled')), 130);
+    ids = [chosen];
+  }
+  let code = 0;
+  for (const id of ids) {
+    if (dbDriver(id)) {
+      say(`${err().green('✓')} the ${id} driver is already installed`);
+      continue;
+    }
+    const d = await ensureDriver(id);
+    if (typeof d === 'number') code = d;
+  }
+  return code;
+}
+
+async function runSub(sub: string, rest: string[]): Promise<number | null> {
+  try {
+    if (sub === 'list' || sub === 'ls') return showList(rest);
+    if (sub === 'add') return await add(rest);
+    if (sub === 'remove' || sub === 'rm') return await remove(rest);
+    if (sub === 'test') return await test(rest);
+    if (sub === 'drivers') return showDrivers();
+    if (sub === 'install') return await installDrivers(rest);
+  } catch (e) {
+    if (e instanceof DbError) return fail(e.message, e.hint);
+    throw e;
+  }
+  return null;
+}
+
+/** Bare `pf db` in a terminal: the connections, then a menu of actions until Done or esc. */
+async function menu(): Promise<number> {
+  for (;;) {
+    showList([], false);
+    const none = Object.keys(loadConnections()).length ? {} : { disabled: 'no connections yet' };
+    const missing = missingDrivers();
+    const action = await pick('Database connections', [
+      { value: 'add', label: 'Add a connection' },
+      { value: 'test', label: 'Test a connection', ...none },
+      { value: 'remove', label: 'Remove a connection', ...none },
+      { value: 'install', label: 'Install a driver', ...(missing.length ? { hint: missing.map((k) => k.id).join(', ') } : { disabled: 'all installed' }) },
+      { value: 'drivers', label: 'Show drivers' },
+      { value: 'done', label: 'Done' },
+    ]);
+    if (action === null || action === 'done') return 0;
+    say('');
+    await runSub(action, []);
+    say('');
+  }
+}
+
 export const dbCommand: Command = {
   name: 'db',
-  summary: 'Database connections: list, add, remove, test',
+  summary: 'Database connections: list, add, remove, test, install drivers',
   group: 'Tools',
-  usage: 'pf db [list|add|remove|test|drivers]',
+  usage: 'pf db [list|add|remove|test|drivers|install]',
   async run(_ctx, args) {
     const rest = [...args];
-    const sub = rest.shift() ?? 'list';
-    try {
-      if (sub === 'list' || sub === 'ls') return showList(rest);
-      if (sub === 'add') return await add(rest);
-      if (sub === 'remove' || sub === 'rm') return await remove(rest);
-      if (sub === 'test') return await test(rest);
-      if (sub === 'drivers') return showDrivers();
-    } catch (e) {
-      if (e instanceof DbError) return fail(e.message, e.hint);
-      throw e;
-    }
-    return usageError(`unknown subcommand "${sub}". ${termLine(dbCommand.usage, err())}`);
+    const sub = rest.shift();
+    if (sub === undefined && interactive()) return menu();
+    const code = await runSub(sub ?? 'list', rest);
+    return code ?? usageError(`unknown subcommand "${sub}". ${termLine(dbCommand.usage, err())}`);
   },
 };

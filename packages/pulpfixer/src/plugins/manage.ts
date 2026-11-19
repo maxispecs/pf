@@ -7,7 +7,7 @@ import { reporter } from '@pulpfixer/kit/ui/prompt';
 import { badgeLabel, termLine } from '@pulpfixer/kit/ui/text';
 import { compareVersions } from '@pulpfixer/kit/util';
 import { shortDescription } from '../skills/discover.js';
-import { loadFailures } from './loader.js';
+import { loadFailures, loadInstalledPlugin } from './loader.js';
 import { BUILTIN_PLUGINS } from './index.js';
 import {
   bundledVersion,
@@ -149,6 +149,14 @@ export async function installPlugins(specs: string[], opts: { dryRun?: boolean }
     } else if (!opts.dryRun) r.ok(`installed ${p.package}@${short(p.version)}${mine?.version ? ` (was v${short(mine.version)})` : ''}`);
   }
   return fails ? 1 : 0;
+}
+
+/** The `pf db` driver installer: install `@pulpfixer/db-<id>` and load it into this run. Returns why it failed, or null. */
+export async function installDbDriver(id: string): Promise<string | null> {
+  if (!/^[a-z][a-z0-9-]*$/.test(id)) return `"${id}" is not a driver name`;
+  const name = `db-${id}`;
+  if ((await installPlugins([name])) !== 0) return `pf plugin install ${name} failed`;
+  return loadInstalledPlugin(name);
 }
 
 /** `pf plugin remove <name...>`: registry installs only; built-in plugins stay. */

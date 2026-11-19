@@ -52,6 +52,10 @@ test('a suite extension is bumped alone too: core does not pin @pulpfixer/ext-*'
   assert.deepEqual(plan.map((b) => b.pkg.name), ['@pulpfixer/ext-bg-tone']);
   assert.deepEqual(planBumps([pkg('@pulpfixer/ext-bg-tone', { local: '1.1.0' }), pkg('pulpfixer')]), []);
   assert.deepEqual(planBumps([pkg('@pulpfixer/preset-suite', { changes: ['packages/preset-suite/preset.json'] }), pkg('pulpfixer')]).map((b) => b.pkg.name), ['@pulpfixer/preset-suite']);
+  assert.deepEqual(
+    planBumps([pkg('@pulpfixer/template-query-package', { changes: ['packages/template-query-package/template.json'] }), pkg('pulpfixer')]).map((b) => b.pkg.name),
+    ['@pulpfixer/template-query-package'],
+  );
 });
 
 test('core alone changing bumps only core', () => {

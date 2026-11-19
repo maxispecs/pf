@@ -14,6 +14,7 @@ import { loadFailures } from '../plugins/loader.js';
 import { bundledVersion, installedPlugins, pluginsDir } from '../plugins/registry.js';
 import { BUNDLED_LABEL, PF_SKILLS_LABEL, bundledSkillsDir, pfSkillsDir, shortDescription, skillsIn } from '../skills/discover.js';
 import { inspectPath, installedSkills, targetLabel } from '../skills/registry.js';
+import { cachedTemplates, templatePackage, type CachedTemplate } from '../templates/templates.js';
 
 export type RowState = 'ok' | 'warn' | 'bad';
 
@@ -26,7 +27,7 @@ export interface VersionRow {
 }
 
 export interface VersionSection {
-  id: 'pf' | 'path' | 'bundled' | 'plugins' | 'skills' | 'presets' | 'extensions';
+  id: 'pf' | 'path' | 'bundled' | 'plugins' | 'skills' | 'presets' | 'extensions' | 'templates';
   title: string;
   hint: string;
   /** Shown when there are no rows. */
@@ -174,9 +175,20 @@ export function systemSections(sys: SystemVersions): VersionSection[] {
   return [presets, extensions];
 }
 
+/** Templates fetched by `pf template apply` (`~/.pf/templates`). */
+export function templatesSection(cached: CachedTemplate[] = cachedTemplates()): VersionSection {
+  return {
+    id: 'templates',
+    title: 'Templates',
+    hint: '~/.pf/templates, fetched by pf template apply',
+    empty: 'none fetched yet (pf template list)',
+    rows: cached.map((t) => (t.problem ? row(t.name, t.version, `unusable: ${t.problem}`, 'bad') : row(t.name, t.version, templatePackage(t.name)))),
+  };
+}
+
 /** Everything pulpfixer-related on this machine. Reads files and Cursor's extension list; no network. */
 export function collectVersions(): VersionSection[] {
-  return [pfSection(), pathSection(), bundledSection(), pluginsSection(), skillsSection(), ...systemSections(systemVersions())];
+  return [pfSection(), pathSection(), bundledSection(), pluginsSection(), skillsSection(), ...systemSections(systemVersions()), templatesSection()];
 }
 
 /** The text of the sections, aligned per section. Pure: returns the lines. */

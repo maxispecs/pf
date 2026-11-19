@@ -27,6 +27,7 @@ import { pluginCommand } from './plugin.js';
 import { profileCommand } from './profile.js';
 import { publishCommand } from './publish.js';
 import { repoCommand } from './repo.js';
+import { templateCommand } from './template.js';
 import { pluginCommands } from '../plugins/index.js';
 
 /** Built-in commands except the ones that live in cli.ts (help, list, menu, version). */
@@ -49,6 +50,7 @@ export function allCommands(): Command[] {
     skillCommand,
     initCommand,
     repoCommand,
+    templateCommand,
     profileCommand,
     doctorCommand,
     setupCommand,

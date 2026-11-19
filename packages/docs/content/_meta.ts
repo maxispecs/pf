@@ -7,6 +7,7 @@ const meta: MetaRecord = {
   concepts: 'Concepts',
   agent: 'Agent',
   plugins: 'Plugins',
+  templates: 'Templates',
   host: 'Host mode',
   development: 'Development',
 }

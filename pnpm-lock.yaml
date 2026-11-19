@@ -136,6 +136,15 @@ importers:
         specifier: workspace:*
         version: link:../plugin-yubikey
 
+  packages/template-query-package:
+    devDependencies:
+      '@pulpfixer/kit':
+        specifier: workspace:*
+        version: link:../kit
+      '@pulpfixer/plugin-db':
+        specifier: workspace:*
+        version: link:../plugin-db
+
 packages:
 
   '@antfu/install-pkg@2.1.0':

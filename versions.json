@@ -1,6 +1,6 @@
 {
   "stack": {
-    "version": "3.19",
+    "version": "3.20",
     "since": "2026-11-19"
   },
   "packages": {
@@ -15,7 +15,7 @@
       "type": "node"
     },
     "packages/docs": {
-      "version": "2.4",
+      "version": "2.5",
       "since": "2026-11-19",
       "type": "node"
     },
@@ -25,7 +25,7 @@
       "type": "node"
     },
     "packages/kit": {
-      "version": "6.9",
+      "version": "6.10",
       "since": "2026-11-19",
       "type": "node"
     },
@@ -35,7 +35,7 @@
       "type": "node"
     },
     "packages/plugin-db": {
-      "version": "1.1",
+      "version": "1.2",
       "since": "2026-11-19",
       "type": "node"
     },
@@ -60,7 +60,12 @@
       "type": "node"
     },
     "packages/pulpfixer": {
-      "version": "7.0",
+      "version": "7.1",
+      "since": "2026-11-19",
+      "type": "node"
+    },
+    "packages/template-query-package": {
+      "version": "1.0",
       "since": "2026-11-19",
       "type": "node"
     }

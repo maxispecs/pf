@@ -1,0 +1,103 @@
+---
+title: Templates
+---
+
+# Templates
+
+`pf template` creates a new repo from a **template**: a data package `@pulpfixer/template-<name>` on cellars. pf installs the template's latest version every time it applies one, so a template changes with a version bump on the registry and needs no new pf. The first template is `query-package`, the starting point of a [query package](/plugins/writing-a-query-package).
+
+```bash
+pf template                                         # list templates: cached here and on the registry
+pf template apply query-package revrec --driver mysql
+pf template apply query-package revrec --connection billing --driver mysql --summary "Revenue recognition"
+pf template apply query-package revrec --driver mysql --dry-run    # the file list, nothing written
+pf template apply query-package revrec --driver mysql --dir ~/dev/query-revrec
+```
+
+In a terminal, pf asks for each value you did not pass, with its default filled in. Without one, it uses the defaults and stops with the usage line when a required value is missing, so scripts and agents pass flags.
+
+## What apply does
+
+1. Installs `@pulpfixer/template-<name>@latest` into `~/.pf/templates`. With `--offline`, or when the registry cannot be reached, it uses the copy fetched last time.
+2. Fills the template's files with the values and writes them into the new folder (`query-<name>/` for the query package, `--dir` for another place). If any of the files already exists there, nothing is written.
+3. Runs `git init` in the folder, unless it is already inside a git repo (`--no-git` skips this).
+4. Runs `pf repo --no-deploy` on the new repo: the pf link, the pnpm commands, versioning and the background tone (`--no-repo` skips this).
+5. Prints the next steps.
+
+A template is data. pf never runs anything from a template: the only commands are pf's own `git init` and `pf repo`.
+
+| Flag | Meaning |
+|------|---------|
+| `--<param> <value>` | a template value (`--driver mysql`); the first one can also be given without its flag (`revrec`) |
+| `--dir <path>` | where to create the repo instead of the template's folder name |
+| `--dry-run` | list the files and the steps, write nothing |
+| `--offline` | use the cached template, no registry |
+| `--no-git`, `--no-repo` | skip `git init`, skip `pf repo` |
+
+## The query-package template
+
+`pf template apply query-package <name>` asks for:
+
+| Value | Default | Meaning |
+|-------|---------|---------|
+| `name` | (required) | the command (`pf <name>`) and the package `@pulpfixer/query-<name>` |
+| `--summary` | `Queries on the <name> database` | one line for the command list |
+| `--connection` | `<name>` | the `pf db` connection the queries use |
+| `--driver` | (required) | `postgres`, `mysql` or `sqlite` |
+
+It creates a repo that builds, tests and publishes as it is:
+
+| File | What |
+|------|------|
+| `src/index.ts` | `defineQueries({ ... })` with one `ping` query to replace |
+| `tests/queries.test.ts` | a fake driver and a temporary pf home: tests check the SQL and the output, no database needed |
+| `package.json` | `@pulpfixer/query-<name>`, depending on `@pulpfixer/plugin-db` and `@pulpfixer/kit` at the versions this pf ships; `build`, `typecheck`, `test` and `publish:cellars` (what `pf ps` runs) |
+| `AGENTS.md` | the rules the coding agent follows when it writes the queries |
+| `.npmrc` | the cellars registry, with `${NPM_TOKEN}` as the auth line |
+| `pulpfixer.json`, `README.md`, `tsconfig*.json`, `.gitignore` | the rest |
+
+Then:
+
+```bash
+cd query-revrec
+pnpm install
+pf a "write the queries: monthly revenue per product, from these tables: ..."   # follows AGENTS.md and the query-package skill
+pnpm test
+pf ps            # publish to cellars, asks first
+```
+
+The agent uses the bundled `query-package` skill: it asks you for the schema (it has no database tools and never connects), writes each query with the `sql` template, adds a test per query, runs the checks, bumps the version, and leaves publishing to you.
+
+## Writing a template
+
+A template is a package `@pulpfixer/template-<name>` with two things in it:
+
+- `template.json`: the summary, the default folder name, the values to ask for, files to rename, and the next steps.
+- `files/`: the tree that is copied.
+
+```json
+{
+  "summary": "A query package: @pulpfixer/query-<name>",
+  "dir": "query-{{name}}",
+  "params": {
+    "name": { "prompt": "Query package name", "pattern": "[a-z0-9]+(-[a-z0-9]+)*" },
+    "connection": { "prompt": "pf db connection it uses", "default": "{{name}}" },
+    "driver": { "prompt": "Database", "choices": ["postgres", "mysql", "sqlite"] }
+  },
+  "rename": { "_package.json": "package.json", "_gitignore": ".gitignore", "_npmrc": ".npmrc" },
+  "next": ["pnpm install", "pf ps"]
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `params` | the values, in order (the first one is positional). Each has a `prompt`, and optionally `help`, `default` (may use earlier values), `pattern` (the whole value must match) and `choices`. A value without a default is required |
+| `dir` | the default folder name, one segment |
+| `rename` | file names to rename when copying. npm drops or renames `.gitignore` and `.npmrc` on publish, and a nested `package.json` can change what npm packs, so ship them as `_gitignore`, `_npmrc`, `_package.json` |
+| `next` | lines printed at the end |
+
+In file contents, file names and `next`, `{{param}}` is a value and `{{version:@pulpfixer/<package>}}` is the version of a package bundled with the pf that applies the template (`@pulpfixer/kit`, `@pulpfixer/plugin-db`, `pulpfixer`, ...). An unknown placeholder stops the apply. Files with a NUL byte are copied as they are.
+
+Values may not contain quotes, backslashes, backticks, `{{` or newlines, so they are safe inside JSON and TypeScript strings. File paths must stay inside the new folder: no `..`, no absolute paths, nothing under `.git`, no symlinks.
+
+In this monorepo a template is `packages/template-<name>` (see `packages/template-query-package`), with an entry in `ORDER` in `scripts/release.mjs`. Like a preset it is published alone and core does not pin it: `pnpm ver bump packages/template-<name> minor`, then publish. Its `files/src` is part of `pnpm typecheck`, so a change in the query API that breaks the template fails the check.

@@ -8,7 +8,8 @@
   },
   "include": [
     "packages/*/src",
-    "packages/*/tests"
+    "packages/*/tests",
+    "packages/template-query-package/files/src"
   ],
   "exclude": [
     "packages/ext-bg-tone"

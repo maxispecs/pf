@@ -22,6 +22,7 @@ import { updateCommand } from './commands/update.js';
 import { pluginCommand } from './commands/plugin.js';
 import { profileCommand } from './commands/profile.js';
 import { repoCommand } from './commands/repo.js';
+import { templateCommand } from './commands/template.js';
 import { verCommand } from './commands/ver.js';
 import { versionsCommand } from './commands/versions.js';
 import type { Context } from '@pulpfixer/kit/context';
@@ -244,6 +245,7 @@ export function entriesFor(ctx: Context): Entry[] {
     entries.push(agentEntry(ctx));
     entries.push({ ...tool(skillCommand, 'Tools'), name: 'skill', summary: 'Run a skill' });
     entries.push(tool(pluginCommand, 'Tools'));
+    entries.push(tool(templateCommand, 'Tools'));
     entries.push(tool(versionsCommand, 'Tools'));
     entries.push(tool(profileCommand, 'Tools', profileDetail(ctx)));
     entries.push(tool(doctorCommand, 'Tools'));

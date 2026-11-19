@@ -1,0 +1,24 @@
+{
+  "name": "@pulpfixer/template-query-package",
+  "version": "1.0.0",
+  "description": "pf template: a new query package (@pulpfixer/query-<name>), created by pf template apply query-package <name>",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./template.json": "./template.json"
+  },
+  "files": [
+    "template.json",
+    "files"
+  ],
+  "devDependencies": {
+    "@pulpfixer/kit": "workspace:*",
+    "@pulpfixer/plugin-db": "workspace:*"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  }
+}

@@ -6,6 +6,21 @@ title: Writing a query package
 
 A query package is a plugin that holds the SQL for one job (say, revenue recognition from the billing database) and turns it into a command. It uses the [database plugin](/plugins/db) for connections, drivers and the `sql` helpers, so it contains queries and data handling, nothing about how to connect.
 
+## Start from the template
+
+A query package lives in its own repo. `pf template apply query-package` creates one that builds, tests and publishes as it is (see [Templates](/templates)):
+
+```bash
+pf template apply query-package revrec --connection billing --driver mysql
+cd query-revrec
+pnpm install
+pf a "write the revrec queries; the tables are in ../billing/migrations"
+pnpm test
+pf ps                                      # publish @pulpfixer/query-revrec to cellars, asks first
+```
+
+The repo has `src/index.ts` (a `defineQueries` with one `ping` query to replace), a test with a fake driver, the cellars `.npmrc` and `publish:cellars` script, pf's repo setup (link, pnpm commands, versioning), and an `AGENTS.md` with the rules below. The coding agent follows it with the bundled `query-package` skill: it asks you for the schema (it has no database tools and never connects), writes each query with the `sql` template, adds a test per query, runs the checks and bumps the version. Publishing stays your step.
+
 ```ts
 // @pulpfixer/query-revrec: src/index.ts
 import { defineQueries, sql } from '@pulpfixer/plugin-db/api';
@@ -75,4 +90,4 @@ The driver packages and `@pulpfixer/plugin-db` themselves hold no secrets and st
 
 ## Testing
 
-Register a fake driver and run the command, as the plugin's own tests do: `registerDbDrivers([...])` from `@pulpfixer/kit/db`, `putConnection(...)` from `@pulpfixer/plugin-db`, then call the plugin's `commands[0].run(ctx, args)`. With a `PF_HOME` in a temp directory nothing touches your real connections.
+Register a fake driver and run the command, as the plugin's own tests do: `registerDbDrivers([...])` from `@pulpfixer/kit/db`, `putConnection(...)` from `@pulpfixer/plugin-db`, then call the plugin's `commands[0].run(ctx, args)`. With a `PF_HOME` in a temp directory nothing touches your real connections. The template's `tests/queries.test.ts` is set up this way: add a test per query next to the `ping` one.

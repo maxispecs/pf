@@ -126,6 +126,24 @@ export function clearDbDrivers(): void {
   registry().clear();
 }
 
+/**
+ * Installs and loads the plugin that carries driver `id` (`@pulpfixer/db-<id>`), registering its drivers.
+ * Resolves with why it failed, or null. pf sets it at startup; plugins cannot install plugins themselves.
+ */
+export type DbDriverInstaller = (id: string) => Promise<string | null>;
+
+const INSTALLER = Symbol.for('pulpfixer.db.installer.v1');
+
+export function setDbDriverInstaller(fn: DbDriverInstaller | null): void {
+  const g = globalThis as unknown as Record<symbol, DbDriverInstaller | undefined>;
+  if (fn) g[INSTALLER] = fn;
+  else delete g[INSTALLER];
+}
+
+export function dbDriverInstaller(): DbDriverInstaller | undefined {
+  return (globalThis as unknown as Record<symbol, DbDriverInstaller | undefined>)[INSTALLER];
+}
+
 const FIELD_KINDS = new Set(['text', 'number', 'path', 'secret', 'boolean']);
 
 /** Check what a plugin exports as a driver. Returns why it is unusable, or null. */

@@ -83,7 +83,7 @@ export function driverFor(id: string): DbDriver {
   if (d) return d;
   const have = dbDrivers().map((x) => x.id);
   const known = KNOWN_DRIVERS.some((k) => k.id === id);
-  throw new DbError(`no database driver "${id}" is installed${have.length ? ` (have: ${have.join(', ')})` : ''}`, known ? `pf plugin install db-${id}` : 'pf db drivers');
+  throw new DbError(`no database driver "${id}" is installed${have.length ? ` (have: ${have.join(', ')})` : ''}`, known ? `pf db install ${id}` : 'pf db drivers');
 }
 
 /** The values a driver is called with: the saved ones plus every secret, read from where it lives. */

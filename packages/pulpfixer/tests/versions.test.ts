@@ -128,7 +128,7 @@ test('pf vs lists every section, and --json is machine-readable', () => {
   const env = { HOME: home, PF_HOME: path.join(home, '.pf'), PF_NO_PLUGINS: '1' };
   const r = pf(env, 'vs');
   assert.equal(r.code, 0, r.err);
-  for (const title of ['pf', 'Bundled with pf', 'Plugins', 'Skills', 'Presets', 'Cursor extensions']) assert.match(r.out, new RegExp(`^${title}`, 'm'));
+  for (const title of ['pf', 'Bundled with pf', 'Plugins', 'Skills', 'Presets', 'Cursor extensions', 'Templates']) assert.match(r.out, new RegExp(`^${title}`, 'm'));
   assert.match(r.out, /@pulpfixer\/plugin-aws\s+v\d/);
   assert.match(r.out, /save\s+v2\.1\s+~\/\.claude\/skills, registry/);
   assert.match(r.err, /pf v/, 'the banner stays on stderr');
@@ -136,7 +136,7 @@ test('pf vs lists every section, and --json is machine-readable', () => {
   const j = pf(env, 'versions', '--json');
   assert.equal(j.code, 0, j.err);
   const data = JSON.parse(j.out) as { sections: { id: string; rows: { name: string; version: string }[] }[] };
-  assert.deepEqual(data.sections.map((s) => s.id), ['pf', 'path', 'bundled', 'plugins', 'skills', 'presets', 'extensions']);
+  assert.deepEqual(data.sections.map((s) => s.id), ['pf', 'path', 'bundled', 'plugins', 'skills', 'presets', 'extensions', 'templates']);
   assert.ok(data.sections.find((s) => s.id === 'skills')!.rows.some((x) => x.name === 'save' && x.version === '2.1.0'));
 
   assert.equal(pf(env, 'versions', '--nope').code, 1);

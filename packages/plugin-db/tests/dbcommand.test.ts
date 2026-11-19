@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { registerDbDrivers } from '@pulpfixer/kit/db';
+import { clearDbDrivers, registerDbDrivers, setDbDriverInstaller } from '@pulpfixer/kit/db';
 import { dbCommand, parseField } from '../src/commands/db.js';
 import { sqliteDriver } from '../src/drivers/sqlite.js';
 import { connect } from '../src/client.js';
@@ -157,8 +157,43 @@ test('drivers lists built-in, installed and installable ones', async () => {
   const r = await pf('drivers');
   assert.match(r.stdout, /fake.*installed/);
   assert.match(r.stdout, /sqlite.*built in/);
-  assert.match(r.stdout, /pf plugin install db-postgres/);
+  assert.match(r.stdout, /pf db install postgres/);
   assert.doesNotMatch(r.stdout, /db-sqlite/);
+});
+
+test('a known driver that is missing is installed on the way, by add, test and install', async () => {
+  freshHome();
+  const asked: string[] = [];
+  setDbDriverInstaller(async (id) => {
+    asked.push(id);
+    installFake(id);
+    return null;
+  });
+  const added = await pf('add', 'billing', '--driver', 'mysql', '--host', 'h');
+  assert.equal(added.code, 0, added.stderr);
+  assert.match(added.stderr, /MySQL and MariaDB driver installed/);
+  assert.equal(loadConnections().billing!.driver, 'mysql');
+
+  // A saved connection whose driver went missing gets it back before the test.
+  clearDbDrivers();
+  assert.equal((await pf('test', 'billing')).code, 0);
+
+  assert.equal((await pf('install', 'postgres')).code, 0);
+  assert.match((await pf('install', 'postgres')).stderr, /already installed/);
+  assert.deepEqual(asked, ['mysql', 'mysql', 'postgres']);
+
+  assert.equal((await pf('install', 'oracle')).code, 1);
+  clearDbDrivers();
+  setDbDriverInstaller(async () => 'npm install failed');
+  const failed = await pf('install', 'mysql');
+  assert.equal(failed.code, 1);
+  assert.match(failed.stderr, /could not install the "mysql" driver: npm install failed/);
+});
+
+test('without a terminal, remove and install need a name', async () => {
+  freshHome();
+  assert.equal((await pf('remove')).code, 2);
+  assert.equal((await pf('install')).code, 2);
 });
 
 test('without a terminal a lone built-in driver is picked, and an unknown driver points to pf db drivers', async () => {
