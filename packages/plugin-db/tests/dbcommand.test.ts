@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { test } from 'node:test';
+import { registerDbDrivers } from '@pulpfixer/kit/db';
 import { dbCommand, parseField } from '../src/commands/db.js';
+import { sqliteDriver } from '../src/drivers/sqlite.js';
 import { connect } from '../src/client.js';
 import { connectionsPath, loadConnections } from '../src/store.js';
 import { setKeychain } from '../src/secrets.js';
@@ -146,12 +150,29 @@ test('remove asks first, and test runs SELECT 1', async () => {
   assert.equal((await pf('test', 'solo')).code, 1);
 });
 
-test('drivers lists installed and installable ones', async () => {
+test('drivers lists built-in, installed and installable ones', async () => {
   freshHome();
   installFake();
+  registerDbDrivers([sqliteDriver]);
   const r = await pf('drivers');
-  assert.match(r.stdout, /fake/);
+  assert.match(r.stdout, /fake.*installed/);
+  assert.match(r.stdout, /sqlite.*built in/);
   assert.match(r.stdout, /pf plugin install db-postgres/);
+  assert.doesNotMatch(r.stdout, /db-sqlite/);
+});
+
+test('without a terminal a lone built-in driver is picked, and an unknown driver points to pf db drivers', async () => {
+  freshHome();
+  registerDbDrivers([sqliteDriver]);
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pf-db-sqlite-')), 'data.db');
+  const r = await pf('add', 'local', '--path', file, '--no-test');
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(loadConnections().local!.driver, 'sqlite');
+  const missing = await pf('add', 'x', '--driver', 'oracle');
+  assert.equal(missing.code, 1);
+  assert.match(missing.stderr, /pf db drivers/);
+  const known = await pf('add', 'x', '--driver', 'postgres');
+  assert.match(known.stderr, /pf plugin install db-postgres/);
 });
 
 test('an unreadable connections file is reported, never replaced', async () => {

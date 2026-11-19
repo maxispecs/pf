@@ -1,7 +1,8 @@
-import mysql from 'mysql2/promise';
-import type { ConnectionOptions } from 'mysql2/promise';
-import { makeSession, type ConnectionForm, type ConnectionParams, type DbDriver, type QueryResult } from '@pulpfixer/kit/db';
+import { makeSession, type ConnectionForm, type ConnectionParams, type DbDriver } from '@pulpfixer/kit/db';
 import type { Plugin } from '@pulpfixer/kit/plugin';
+import { Connection, type MysqlOptions } from './connection.js';
+
+export type { MysqlOptions } from './connection.js';
 
 const FORMS: ConnectionForm[] = [
   {
@@ -19,21 +20,70 @@ const FORMS: ConnectionForm[] = [
   {
     id: 'dsn',
     label: 'Connection string (DSN)',
-    fields: [{ key: 'dsn', label: 'Connection string', kind: 'secret', required: true, placeholder: 'mysql://user:password@host:3306/database' }],
+    fields: [{ key: 'dsn', label: 'Connection string', kind: 'secret', required: true, placeholder: 'mysql://user:password@host:3306/database?ssl=true' }],
   },
 ];
 
 const text = (p: ConnectionParams, k: string): string | undefined => (typeof p[k] === 'string' && p[k] !== '' ? (p[k] as string) : undefined);
 
-// DECIMAL stays a string (money stays exact) and BIGINT beyond 2^53 arrives as a string, never rounded.
-const COMMON: Partial<ConnectionOptions> = { supportBigNumbers: true, decimalNumbers: false };
+const TLS_MODES: Record<string, boolean> = { DISABLED: false, REQUIRED: true, VERIFY_CA: true, VERIFY_IDENTITY: true };
 
-/** What `mysql2` is configured with for a form and its values. Exported for tests. */
-export function connectionOptions(form: string, params: ConnectionParams): ConnectionOptions {
+function decode(part: string, what: string): string {
+  try {
+    return decodeURIComponent(part);
+  } catch {
+    throw new Error(`the connection string has a malformed ${what}`);
+  }
+}
+
+/**
+ * `mysql://user:password@host:port/database?ssl=true`. Only `ssl` and `ssl-mode` are accepted, so a TLS
+ * setting is never dropped silently; every TLS mode verifies the certificate. The string is never quoted
+ * in an error: it holds the password.
+ */
+export function parseDsn(dsn: string): MysqlOptions {
+  let url: URL;
+  try {
+    url = new URL(dsn);
+  } catch {
+    throw new Error('the connection string is not a valid URL (mysql://user:password@host:3306/database)');
+  }
+  if (url.protocol !== 'mysql:' && url.protocol !== 'mariadb:') throw new Error('the connection string must start with mysql:// or mariadb://');
+  const host = url.hostname.replace(/^\[(.*)\]$/, '$1');
+  if (!host) throw new Error('the connection string has no host');
+  const user = decode(url.username, 'user');
+  if (!user) throw new Error('the connection string has no user');
+  const password = url.password ? decode(url.password, 'password') : undefined;
+  const database = url.pathname.length > 1 ? decode(url.pathname.slice(1), 'database') : undefined;
+  let tls = false;
+  for (const [key, value] of url.searchParams) {
+    if (key === 'ssl') {
+      if (!['true', '1', 'false', '0'].includes(value)) throw new Error('ssl in the connection string must be true or false');
+      tls = value === 'true' || value === '1';
+    } else if (key === 'ssl-mode' || key === 'sslmode') {
+      const mode = TLS_MODES[value.toUpperCase()];
+      if (mode === undefined) throw new Error(`ssl-mode in the connection string must be one of ${Object.keys(TLS_MODES).join(', ')}`);
+      tls = mode;
+    } else {
+      throw new Error(`the connection string has an unsupported parameter "${key}" (supported: ssl, ssl-mode)`);
+    }
+  }
+  return {
+    host,
+    port: url.port ? Number(url.port) : 3306,
+    user,
+    ...(password ? { password } : {}),
+    ...(database ? { database } : {}),
+    tls,
+  };
+}
+
+/** The connection options for a form and its values. Exported for tests. */
+export function connectionOptions(form: string, params: ConnectionParams): MysqlOptions {
   if (form === 'dsn') {
     const dsn = text(params, 'dsn');
     if (!dsn) throw new Error('the connection string is empty');
-    return { uri: dsn, ...COMMON };
+    return parseDsn(dsn);
   }
   const host = text(params, 'host');
   const user = text(params, 'user');
@@ -46,19 +96,7 @@ export function connectionOptions(form: string, params: ConnectionParams): Conne
     user,
     database,
     ...(password ? { password } : {}),
-    ...(params.ssl === true ? { ssl: {} } : {}),
-    ...COMMON,
-  };
-}
-
-/** What `connection.query` resolves with (rows, or a header for a write) as the common result. Exported for tests. */
-export function toResult(first: unknown): QueryResult {
-  if (Array.isArray(first)) return { rows: first as Record<string, unknown>[] };
-  const h = (first ?? {}) as { affectedRows?: unknown; insertId?: unknown };
-  return {
-    rows: [],
-    ...(typeof h.affectedRows === 'number' ? { affected: h.affectedRows } : {}),
-    ...(typeof h.insertId === 'number' || typeof h.insertId === 'string' ? (h.insertId ? { insertId: h.insertId } : {}) : {}),
+    tls: params.ssl === true,
   };
 }
 
@@ -72,12 +110,11 @@ export const mysqlDriver: DbDriver = {
     return `${text(params, 'user') ?? '?'}@${text(params, 'host') ?? '?'}:${typeof params.port === 'number' ? params.port : 3306}/${text(params, 'database') ?? '?'}`;
   },
   async connect(form, params) {
-    const conn = await mysql.createConnection(connectionOptions(form, params));
+    const conn = await Connection.open(connectionOptions(form, params));
     return makeSession(
-      // query(), not execute(): transaction statements cannot be prepared, and LIMIT ? fails when prepared.
-      // mysql2 escapes the values itself.
-      async (q) => toResult((await conn.query(q.text, q.values))[0]),
-      () => conn.end(),
+      // Values go as a prepared statement (bound on the server); a statement without values (BEGIN, COMMIT) as text.
+      (q) => (q.values.length ? conn.execute(q.text, q.values) : conn.query(q.text)),
+      () => conn.close(),
     );
   },
 };

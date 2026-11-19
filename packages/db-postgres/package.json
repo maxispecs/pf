@@ -1,6 +1,6 @@
 {
   "name": "@pulpfixer/db-postgres",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "pf database driver: PostgreSQL (pf db, query packages)",
   "license": "MIT",
   "type": "module",
@@ -15,16 +15,12 @@
     "dist"
   ],
   "dependencies": {
-    "@pulpfixer/kit": "workspace:*",
-    "pg": "^8.23.1"
+    "@pulpfixer/kit": "workspace:*"
   },
   "engines": {
     "node": ">=18"
   },
   "publishConfig": {
     "registry": "https://cellars.staging.pangenea.com/"
-  },
-  "devDependencies": {
-    "@types/pg": "^8.23.1"
   }
 }

@@ -1,26 +1,21 @@
 {
   "stack": {
-    "version": "3.15",
+    "version": "3.18",
     "since": "2026-11-19"
   },
   "packages": {
     "packages/db-mysql": {
-      "version": "1.0",
+      "version": "1.1",
       "since": "2026-11-19",
       "type": "node"
     },
     "packages/db-postgres": {
-      "version": "1.0",
-      "since": "2026-11-19",
-      "type": "node"
-    },
-    "packages/db-sqlite": {
-      "version": "1.0",
+      "version": "1.1",
       "since": "2026-11-19",
       "type": "node"
     },
     "packages/docs": {
-      "version": "2.3",
+      "version": "2.4",
       "since": "2026-11-19",
       "type": "node"
     },
@@ -40,7 +35,7 @@
       "type": "node"
     },
     "packages/plugin-db": {
-      "version": "1.0",
+      "version": "1.1",
       "since": "2026-11-19",
       "type": "node"
     },
@@ -65,7 +60,7 @@
       "type": "node"
     },
     "packages/pulpfixer": {
-      "version": "6.14",
+      "version": "6.15",
       "since": "2026-11-19",
       "type": "node"
     }

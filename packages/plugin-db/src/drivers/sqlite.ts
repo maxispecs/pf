@@ -1,5 +1,4 @@
 import { makeSession, type CompiledQuery, type ConnectionForm, type ConnectionParams, type DbDriver, type QueryResult } from '@pulpfixer/kit/db';
-import type { Plugin } from '@pulpfixer/kit/plugin';
 
 const FORMS: ConnectionForm[] = [
   {
@@ -41,6 +40,7 @@ export function runStatement(stmt: Statement, q: CompiledQuery): QueryResult {
   return { rows: [], affected: Number(r.changes), ...(insertId && /^\s*(insert|replace)\b/i.test(q.text) ? { insertId } : {}) };
 }
 
+/** SQLite through Node's own `node:sqlite` (22.13+), loaded on connect so pf still starts on older Node. */
 export const sqliteDriver: DbDriver = {
   id: 'sqlite',
   label: 'SQLite',
@@ -65,12 +65,3 @@ export const sqliteDriver: DbDriver = {
     );
   },
 };
-
-const plugin: Plugin = {
-  name: 'db-sqlite',
-  api: 2,
-  summary: 'SQLite driver for pf db',
-  commands: [],
-  dbDrivers: [sqliteDriver],
-};
-export default plugin;

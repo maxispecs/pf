@@ -4,15 +4,15 @@ title: Database plugin
 
 # Database plugin
 
-The built-in `db` plugin gives every database the same shape: saved connections (`pf db`) and one set of helpers to query, insert and update (`sql`, `Db`). It covers relational databases. Each kind of database is a **driver**, a separate plugin you install when you need it:
+The built-in `db` plugin gives every database the same shape: saved connections (`pf db`) and one set of helpers to query, insert and update (`sql`, `Db`). It covers relational databases. Each kind of database is a **driver**. SQLite comes with pf; the others are separate plugins you install when you need them:
 
 | Package | Plugin name | Database | Needs |
 |---------|-------------|----------|-------|
-| `@pulpfixer/db-postgres` | `db-postgres` | PostgreSQL | `pg` (installed with it) |
-| `@pulpfixer/db-mysql` | `db-mysql` | MySQL and MariaDB | `mysql2` (installed with it) |
-| `@pulpfixer/db-sqlite` | `db-sqlite` | SQLite | Node 22.13 or newer (`node:sqlite`) |
+| built in (`@pulpfixer/plugin-db`) | | SQLite | Node 22.13 or newer (`node:sqlite`); nothing to install |
+| `@pulpfixer/db-postgres` | `db-postgres` | PostgreSQL | nothing: pf speaks the PostgreSQL protocol itself |
+| `@pulpfixer/db-mysql` | `db-mysql` | MySQL and MariaDB | nothing: pf speaks the MySQL protocol itself |
 
-The plugin and the drivers hold no secrets, so anyone can install them. Queries that touch company data live in separate packages, see [Writing a query package](/plugins/writing-a-query-package).
+On an older Node, pf still runs and lists the SQLite driver; only connecting to a SQLite file fails, and says which Node it needs. The plugin and the drivers hold no secrets, so anyone can install them. Queries that touch company data live in separate packages, see [Writing a query package](/plugins/writing-a-query-package).
 
 ```bash
 pf plugin install db-mysql        # a driver, once
@@ -27,7 +27,7 @@ pf db [list] [--json]             # name, driver, a safe summary, where each sec
 pf db add [name] [--driver mysql] [--form dsn] [--<field> value ...] [--secret-from keychain|env:NAME|prompt] [--no-test] [--yes]
 pf db remove <name> [--yes]       # also deletes its keychain entries
 pf db test [name]                 # connect and run SELECT 1
-pf db drivers                     # installed drivers, and the ones you can install
+pf db drivers                     # built-in and installed drivers, and the ones you can install
 ```
 
 ### Adding a connection
@@ -37,7 +37,7 @@ The **driver** says what to ask. A driver offers one or more *forms*, and each f
 - MySQL and PostgreSQL: `params` (host, port, user, password, database, TLS) or `dsn` (one connection string).
 - SQLite: `file` (the file, read-only or not).
 
-In a terminal `pf db add` asks for each field of the form you pick, then connects once to check the values. Without a terminal, give everything as flags. A field's flag is its key in kebab case:
+In a terminal `pf db add` first asks which driver, listing the drivers you can still install too (picking one of those prints its `pf plugin install` command), then asks for each field of the form you pick, then connects once to check the values. Without a terminal and without `--driver`, the only driver there is (SQLite, until you install another) is used. Without a terminal, give everything as flags. A field's flag is its key in kebab case:
 
 ```bash
 pf db add billing --driver mysql --host db.internal --user report --database billing --secret-from env:BILLING_DB_PASSWORD
@@ -46,6 +46,28 @@ pf db add legacy  --driver postgres --form dsn --secret-from env:LEGACY_DSN
 ```
 
 The form is chosen from the flags you give (`--host` means `params`); `--form` says it outright. A connection that fails its check is not saved unless you confirm (or pass `--no-test`).
+
+### MySQL and MariaDB
+
+`db-mysql` has no npm dependency: it speaks the MySQL protocol itself, on Node's `net`, `tls` and `crypto`.
+
+- **Logins:** `mysql_native_password`, `caching_sha2_password` (MySQL 8's default; without TLS the password goes RSA-encrypted with the server's key) and MariaDB's `client_ed25519`. Any other plugin is refused by name.
+- **TLS** (`--ssl`, or `?ssl=true` in a DSN) always verifies the server certificate against the host name. Add a private CA with `NODE_EXTRA_CA_CERTS`. A server that does not offer TLS is refused, never used in the clear.
+- **DSN:** `mysql://user:password@host:3306/database` (or `mariadb://`; percent-encode special characters in the user and password). Only `ssl=true|false` and `ssl-mode=DISABLED|REQUIRED|VERIFY_CA|VERIFY_IDENTITY` are accepted after `?`, and every TLS mode verifies. Any other parameter is an error, so a setting is never ignored silently.
+- **Values** go as a server-side prepared statement, bound by the server. A statement without values is sent as plain text.
+- **Types:** integers and floats are numbers. BIGINT beyond 2^53 and every DECIMAL are strings, so they stay exact. DATE / DATETIME / TIMESTAMP are local-time `Date`s (a zero date is an invalid `Date`) and TIME is a string. JSON is parsed. Binary columns, BIT and GEOMETRY are bytes.
+- pf never offers `LOAD DATA LOCAL INFILE` (a server asking for a file gets nothing) or several statements in one string.
+
+### PostgreSQL
+
+`db-postgres` has no npm dependency either: it speaks the PostgreSQL protocol (version 3) itself, on Node's `net`, `tls` and `crypto`. Values come back as they did with `node-postgres`, so query packages see no difference.
+
+- **Logins:** SCRAM-SHA-256 (the default since PostgreSQL 14; pf also checks the server's proof that it knows the password), MD5 and cleartext passwords, or none (`trust`). Kerberos, GSSAPI, SSPI and client certificates are refused by name.
+- **TLS** (`--ssl`, or `sslmode` in a DSN) always verifies the server certificate against the host name. Add a private CA (Amazon RDS, a company CA) with `NODE_EXTRA_CA_CERTS`. `sslmode=require`, `verify-ca` and `verify-full` refuse a server without TLS; `prefer` uses TLS when the server offers it (verified) and plain text when it does not; `disable` and `allow` (and no `sslmode`) never use it.
+- **DSN:** `postgres://user:password@host:5432/database` (or `postgresql://`; percent-encode special characters). An empty database is the user's name. A Unix socket is a directory as the host: `?host=/var/run/postgresql` or `postgres://user@%2Fvar%2Frun%2Fpostgresql/db`. Only `sslmode`, `ssl`, `host`, `port`, `application_name` and `connect_timeout` (seconds, default 10) are accepted after `?`; any other parameter (`sslrootcert`, `options`, ...) is an error, so a setting is never ignored silently. The `key=value` form is not supported.
+- **Values** are bound by the server (extended query protocol, one unnamed statement per call), in text form: a `Date` goes with its time zone offset, bytes as `bytea`, an array as an array literal, any other object as JSON.
+- **Types:** `int2`, `int4`, `oid`, `float4` and `float8` are numbers; `int8` and `numeric` are strings, so they stay exact. `bool` is a boolean, `json` / `jsonb` are parsed and `bytea` is bytes. `date` and `timestamp` are local-time `Date`s and `timestamptz` an exact `Date` (`infinity` is `Infinity`). Arrays of those are arrays. Every other type (`interval`, `time`, `uuid`, `inet`, ...) is its text.
+- pf never runs `COPY` (it is refused and the connection stays usable) and runs one statement per call.
 
 ### Where secrets live
 
@@ -113,4 +135,4 @@ const plugin: Plugin = { name: 'db-mydb', api: 2, summary: 'My database driver',
 export default plugin;
 ```
 
-pf registers a driver when it loads the plugin, in a registry that every plugin's copy of the kit shares. A driver may have npm dependencies (`pg`, `mysql2`): they install into `~/.pf/plugins` with it. Everything else in pf has none.
+pf registers a driver when it loads the plugin, in a registry that every plugin's copy of the kit shares. A driver may have npm dependencies: they install into `~/.pf/plugins` with it. pf's own drivers have none (PostgreSQL and MySQL speak their protocols themselves), and SQLite, built on Node's own `node:sqlite`, is small enough to live inside `@pulpfixer/plugin-db` (`src/drivers/sqlite.ts`) instead of in a package of its own.

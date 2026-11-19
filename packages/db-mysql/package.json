@@ -1,6 +1,6 @@
 {
   "name": "@pulpfixer/db-mysql",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "pf database driver: MySQL and MariaDB (pf db, query packages)",
   "license": "MIT",
   "type": "module",
@@ -15,8 +15,7 @@
     "dist"
   ],
   "dependencies": {
-    "@pulpfixer/kit": "workspace:*",
-    "mysql2": "^3.24.6"
+    "@pulpfixer/kit": "workspace:*"
   },
   "engines": {
     "node": ">=18"

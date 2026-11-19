@@ -8,7 +8,7 @@ import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tsc = path.join(root, 'node_modules', '.bin', 'tsc');
-const PACKAGES = ['kit', 'plugin-aws', 'plugin-db', 'plugin-system', 'plugin-yubikey', 'db-postgres', 'db-mysql', 'db-sqlite', 'pulpfixer'];
+const PACKAGES = ['kit', 'plugin-aws', 'plugin-db', 'plugin-system', 'plugin-yubikey', 'db-postgres', 'db-mysql', 'pulpfixer'];
 
 for (const name of PACKAGES) {
   const dir = path.join(root, 'packages', name);

@@ -3,13 +3,21 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { bindValue, runStatement, sqliteDriver } from '../src/index.js';
+import { validateDbDriver } from '@pulpfixer/kit/db';
+import { bindValue, runStatement, sqliteDriver } from '../src/drivers/sqlite.js';
+import { dbPlugin } from '../src/index.js';
 
 const hasSqlite = (() => {
   const [major = 0, minor = 0] = process.versions.node.split('.').map(Number);
   return major > 22 || (major === 22 && minor >= 13);
 })();
 const q = (text: string, ...values: unknown[]) => ({ text, values });
+
+test('the db plugin ships the SQLite driver', () => {
+  assert.equal(dbPlugin.api, 2);
+  assert.deepEqual(dbPlugin.dbDrivers?.map((d) => d.id), ['sqlite']);
+  assert.equal(validateDbDriver(sqliteDriver), null);
+});
 
 test('bindValue converts what SQLite cannot take and refuses the rest', () => {
   assert.equal(bindValue(true), 1);

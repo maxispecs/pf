@@ -1,4 +1,5 @@
 import { dbDriver, dbDrivers, findForm, type CompiledQuery, type ConnectionParams, type DbDriver, type DbSession, type Dialect, type QueryResult } from '@pulpfixer/kit/db';
+import { KNOWN_DRIVERS } from './drivers/index.js';
 import { DbError } from './errors.js';
 import { resolveSecret } from './secrets.js';
 import { getConnection, loadConnections, type Connection } from './store.js';
@@ -81,7 +82,8 @@ export function driverFor(id: string): DbDriver {
   const d = dbDriver(id);
   if (d) return d;
   const have = dbDrivers().map((x) => x.id);
-  throw new DbError(`no database driver "${id}" is installed${have.length ? ` (have: ${have.join(', ')})` : ''}`, `pf plugin install db-${id}`);
+  const known = KNOWN_DRIVERS.some((k) => k.id === id);
+  throw new DbError(`no database driver "${id}" is installed${have.length ? ` (have: ${have.join(', ')})` : ''}`, known ? `pf plugin install db-${id}` : 'pf db drivers');
 }
 
 /** The values a driver is called with: the saved ones plus every secret, read from where it lives. */

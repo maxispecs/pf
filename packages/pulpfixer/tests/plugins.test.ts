@@ -82,7 +82,7 @@ test('drivers and query packages install from the @pulpfixer scope under their o
   assert.equal(pluginOfPackage('@pulpfixer/kit'), null);
   assert.equal(pluginOfPackage('@pulpfixer/plugin-aws'), null);
   assert.equal(pluginOfPackage('@pulpfixer/db-'), null);
-  assert.ok(isPluginPackage('@pulpfixer/db-sqlite'));
+  assert.ok(isPluginPackage('@pulpfixer/db-mysql'));
   assert.ok(!isPluginPackage('@pulpfixer/preset-cursor'));
   assert.ok(isQueryPackage('@pulpfixer/query-revrec'));
   assert.ok(!isQueryPackage('@pulpfixer/db-mysql'));

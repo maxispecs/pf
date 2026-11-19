@@ -9,6 +9,7 @@ import { badge, table, termLine } from '@pulpfixer/kit/ui/text';
 import { interactive, takeFlag, takeOption } from '@pulpfixer/kit/util';
 import { flagName, takeBool } from '../args.js';
 import { driverFor, resolveParams } from '../client.js';
+import { BUILTIN_DRIVERS, KNOWN_DRIVERS } from '../drivers/index.js';
 import { DbError } from '../errors.js';
 import {
   describeRef,
@@ -19,12 +20,9 @@ import {
 } from '../secrets.js';
 import { checkName, getConnection, loadConnections, plainParams, putConnection, removeConnection, type Connection } from '../store.js';
 
-/** Drivers published for pf, shown by `pf db drivers` when they are not installed. Installed: `pf plugin install db-<id>`. */
-export const KNOWN_DRIVERS = [
-  { id: 'postgres', label: 'PostgreSQL' },
-  { id: 'mysql', label: 'MySQL and MariaDB' },
-  { id: 'sqlite', label: 'SQLite' },
-] as const;
+export { KNOWN_DRIVERS };
+
+const isBuiltin = (d: DbDriver) => BUILTIN_DRIVERS.some((b) => b.id === d.id);
 
 type Value = string | number | boolean;
 
@@ -90,7 +88,7 @@ function showList(args: string[]): number {
 function showDrivers(): number {
   const c = out();
   const installed = dbDrivers();
-  const rows = installed.map((d) => [d.id, d.dialect, d.label, d.forms.map((f) => f.id).join(', '), c.green('installed')]);
+  const rows = installed.map((d) => [d.id, d.dialect, d.label, d.forms.map((f) => f.id).join(', '), c.green(isBuiltin(d) ? 'built in' : 'installed')]);
   for (const k of KNOWN_DRIVERS) {
     if (!dbDriver(k.id)) rows.push([k.id, '', k.label, '', `pf plugin install db-${k.id}`]);
   }
@@ -107,11 +105,20 @@ async function chooseDriver(id: string | undefined): Promise<DbDriver | number> 
     return fail(`the "${id}" database driver is not installed`, known ? `pf plugin install db-${id}` : `pf db drivers`);
   }
   const all = dbDrivers();
-  if (all.length === 0) return fail('no database driver is installed', `pf plugin install db-${KNOWN_DRIVERS[0].id}   (or db-mysql, db-sqlite: see pf db drivers)`);
-  if (all.length === 1) return all[0]!;
-  if (!interactive()) return usageError(`say which driver: pf db add <name> --driver ${all.map((d) => d.id).join('|')}`);
-  const chosen = await pick('Database driver', all.map((d) => ({ value: d, label: d.id, hint: d.label })));
-  return chosen ?? (say(err().dim('cancelled')), 130);
+  if (all.length === 0) return fail('no database driver is installed', 'pf db drivers');
+  const missing = KNOWN_DRIVERS.filter((k) => !dbDriver(k.id));
+  if (!interactive()) {
+    if (all.length === 1) return all[0]!;
+    return usageError(`say which driver: pf db add <name> --driver ${all.map((d) => d.id).join('|')}`);
+  }
+  if (all.length === 1 && missing.length === 0) return all[0]!;
+  const chosen = await pick<DbDriver | string>('Database driver', [
+    ...all.map((d) => ({ value: d, label: d.id, hint: d.label })),
+    ...missing.map((k) => ({ value: k.id, label: k.id, hint: `${k.label} (not installed)` })),
+  ]);
+  if (chosen === null) return (say(err().dim('cancelled')), 130);
+  if (typeof chosen === 'string') return fail(`the "${chosen}" database driver is not installed`, `pf plugin install db-${chosen}`);
+  return chosen;
 }
 
 /** The form to use: `--form`, else the one that fits the flags given, else ask (several) or the first. */
