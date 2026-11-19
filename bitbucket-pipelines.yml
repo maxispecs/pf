@@ -1,0 +1,61 @@
+# Bitbucket Pipelines: check every push, publish to the cellars staging registry on demand.
+#
+# The publish step is the same thing `pf publish staging` / `pf ps` runs locally: `pnpm run publish:cellars`
+# (scripts/release.mjs --publish). It publishes every package whose version the registry lacks, in dependency
+# order, so bump first (`pnpm ver bump <package> minor`) and push; the release script fails when core pins a
+# changed dependency without a new core, or when every version is already published.
+#
+# Setup (Repository settings -> Pipelines -> Repository variables):
+#   NPM_TOKEN   token for https://cellars.staging.pangenea.com/ (mark it Secured). The repo .npmrc reads
+#               it as ${NPM_TOKEN}; scripts/release.mjs checks it with `npm whoami` before publishing.
+#
+# Locally `pf ps` always asks before publishing, so here the publish step is `trigger: manual` on main: a
+# person presses Run on the pipeline. Delete the `trigger: manual` line to publish on every push to main.
+
+image: node:22
+
+definitions:
+  caches:
+    pnpm: ~/.local/share/pnpm/store
+  steps:
+    - step: &check
+        name: Typecheck, test, build
+        caches:
+          - pnpm
+        script:
+          - npm install -g pnpm@12
+          # the docs site (Amplify builds it) is not part of the checks or the release
+          - pnpm install --frozen-lockfile --filter '!@pulpfixer/docs'
+          - pnpm run typecheck
+          - pnpm run test
+          - pnpm run build
+    - step: &publish-staging
+        name: Publish to cellars (staging)
+        deployment: staging
+        trigger: manual
+        caches:
+          - pnpm
+        script:
+          - npm install -g pnpm@12
+          - pnpm install --frozen-lockfile --filter '!@pulpfixer/docs'
+          - test -n "$NPM_TOKEN" || { echo "NPM_TOKEN is not set (Repository settings -> Pipelines -> Repository variables)"; exit 1; }
+          # checks (typecheck, test, build), then pnpm publish of every new version
+          - pnpm run publish:cellars
+
+pipelines:
+  default:
+    - step: *check
+  branches:
+    main:
+      - step: *check
+      - step: *publish-staging
+  pull-requests:
+    '**':
+      - step: *check
+  # Run from the Bitbucket UI (Pipelines -> Run pipeline -> Custom) to publish from any branch.
+  # The first step of a pipeline cannot be manual, so this one drops the trigger.
+  custom:
+    publish-staging:
+      - step:
+          <<: *publish-staging
+          trigger: automatic

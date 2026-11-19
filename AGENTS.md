@@ -79,6 +79,7 @@ New built-in plugin: `packages/plugin-<name>` (copy `plugin-aws`'s package.json 
 | `scripts/gif-frame.mjs` | pulls one frame (middle by default) out of a GIF as a PNG with transparency, optional `--crop`; source pictures for art generators like `travolta-art.mjs` (no dependencies) |
 | `scripts/build.mjs`, `test.mjs` | build / test every package |
 | `scripts/release.mjs` | check, build, dry-run publish of every unpublished package (`--publish` for real) |
+| `bitbucket-pipelines.yml` | Bitbucket Pipelines: typecheck, test and build on every push and pull request; on `main` a manual `Publish to cellars (staging)` step runs `pnpm run publish:cellars` (what `pf ps` runs locally; needs the secured repository variable `NPM_TOKEN`), also available as the custom pipeline `publish-staging`. Skips the docs package (Amplify builds it) |
 
 ## Commands
 
