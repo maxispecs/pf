@@ -38,6 +38,15 @@ test('a preset is bumped alone: core does not pin presets', () => {
   assert.deepEqual(ahead, []);
 });
 
+test('a database driver is bumped alone too: core does not pin @pulpfixer/db-*', () => {
+  const plan = planBumps([pkg('@pulpfixer/db-mysql', { changes: ['packages/db-mysql/src/index.ts'] }), pkg('pulpfixer')]);
+  assert.deepEqual(plan.map((b) => b.pkg.name), ['@pulpfixer/db-mysql']);
+  assert.deepEqual(planBumps([pkg('@pulpfixer/db-sqlite', { local: '1.1.0' }), pkg('pulpfixer')]), []);
+  // plugin-db is a built-in plugin: core pins it and goes along.
+  const core = planBumps([pkg('@pulpfixer/plugin-db', { changes: ['packages/plugin-db/src/sql.ts'] }), pkg('pulpfixer')]);
+  assert.deepEqual(core.map((b) => b.pkg.name), ['@pulpfixer/plugin-db', 'pulpfixer']);
+});
+
 test('a suite extension is bumped alone too: core does not pin @pulpfixer/ext-*', () => {
   const plan = planBumps([pkg('@pulpfixer/ext-bg-tone', { changes: ['packages/ext-bg-tone/src/apply.ts'] }), pkg('pulpfixer')]);
   assert.deepEqual(plan.map((b) => b.pkg.name), ['@pulpfixer/ext-bg-tone']);

@@ -32,9 +32,10 @@ const die = (s) => {
 // token saved by `npm login` is shadowed. When NPM_TOKEN is unset, load it from the user .npmrc into this
 // process's environment (child processes inherit it). The value is never printed.
 const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: root, stdio: 'inherit', ...opts });
-const ORDER = ['kit', 'plugin-aws', 'plugin-system', 'plugin-yubikey', 'ext-bg-tone', 'preset-cursor', 'preset-suite', 'pulpfixer'];
-// Presets (data) and suite extensions (a .vsix) are fetched by `pf sys` at their latest version, so core does not pin them.
-const isPreset = (p) => p.name.startsWith('@pulpfixer/preset-') || p.name.startsWith('@pulpfixer/ext-');
+const ORDER = ['kit', 'plugin-aws', 'plugin-db', 'plugin-system', 'plugin-yubikey', 'db-postgres', 'db-mysql', 'db-sqlite', 'ext-bg-tone', 'preset-cursor', 'preset-suite', 'pulpfixer'];
+// Presets (data), suite extensions (a .vsix) and database drivers (registry plugins, `pf plugin install db-<name>`) are
+// fetched at their latest version, so core does not pin them.
+const isPreset = (p) => ['preset-', 'ext-', 'db-'].some((k) => p.name.startsWith(`@pulpfixer/${k}`));
 const capture = (cmd, args) => spawnSync(cmd, args, { cwd: root, encoding: 'utf8' });
 
 function userNpmrcToken() {

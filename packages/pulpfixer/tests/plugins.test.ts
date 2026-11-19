@@ -3,10 +3,12 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { clearDbDrivers, dbDriver } from '@pulpfixer/kit/db';
 import { allCommands } from '../src/commands/index.js';
-import { loadFailures, loadInstalledPlugins, loadedPlugins, validatePlugin } from '../src/plugins/loader.js';
+import { loadFailures, loadInstalledPlugins, loadedPlugins, registerPluginDrivers, validatePlugin } from '../src/plugins/loader.js';
 import { builtinRows } from '../src/plugins/manage.js';
-import { builtinOfPackage, builtinPackage, bundledVersion, candidatePackages, entryOf, installArgv, installedPlugins, parseSpec, pickBuiltinPackages, pickPluginPackages, pluginOfPackage, uninstallArgv } from '../src/plugins/registry.js';
+import { BUILTIN_PLUGINS } from '../src/plugins/index.js';
+import { builtinOfPackage, builtinPackage, bundledVersion, candidatePackages, entryOf, installArgv, installedPlugins, isPluginPackage, isQueryPackage, parseSpec, pickBuiltinPackages, pickPluginPackages, pluginOfPackage, uninstallArgv } from '../src/plugins/registry.js';
 import { json, mkRepo } from './helpers.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -71,6 +73,63 @@ test('npm argv installs and removes inside the plugins prefix', () => {
     assert.deepEqual(uninstallArgv('@pf-plugins/jira').slice(0, 3), ['npm', 'uninstall', '@pf-plugins/jira']);
   } finally {
     delete process.env.PF_HOME;
+  }
+});
+
+test('drivers and query packages install from the @pulpfixer scope under their own names', () => {
+  assert.equal(pluginOfPackage('@pulpfixer/db-mysql'), 'db-mysql');
+  assert.equal(pluginOfPackage('@pulpfixer/query-revrec'), 'query-revrec');
+  assert.equal(pluginOfPackage('@pulpfixer/kit'), null);
+  assert.equal(pluginOfPackage('@pulpfixer/plugin-aws'), null);
+  assert.equal(pluginOfPackage('@pulpfixer/db-'), null);
+  assert.ok(isPluginPackage('@pulpfixer/db-sqlite'));
+  assert.ok(!isPluginPackage('@pulpfixer/preset-cursor'));
+  assert.ok(isQueryPackage('@pulpfixer/query-revrec'));
+  assert.ok(!isQueryPackage('@pulpfixer/db-mysql'));
+  // A query package has one possible home: it is never looked up under another scope.
+  assert.deepEqual(candidatePackages('db-mysql'), ['@pulpfixer/db-mysql']);
+  assert.deepEqual(candidatePackages('query-revrec'), ['@pulpfixer/query-revrec']);
+  assert.deepEqual(candidatePackages('@pulpfixer/query-revrec'), ['@pulpfixer/query-revrec']);
+  assert.deepEqual(candidatePackages('dbx'), ['@pf-plugins/dbx', '@pf-plugins-dbx/dbx']);
+  const picked = pickPluginPackages([
+    { name: '@pulpfixer/db-mysql', version: '1.0.0', description: 'driver' },
+    { name: '@pulpfixer/query-revrec', version: '1.2.0' },
+    { name: '@pulpfixer/kit', version: '6.8.0' },
+    { name: '@pulpfixer/plugin-aws', version: '5.2.0' },
+  ]);
+  assert.deepEqual(picked.map((p) => [p.name, p.package]), [['db-mysql', '@pulpfixer/db-mysql'], ['query-revrec', '@pulpfixer/query-revrec']]);
+});
+
+test('plugin-db is built in and `pf db` is a command', () => {
+  assert.ok(BUILTIN_PLUGINS.some((p) => p.name === 'db'));
+  assert.ok(allCommands().some((c) => c.name === 'db'));
+});
+
+const DRIVER_JS = (api: string) =>
+  `export default { name: 'db-fakedb', ${api} summary: 'driver', commands: [], dbDrivers: [{ id: 'fakedb', label: 'Fake', dialect: 'sqlite', forms: [{ id: 'file', label: 'File', fields: [] }], describe: () => 'x', connect: async () => ({}) }] };\n`;
+
+test('a driver plugin needs api 2, is validated, and is registered when it loads', async () => {
+  const driver = { id: 'd', label: 'D', dialect: 'sqlite', forms: [{ id: 'f', label: 'F', fields: [] }], describe: () => '', connect: async () => ({}) };
+  const base = { name: 'x', commands: [] };
+  assert.match(validatePlugin({ default: { ...base, dbDrivers: [driver] } }) as string, /needs "api": 2/);
+  assert.match(validatePlugin({ default: { ...base, api: 2, dbDrivers: 'nope' } }) as string, /array/);
+  assert.match(validatePlugin({ default: { ...base, api: 2, dbDrivers: [{ ...driver, dialect: 'oracle' }] } }) as string, /dialect/);
+  assert.equal(typeof validatePlugin({ default: { ...base, api: 2, dbDrivers: [driver] } }), 'object');
+
+  clearDbDrivers();
+  process.env.PF_HOME = homeWith({ '@pulpfixer/db-fakedb': DRIVER_JS('api: 2,'), '@pulpfixer/db-old': DRIVER_JS('').replace('fakedb', 'olddb').replace('db-olddb', 'db-old') });
+  try {
+    await loadInstalledPlugins();
+    assert.equal(dbDriver('fakedb')?.label, 'Fake');
+    assert.equal(dbDriver('olddb'), undefined);
+    assert.match(loadFailures().find((f) => f.package === '@pulpfixer/db-old')!.error, /needs "api": 2/);
+    clearDbDrivers();
+    registerPluginDrivers(loadedPlugins().map((l) => l.plugin));
+    assert.ok(dbDriver('fakedb'));
+  } finally {
+    delete process.env.PF_HOME;
+    clearDbDrivers();
+    await loadInstalledPlugins();
   }
 });
 

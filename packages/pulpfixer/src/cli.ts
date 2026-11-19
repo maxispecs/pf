@@ -11,7 +11,7 @@ import { printActionArt } from './art/index.js';
 import { err, out } from '@pulpfixer/kit/ui/palette';
 import { badge, h2, promptLine, termLine } from '@pulpfixer/kit/ui/text';
 import { BUILTIN_PLUGINS } from './plugins/index.js';
-import { loadInstalledPlugins } from './plugins/loader.js';
+import { loadInstalledPlugins, registerPluginDrivers } from './plugins/loader.js';
 import { cachedLatest, refreshInBackground } from './update/check.js';
 import { version } from '@pulpfixer/kit/version';
 
@@ -77,6 +77,7 @@ function suggest(name: string, ctx: Context): string[] {
 export async function main(argv: string[]): Promise<number> {
   const ctx = buildContext();
   const first = argv[0];
+  registerPluginDrivers(BUILTIN_PLUGINS);
   await loadInstalledPlugins(BUILTIN_PLUGINS.map((p) => p.name));
   // Set by the ./pf launcher. Read it once and drop it so commands pf starts (a global pf) don't inherit it.
   const local = localRoot();

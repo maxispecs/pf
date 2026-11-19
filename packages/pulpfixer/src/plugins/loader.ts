@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { registerDbDrivers, validateDbDriver } from '@pulpfixer/kit/db';
 import { PLUGIN_API, type Plugin } from '@pulpfixer/kit/plugin';
 import { readJson } from '@pulpfixer/kit/util';
 import { entryOf, installedPlugins, type InstalledPlugin } from './registry.js';
@@ -35,7 +36,20 @@ export function validatePlugin(value: unknown): Plugin | string {
   }
   if (p.tools !== undefined && typeof p.tools !== 'function') return 'tools must be a function returning the tool list';
   if (p.api !== undefined && (typeof p.api !== 'number' || p.api > PLUGIN_API)) return `it needs plugin API ${String(p.api)}, this pf has ${PLUGIN_API}: run pf update`;
+  if (p.dbDrivers !== undefined) {
+    if (!Array.isArray(p.dbDrivers)) return 'dbDrivers must be an array of database drivers';
+    if ((p.api ?? 1) < 2) return 'dbDrivers needs "api": 2';
+    for (const d of p.dbDrivers) {
+      const problem = validateDbDriver(d);
+      if (problem) return problem;
+    }
+  }
   return p as Plugin;
+}
+
+/** Make the database drivers of these plugins known to `pf db` and to query packages. */
+export function registerPluginDrivers(plugins: readonly Plugin[]): void {
+  for (const p of plugins) if (p.dbDrivers?.length) registerDbDrivers(p.dbDrivers);
 }
 
 async function loadOne(info: InstalledPlugin): Promise<LoadedPlugin | string> {
@@ -69,6 +83,7 @@ export async function loadInstalledPlugins(reservedNames: string[] = []): Promis
     } else {
       taken.add(r.plugin.name);
       loaded.push(r);
+      registerPluginDrivers([r.plugin]);
     }
   }
 }

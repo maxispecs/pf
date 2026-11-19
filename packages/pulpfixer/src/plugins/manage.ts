@@ -15,6 +15,7 @@ import {
   installArgv,
   installedPlugins,
   parseSpec,
+  pluginOfPackage,
   pluginsDir,
   searchBuiltins,
   searchRemote,
@@ -156,7 +157,8 @@ export async function removePlugins(names: string[], opts: { dryRun?: boolean } 
   let fails = 0;
   const all = installedPlugins();
   for (const n of names) {
-    const name = parseSpec(n).name.replace(/^@pf-plugins(?:-[^/]+)?\//, '');
+    const given = parseSpec(n).name;
+    const name = pluginOfPackage(given) ?? given.replace(/^@pf-plugins(?:-[^/]+)?\//, '');
     const hit = all.find((p) => p.name === name);
     if (!hit) {
       r.warn(BUILTIN_PLUGINS.some((b) => b.name === name) ? `${name} is built into pf and cannot be removed` : `${name} is not installed (pf plugin list)`);

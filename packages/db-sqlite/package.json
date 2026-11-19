@@ -1,0 +1,26 @@
+{
+  "name": "@pulpfixer/db-sqlite",
+  "version": "1.0.0",
+  "description": "pf database driver: SQLite through node:sqlite (pf db, query packages)",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@pulpfixer/kit": "workspace:*"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  }
+}

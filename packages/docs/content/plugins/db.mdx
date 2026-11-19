@@ -1,0 +1,116 @@
+---
+title: Database plugin
+---
+
+# Database plugin
+
+The built-in `db` plugin gives every database the same shape: saved connections (`pf db`) and one set of helpers to query, insert and update (`sql`, `Db`). It covers relational databases. Each kind of database is a **driver**, a separate plugin you install when you need it:
+
+| Package | Plugin name | Database | Needs |
+|---------|-------------|----------|-------|
+| `@pulpfixer/db-postgres` | `db-postgres` | PostgreSQL | `pg` (installed with it) |
+| `@pulpfixer/db-mysql` | `db-mysql` | MySQL and MariaDB | `mysql2` (installed with it) |
+| `@pulpfixer/db-sqlite` | `db-sqlite` | SQLite | Node 22.13 or newer (`node:sqlite`) |
+
+The plugin and the drivers hold no secrets, so anyone can install them. Queries that touch company data live in separate packages, see [Writing a query package](/plugins/writing-a-query-package).
+
+```bash
+pf plugin install db-mysql        # a driver, once
+pf db add billing                 # a connection, asking what the driver needs
+pf db                             # list the connections
+```
+
+## pf db
+
+```bash
+pf db [list] [--json]             # name, driver, a safe summary, where each secret comes from
+pf db add [name] [--driver mysql] [--form dsn] [--<field> value ...] [--secret-from keychain|env:NAME|prompt] [--no-test] [--yes]
+pf db remove <name> [--yes]       # also deletes its keychain entries
+pf db test [name]                 # connect and run SELECT 1
+pf db drivers                     # installed drivers, and the ones you can install
+```
+
+### Adding a connection
+
+The **driver** says what to ask. A driver offers one or more *forms*, and each form is a list of fields:
+
+- MySQL and PostgreSQL: `params` (host, port, user, password, database, TLS) or `dsn` (one connection string).
+- SQLite: `file` (the file, read-only or not).
+
+In a terminal `pf db add` asks for each field of the form you pick, then connects once to check the values. Without a terminal, give everything as flags. A field's flag is its key in kebab case:
+
+```bash
+pf db add billing --driver mysql --host db.internal --user report --database billing --secret-from env:BILLING_DB_PASSWORD
+pf db add local   --driver sqlite --path ./data.db
+pf db add legacy  --driver postgres --form dsn --secret-from env:LEGACY_DSN
+```
+
+The form is chosen from the flags you give (`--host` means `params`); `--form` says it outright. A connection that fails its check is not saved unless you confirm (or pass `--no-test`).
+
+### Where secrets live
+
+`connections.json` (`~/.pf/db/connections.json`, mode 0600) holds the driver, the form, the plain values and, for each secret field (a password, a DSN), only a **reference**:
+
+| Source | What it means |
+|--------|---------------|
+| `keychain` | the OS keychain (macOS `security`, Linux `secret-tool`). The keychain tool asks for the password itself, so it never goes through a command line. Needs a terminal to enter it |
+| `env:NAME` | read from an environment variable each time |
+| `prompt` | typed (hidden) each time, in a terminal |
+
+A secret is never taken from a flag, and `pf db list` never shows one.
+
+## The query helpers
+
+Query packages (and your own scripts) use `@pulpfixer/plugin-db/api`:
+
+```ts
+import { connect, sql } from '@pulpfixer/plugin-db/api';
+
+const db = await connect('billing');
+const rows = await db.all(sql`SELECT product, SUM(amount) AS total FROM revenue WHERE period = ${month} GROUP BY product`);
+await db.insert('audit', { who: 'pf', what: 'report' });
+await db.update('revenue', { checked: 1 }, { id: 42 });
+await db.close();
+```
+
+`sql` is a tagged template: every `${value}` is a bound parameter, never text. Names go through `sql.id('table.column')`; only `sql.raw(...)` inserts text as it is. `undefined` and bare arrays are errors (use `null`, or `sql.list(values)` inside `IN (...)`). The same code runs on every driver: placeholders (`$1` or `?`) and identifier quoting are chosen from the driver's dialect.
+
+| Method | Does |
+|--------|------|
+| `db.all(q)` / `db.one(q)` / `db.value(q)` | all rows / the first row / the first column of the first row |
+| `db.query(q)` | the whole result (`rows`, `affected`, `insertId`) of a read |
+| `db.exec(q)` | run a statement that changes data |
+| `db.insert(table, rowOrRows, { returning })` | one `INSERT` for one or many rows with the same columns |
+| `db.update(table, set, where)` / `db.deleteFrom(table, where)` | `where` is required: an object (`{ id: 3 }`, `null` is `IS NULL`, an array is `IN`) or a `sql` fragment |
+| `db.transaction(async (tx) => ...)` | one transaction: committed on return, rolled back on a throw; nested ones are savepoints |
+
+A statement can also be a plain string (`db.all('SELECT 1')`). `withDb(name, fn)` opens, runs and always closes. `connectWith(driver, form, params)` opens a database from values you hold, without a saved connection. The helpers do not touch the agent: there are no database tools for it, because results can hold user data.
+
+## Writing a driver
+
+A driver is a registry plugin (`@pulpfixer/db-<name>`) that default-exports a plugin with `api: 2` and a `dbDrivers` list. Kit's `@pulpfixer/kit/db` has the contract:
+
+```ts
+import { makeSession, type DbDriver } from '@pulpfixer/kit/db';
+import type { Plugin } from '@pulpfixer/kit/plugin';
+
+const driver: DbDriver = {
+  id: 'mydb',
+  label: 'My database',
+  dialect: 'postgres',                  // 'postgres' | 'mysql' | 'sqlite': picks placeholders and quoting
+  forms: [{ id: 'params', label: 'Host and user', fields: [
+    { key: 'host', label: 'Host', kind: 'text', required: true },
+    { key: 'password', label: 'Password', kind: 'secret' },   // kept as a reference, handed to connect() resolved
+  ] }],
+  describe: (form, params) => String(params.host),             // one safe line for lists: no secrets here
+  async connect(form, params) {
+    const client = await open(params);
+    // execute() runs one compiled statement; makeSession adds transactions (BEGIN / COMMIT / savepoints).
+    return makeSession(async (q) => ({ rows: await client.query(q.text, q.values) }), () => client.close());
+  },
+};
+const plugin: Plugin = { name: 'db-mydb', api: 2, summary: 'My database driver', commands: [], dbDrivers: [driver] };
+export default plugin;
+```
+
+pf registers a driver when it loads the plugin, in a registry that every plugin's copy of the kit shares. A driver may have npm dependencies (`pg`, `mysql2`): they install into `~/.pf/plugins` with it. Everything else in pf has none.

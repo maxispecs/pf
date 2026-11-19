@@ -48,18 +48,33 @@ export function bundledVersion(plugin: string): string {
   return '';
 }
 
-export function isPluginPackage(name: string): boolean {
-  return PACKAGE_RE.test(name);
+/**
+ * Database drivers and query packages live in the company scope next to the built-in plugins:
+ * `@pulpfixer/db-<name>` (a driver for `pf db`, open to everyone) and `@pulpfixer/query-<name>` (queries on
+ * a database; cellars marks the prefix as clearance, so only cleared users can see or install them).
+ * Their plugin name keeps the prefix: `db-mysql`, `query-revrec`.
+ */
+const SCOPED_RE = new RegExp(`^${BUILTIN_SCOPE}/((?:db|query)-${NAME})$`);
+const SCOPED_NAME_RE = new RegExp(`^(?:db|query)-${NAME}$`);
+
+/** `@pulpfixer/query-revrec` -> true. Such packages need clearance on the registry when they are queries. */
+export function isQueryPackage(name: string): boolean {
+  return new RegExp(`^${BUILTIN_SCOPE}/query-${NAME}$`).test(name);
 }
 
-/** `@pf-plugins-jira/jira` -> `jira`. */
+export function isPluginPackage(name: string): boolean {
+  return PACKAGE_RE.test(name) || SCOPED_RE.test(name);
+}
+
+/** `@pf-plugins-jira/jira` -> `jira`; `@pulpfixer/db-mysql` -> `db-mysql`. */
 export function pluginOfPackage(name: string): string | null {
-  return PACKAGE_RE.exec(name)?.[1] ?? null;
+  return PACKAGE_RE.exec(name)?.[1] ?? SCOPED_RE.exec(name)?.[1] ?? null;
 }
 
 /** Package names a plugin may be published under, most likely first. */
 export function candidatePackages(plugin: string): string[] {
   if (isPluginPackage(plugin)) return [plugin];
+  if (SCOPED_NAME_RE.test(plugin)) return [`${BUILTIN_SCOPE}/${plugin}`];
   if (!new RegExp(`^${NAME}$`).test(plugin)) return [];
   return [`${PLUGIN_SCOPE}/${plugin}`, `${PLUGIN_SCOPE}-${plugin}/${plugin}`];
 }
@@ -179,10 +194,15 @@ function search(query: string, timeoutMs: number): { results?: ReturnType<typeof
   return r.ok ? { results: parseSearch(r.stdout) } : { error: npmError(r.stderr) };
 }
 
-/** Every installable plugin on the registry, from `npm search`. */
+/**
+ * Every installable plugin on the registry, from `npm search`: the `@pf-plugins` scope, plus the drivers and
+ * query packages in `@pulpfixer` (a query package only shows for an account with clearance).
+ */
 export function searchRemote(timeoutMs = 30_000): { plugins?: RemotePlugin[]; error?: string } {
-  const r = search(PLUGIN_SCOPE.slice(1), timeoutMs);
-  return r.results ? { plugins: pickPluginPackages(r.results) } : { error: r.error };
+  const mine = search(PLUGIN_SCOPE.slice(1), timeoutMs);
+  const scoped = search(BUILTIN_SCOPE, timeoutMs);
+  if (!mine.results && !scoped.results) return { error: mine.error };
+  return { plugins: pickPluginPackages([...(mine.results ?? []), ...(scoped.results ?? [])]) };
 }
 
 /** Built-in plugins as published on the registry. */
@@ -212,7 +232,12 @@ export function viewRemote(pluginOrPackage: string, version?: string, timeoutMs 
     error = npmError(r.stderr);
     if (!/E404|404/.test(error)) break;
   }
-  return { error: /E404|404/.test(error) ? `no ${candidates.join(' or ')} on the registry` : error };
+  if (/E404|404/.test(error)) {
+    // The registry answers 404 for a package the account may not read, so a query package may only be out of reach.
+    if (candidates.length === 1 && isQueryPackage(candidates[0]!)) return { error: `no ${candidates[0]} on the registry, or your account lacks the clearance to see it` };
+    return { error: `no ${candidates.join(' or ')} on the registry` };
+  }
+  return { error };
 }
 
 /** npm arguments that install `<package>@<version>` into the plugins prefix. */

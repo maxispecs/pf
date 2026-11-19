@@ -1,0 +1,27 @@
+{
+  "name": "@pulpfixer/db-mysql",
+  "version": "1.0.0",
+  "description": "pf database driver: MySQL and MariaDB (pf db, query packages)",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@pulpfixer/kit": "workspace:*",
+    "mysql2": "^3.24.6"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  }
+}

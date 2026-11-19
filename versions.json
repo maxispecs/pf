@@ -1,12 +1,27 @@
 {
   "stack": {
-    "version": "3.14",
+    "version": "3.15",
     "since": "2026-11-19"
   },
   "packages": {
+    "packages/db-mysql": {
+      "version": "1.0",
+      "since": "2026-11-19",
+      "type": "node"
+    },
+    "packages/db-postgres": {
+      "version": "1.0",
+      "since": "2026-11-19",
+      "type": "node"
+    },
+    "packages/db-sqlite": {
+      "version": "1.0",
+      "since": "2026-11-19",
+      "type": "node"
+    },
     "packages/docs": {
-      "version": "2.2",
-      "since": "2026-11-17",
+      "version": "2.3",
+      "since": "2026-11-19",
       "type": "node"
     },
     "packages/ext-bg-tone": {
@@ -15,13 +30,18 @@
       "type": "node"
     },
     "packages/kit": {
-      "version": "6.8",
-      "since": "2026-11-17",
+      "version": "6.9",
+      "since": "2026-11-19",
       "type": "node"
     },
     "packages/plugin-aws": {
       "version": "5.2",
       "since": "2026-11-17",
+      "type": "node"
+    },
+    "packages/plugin-db": {
+      "version": "1.0",
+      "since": "2026-11-19",
       "type": "node"
     },
     "packages/plugin-system": {
@@ -45,7 +65,7 @@
       "type": "node"
     },
     "packages/pulpfixer": {
-      "version": "6.13",
+      "version": "6.14",
       "since": "2026-11-19",
       "type": "node"
     }

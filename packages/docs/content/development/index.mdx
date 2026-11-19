@@ -10,6 +10,8 @@ pf is a pnpm workspace. The shipped packages are versioned together by `versions
 |---------|------|------|
 | `packages/kit` | `@pulpfixer/kit` | Shared foundation: detect, exec, ui, config, util, context and the `Command` / `Plugin` types. Depends on nothing |
 | `packages/plugin-aws` | `@pulpfixer/plugin-aws` | The AWS plugin. Depends only on kit |
+| `packages/plugin-db` | `@pulpfixer/plugin-db` | The database plugin (`pf db`, the `sql` and `Db` helpers, `defineQueries`). Depends only on kit |
+| `packages/db-postgres`, `db-mysql`, `db-sqlite` | `@pulpfixer/db-<name>` | Database drivers: registry plugins with a `dbDrivers` list. The only packages with npm runtime dependencies (`pg`, `mysql2`; SQLite uses `node:sqlite`). Published alone, not a dependency of core |
 | `packages/plugin-system` | `@pulpfixer/plugin-system` | The system plugin (`pf sys`). Depends only on kit |
 | `packages/plugin-yubikey` | `@pulpfixer/plugin-yubikey` | The YubiKey plugin. Depends only on kit |
 | `packages/preset-cursor` | `@pulpfixer/preset-cursor` | Data only: the standard Cursor extensions and settings. Published alone, not a dependency of core: `pf sys apply cursor` fetches its latest version |
@@ -23,6 +25,8 @@ flowchart LR
   core["core (pulpfixer)"] --> awsPlugin[plugin-aws]
   core --> ykPlugin[plugin-yubikey]
   core --> sysPlugin[plugin-system]
+  core --> dbPlugin[plugin-db]
+  dbPlugin --> kit
   core --> kit
   awsPlugin --> kit
   ykPlugin --> kit

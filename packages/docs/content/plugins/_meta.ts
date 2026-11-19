@@ -6,6 +6,8 @@ const meta: MetaRecord = {
   system: 'System plugin',
   'bg-tone': 'Background Tone (suite)',
   yubikey: 'YubiKey plugin',
+  db: 'Database plugin',
+  'writing-a-query-package': 'Writing a query package',
   'writing-a-plugin': 'Writing a plugin',
 }
 

@@ -1,9 +1,13 @@
 import type { Tool } from './agent-tool.js';
+import type { DbDriver } from './db.js';
 import type { Command, Entry } from './types.js';
 import type { Context } from './context.js';
 
-/** The plugin interface revision this kit implements. pf refuses a plugin that asks for a newer one. */
-export const PLUGIN_API = 1;
+/**
+ * The plugin interface revision this kit implements. pf refuses a plugin that asks for a newer one.
+ * Revision 2 added `dbDrivers`.
+ */
+export const PLUGIN_API = 2;
 
 /**
  * A plugin bundles related commands (and optional menu entries) that live outside the core
@@ -21,4 +25,6 @@ export interface Plugin {
   entries?(ctx: Context): Entry[];
   /** Tools this plugin serves to agent CLIs through `pf mcp`. A built-in tool of the same name wins. */
   tools?(ctx: Context): Tool[];
+  /** Database drivers this plugin adds for `pf db` (needs `api: 2`). See `@pulpfixer/kit/db`. */
+  dbDrivers?: DbDriver[];
 }

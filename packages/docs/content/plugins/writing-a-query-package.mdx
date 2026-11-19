@@ -1,0 +1,78 @@
+---
+title: Writing a query package
+---
+
+# Writing a query package
+
+A query package is a plugin that holds the SQL for one job (say, revenue recognition from the billing database) and turns it into a command. It uses the [database plugin](/plugins/db) for connections, drivers and the `sql` helpers, so it contains queries and data handling, nothing about how to connect.
+
+```ts
+// @pulpfixer/query-revrec: src/index.ts
+import { defineQueries, sql } from '@pulpfixer/plugin-db/api';
+
+export default defineQueries({
+  name: 'revrec',
+  summary: 'Revenue recognition from the billing database',
+  connection: 'billing',          // the pf db connection to use (override with --db)
+  driver: 'mysql',                // suggested by the message when the connection is missing
+  queries: {
+    monthly: {
+      summary: 'Recognized revenue per product for a month',
+      params: { month: { required: true, help: 'YYYY-MM' } },
+      run: (db, { month }) => db.all(sql`
+        SELECT product, SUM(amount) AS recognized
+        FROM revenue_schedule
+        WHERE period = ${month}
+        GROUP BY product`),
+    },
+  },
+});
+```
+
+```bash
+pf revrec                                  # lists the queries and their flags
+pf revrec monthly --month 2026-10          # a table
+pf revrec monthly --month 2026-10 --csv    # or --json
+pf revrec monthly --month 2026-10 --db billing-replica
+```
+
+## Queries
+
+Each entry in `queries` has:
+
+| Field | Meaning |
+|-------|---------|
+| `summary` | one line for the list |
+| `params` | the flags it takes, by name |
+| `writes` | `true` when it changes data (see below) |
+| `run(db, params, { ctx, dryRun })` | the query: return the rows (an array of objects, or what `db.query` gives); post-process them in plain TypeScript before returning |
+
+A param is `{ type?: 'string' | 'number' | 'boolean', required?, default?, help?, choices? }`. A param named `productId` is the flag `--product-id`; numbers are checked, a boolean is a bare flag (`--all`, `--no-all`), and `choices` limits the values. A missing required flag stops with the usage line.
+
+Rows print as a table, or as `--json` / `--csv` for a pipe. Money columns arrive as strings from MySQL (DECIMAL stays exact): convert them deliberately, not through floating point.
+
+### Queries that write
+
+A query that changes data must say `writes: true`. Without it, `db.exec`, `db.insert`, `db.update` and `db.deleteFrom` throw, so a read-only query cannot change anything by accident (the check follows the method, not the SQL text). A writing query:
+
+- asks for confirmation before it runs (`--yes` skips it; without a terminal it needs `--yes`);
+- under `--dry-run` runs its reads but only prints its writes (`would run ...`), so you see the statements first.
+
+## Publishing with clearance
+
+Name the package `@pulpfixer/query-<name>` and add `"@pulpfixer/plugin-db"` and `"@pulpfixer/kit"` as dependencies. Cellars treats the `@pulpfixer/query-` prefix as **clearance**: a package first published under it is created restricted, so only users with the clearance role can see or install it, and everyone else gets a 404 (the same as a package that does not exist).
+
+One-time setup, by a cellars administrator: in the cellars admin panel, make the `@pulpfixer/query-` prefix a **clearance prefix** on a project (the project's Scopes tab), so new packages under it start restricted. Marking is not retroactive, so do it before the first publish. An administrator does not get clearance by being an administrator: the clearance role is granted in the identity provider.
+
+For the user:
+
+```bash
+pf plugin install query-revrec     # installs @pulpfixer/query-revrec; "no ... or your account lacks the clearance" when not allowed
+pf db add billing --driver mysql   # the connection it expects, with the credentials the user is entitled to
+```
+
+The driver packages and `@pulpfixer/plugin-db` themselves hold no secrets and stay open to every cellars user.
+
+## Testing
+
+Register a fake driver and run the command, as the plugin's own tests do: `registerDbDrivers([...])` from `@pulpfixer/kit/db`, `putConnection(...)` from `@pulpfixer/plugin-db`, then call the plugin's `commands[0].run(ctx, args)`. With a `PF_HOME` in a temp directory nothing touches your real connections.
