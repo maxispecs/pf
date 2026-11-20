@@ -1,0 +1,16 @@
+# The files/ and scratch/ folders exist in the repo (a .gitkeep in each) but nothing inside them is committed.
+# files/   inputs, outputs and logs: can hold user data
+# scratch/ one-off tools: promote one with `pf wb-promote <name> "<what it does>"` to keep it
+files/*
+!files/.gitkeep
+scratch/*
+!scratch/.gitkeep
+
+# Machine-local
+node_modules/
+.env*
+.DS_Store
+
+# To keep ALL permanent tools out of git too, uncomment the next line.
+# (Files git already tracks stay tracked: also run  git rm -r --cached tools )
+# tools/

@@ -1,0 +1,20 @@
+{
+  "name": "workbench",
+  "commands": {
+    "ddb-check": {
+      "run": "node tools/ddb-check/index.mjs",
+      "description": "Check a saved DynamoDB connection (--connection=NAME)",
+      "group": "Tools"
+    },
+    "wb-new": {
+      "run": "node tools/wb-new/index.mjs",
+      "description": "Start a one-off tool in scratch/ from the template: wb-new <name>",
+      "group": "Workbench"
+    },
+    "wb-promote": {
+      "run": "node tools/wb-promote/index.mjs",
+      "description": "Make a scratch tool permanent: wb-promote <name> \"<what it does>\"",
+      "group": "Workbench"
+    }
+  }
+}

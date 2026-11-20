@@ -1,0 +1,26 @@
+{
+  "name": "@pulpfixer/db-dynamodb",
+  "version": "1.0.0",
+  "description": "pf database driver: Amazon DynamoDB through PartiQL (pf db, query packages)",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@pulpfixer/kit": "workspace:*"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  }
+}

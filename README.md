@@ -51,7 +51,7 @@ Afterwards, `pf doctor` checks the machine and `pf rp` (in a repo) hooks pf's he
 | `packages/kit` | `@pulpfixer/kit` | shared foundation: repo/stack detection, exec, ui, config, `Command`/`Plugin` types |
 | `packages/plugin-aws` | `@pulpfixer/plugin-aws` | AWS plugin (`pf s3`, `pf dl`, `pf aws`, the agent's `pf_aws_*` tools) |
 | `packages/plugin-yubikey` | `@pulpfixer/plugin-yubikey` | YubiKey plugin (`pf otp`, `pf yk`) |
-| `packages/plugin-db` | `@pulpfixer/plugin-db` | database plugin (`pf db`, query helpers, the built-in SQLite driver); drivers `packages/db-postgres`, `db-mysql` are separate plugins |
+| `packages/plugin-db` | `@pulpfixer/plugin-db` | database plugin (`pf db`, query helpers, the built-in SQLite driver); drivers `packages/db-postgres`, `db-mysql`, `db-dynamodb` are separate plugins |
 | `packages/pulpfixer` | `pulpfixer` | the `pf` binary: dispatch, built-in commands, agent, host mode, skills |
 | `packages/docs` | `@pulpfixer/docs` | the documentation site (Nextra); private, never published |
 

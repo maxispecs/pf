@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { compile, conditions, deleteFrom, insert, sql, SqlError, update, where } from '../src/sql.js';
+import { compile, conditions, deleteFrom, insert, insertItem, sql, SqlError, update, where } from '../src/sql.js';
 
 test('values become placeholders per dialect, never text', () => {
   const evil = "x'; DROP TABLE orders; --";
@@ -68,4 +68,23 @@ test('update and delete need a where', () => {
   assert.throws(() => update('users', { a: 1 }, {}), /needs a where/);
   assert.throws(() => deleteFrom('users', {}), /needs a where/);
   assert.equal(compile(update('users', { a: 1 }, sql`created < ${7}`), 'sqlite').text, 'UPDATE "users" SET "a" = ? WHERE created < ?');
+});
+
+test('DynamoDB (PartiQL): question-mark placeholders, double-quoted names, VALUE {} inserts', () => {
+  const evil = "x'; DROP TABLE orders; --";
+  assert.deepEqual(compile(sql`SELECT * FROM ${sql.id('orders')} WHERE pk = ${evil}`, 'dynamodb'), { text: 'SELECT * FROM "orders" WHERE pk = ?', values: [evil] });
+  assert.deepEqual(compile(insertItem('users', { id: 'a', age: 3, note: null }), 'dynamodb'), {
+    text: `INSERT INTO "users" VALUE {'id': ?, 'age': ?, 'note': ?}`,
+    values: ['a', 3, null],
+  });
+  assert.equal(compile(insertItem('t', [{ "it's": 1 }]), 'dynamodb').text, `INSERT INTO "t" VALUE {'it''s': ?}`);
+  assert.deepEqual(compile(update('t', { n: 2 }, { pk: 'a' }), 'dynamodb'), { text: 'UPDATE "t" SET "n" = ? WHERE "pk" = ?', values: [2, 'a'] });
+  assert.deepEqual(compile(deleteFrom('t', { pk: 'a' }), 'dynamodb'), { text: 'DELETE FROM "t" WHERE "pk" = ?', values: ['a'] });
+});
+
+test('DynamoDB inserts one item per statement and has no RETURNING', () => {
+  assert.throws(() => insertItem('t', [{ a: 1 }, { a: 2 }]), /one item per statement/);
+  assert.throws(() => insertItem('t', { a: 1 }, { returning: 'a' }), /no RETURNING/);
+  assert.throws(() => insertItem('t', {}), /no columns/);
+  assert.throws(() => insertItem('t', { a: undefined }), /undefined/);
 });
