@@ -21,6 +21,12 @@ importers:
         specifier: ^7.0.0
         version: 7.0.2
 
+  packages/db-dynamodb:
+    dependencies:
+      '@pulpfixer/kit':
+        specifier: workspace:*
+        version: link:../kit
+
   packages/db-mysql:
     dependencies:
       '@pulpfixer/kit':
@@ -192,6 +198,18 @@ importers:
       '@pulpfixer/plugin-db':
         specifier: workspace:*
         version: link:../plugin-db
+
+  workbench:
+    dependencies:
+      '@pulpfixer/db-dynamodb':
+        specifier: workspace:*
+        version: link:../packages/db-dynamodb
+      '@pulpfixer/kit':
+        specifier: workspace:*
+        version: link:../packages/kit
+      '@pulpfixer/plugin-db':
+        specifier: workspace:*
+        version: link:../packages/plugin-db
 
 packages:
 

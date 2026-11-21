@@ -4,13 +4,14 @@ title: Database plugin
 
 # Database plugin
 
-The built-in `db` plugin gives every database the same shape: saved connections (`pf db`) and one set of helpers to query, insert and update (`sql`, `Db`). It covers relational databases. Each kind of database is a **driver**. SQLite comes with pf; the others are separate plugins you install when you need them:
+The built-in `db` plugin gives every database the same shape: saved connections (`pf db`) and one set of helpers to query, insert and update (`sql`, `Db`). It covers relational databases and, through PartiQL, DynamoDB. Each kind of database is a **driver**. SQLite comes with pf; the others are separate plugins you install when you need them:
 
 | Package | Plugin name | Database | Needs |
 |---------|-------------|----------|-------|
 | built in (`@pulpfixer/plugin-db`) | | SQLite | Node 22.13 or newer (`node:sqlite`); nothing to install |
 | `@pulpfixer/db-postgres` | `db-postgres` | PostgreSQL | nothing: pf speaks the PostgreSQL protocol itself |
 | `@pulpfixer/db-mysql` | `db-mysql` | MySQL and MariaDB | nothing: pf speaks the MySQL protocol itself |
+| `@pulpfixer/db-dynamodb` | `db-dynamodb` | Amazon DynamoDB (PartiQL) | nothing to install: pf speaks the DynamoDB API itself; SSO and assume-role profiles use the `aws` CLI |
 
 On an older Node, pf still runs and lists the SQLite driver; only connecting to a SQLite file fails, and says which Node it needs. The plugin and the drivers hold no secrets, so anyone can install them. Queries that touch company data live in separate packages, see [Writing a query package](/plugins/writing-a-query-package).
 
@@ -74,6 +75,24 @@ The form is chosen from the flags you give (`--host` means `params`); `--form` s
 - **Values** are bound by the server (extended query protocol, one unnamed statement per call), in text form: a `Date` goes with its time zone offset, bytes as `bytea`, an array as an array literal, any other object as JSON.
 - **Types:** `int2`, `int4`, `oid`, `float4` and `float8` are numbers; `int8` and `numeric` are strings, so they stay exact. `bool` is a boolean, `json` / `jsonb` are parsed and `bytea` is bytes. `date` and `timestamp` are local-time `Date`s and `timestamptz` an exact `Date` (`infinity` is `Infinity`). Arrays of those are arrays. Every other type (`interval`, `time`, `uuid`, `inet`, ...) is its text.
 - pf never runs `COPY` (it is refused and the connection stays usable) and runs one statement per call.
+
+### Amazon DynamoDB
+
+`db-dynamodb` has no npm dependency (no AWS SDK): it speaks the DynamoDB JSON API itself over Node's `https`, signs every request with AWS Signature Version 4 on `crypto`, and runs your statements as **PartiQL** (`ExecuteStatement`). Its dialect is `dynamodb`: `?` placeholders and `"double-quoted"` names, so the `sql` helper, `Db` and `defineQueries` work as they do for the other drivers.
+
+```bash
+pf db add orders --driver dynamodb --region eu-west-1 --profile acme   # an AWS profile
+pf db add local --driver dynamodb --form keys --region local --endpoint http://localhost:8000 --access-key-id test --secret-from env:DDB_SECRET   # DynamoDB Local
+```
+
+- **Credentials**, in this order: the `keys` form (an access key id and a secret access key; the secret is stored as a reference like any secret, never from a flag, and temporary credentials with a session token come from the next two sources); for the `profile` form with no profile named, `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN`; static keys of the profile in `~/.aws/credentials`; then whatever the `aws` CLI resolves for the profile (`aws configure export-credentials`), which is how SSO, assume-role and `credential_process` profiles work and needs the CLI (the AWS plugin already does). Credentials are kept in memory only and resolved again a minute before they expire.
+- **Endpoint:** empty means `dynamodb.<region>.amazonaws.com`. A custom endpoint (DynamoDB Local, a VPC endpoint) must be `https://`, or `http://` for localhost only, and may hold no user, password, path or query, so credentials never travel in clear text or in a URL.
+- **Statements** are bound by DynamoDB (`Parameters`). `SELECT` follows every page of the answer. A result over `maxItems` (default 10000) is an **error**, not a silent cut: add a key condition or raise `maxItems`. `ConsistentRead` is on unless the connection turns it off.
+- **Writes:** PartiQL changes one item per statement and needs the full primary key. `Db.insert` writes `INSERT INTO "t" VALUE {'a': ?}` (one item per call, no `RETURNING`); `update` and `deleteFrom` need a where, as everywhere. A successful insert or update reports `affected: 1`. A DELETE of a missing item succeeds, so it reports a count only when you add `RETURNING ALL OLD *`.
+- **Transactions:** DynamoDB has no interactive transactions. `db.transaction(fn)` queues the writes `fn` makes and sends them as one all-or-nothing `ExecuteTransaction` (at most 100 statements) when `fn` returns. A read inside it is an error, and nothing is sent when `fn` throws.
+- **Types:** strings, booleans and null as they are. Numbers are JS numbers when that is exact and strings otherwise (a 20-digit number, a long decimal), so nothing is rounded. Lists and maps are arrays and objects, sets are arrays, binary is a `Buffer`. Going in, a `Date` is an ISO string, a `Set` of strings or numbers a DynamoDB set, and `NaN`, `Infinity` and an empty set are refused.
+- **Throttling** (`ThrottlingException`, `ProvisionedThroughputExceededException`) is retried with a short back-off. Other errors, including a 5xx, are not, because the write may already have been applied. An error shows AWS's name and message and never the statement or its values.
+- Not covered: `IN (?, ?)` from `sql.list` (PartiQL wants `IN [?, ?]`: write it with `sql.raw`), streams, table administration and scan segments.
 
 ### Where secrets live
 

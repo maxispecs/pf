@@ -3,7 +3,7 @@ import { KNOWN_DRIVERS } from './drivers/index.js';
 import { DbError } from './errors.js';
 import { resolveSecret } from './secrets.js';
 import { getConnection, loadConnections, type Connection } from './store.js';
-import { compile, deleteFrom, insert, update, type InsertOptions, type Row, type SqlFragment, type SqlLike } from './sql.js';
+import { compile, deleteFrom, insert, insertItem, update, type InsertOptions, type Row, type SqlFragment, type SqlLike } from './sql.js';
 
 /**
  * What a write may do on this handle:
@@ -86,7 +86,7 @@ export function makeDb(session: DbSession, dialect: Dialect, name: string, opts:
       })();
     },
     exec: (q) => run(q, true),
-    insert: (table, rows, o) => run(insert(table, rows, o), true),
+    insert: (table, rows, o) => run(dialect === 'dynamodb' ? insertItem(table, rows, o) : insert(table, rows, o), true),
     update: (table, set, where) => run(update(table, set, where), true),
     deleteFrom: (table, where) => run(deleteFrom(table, where), true),
     transaction: (fn) => session.transaction((tx) => fn(makeDb(tx, dialect, name, opts))),

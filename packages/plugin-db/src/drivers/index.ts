@@ -8,6 +8,7 @@ export const BUILTIN_DRIVERS: readonly DbDriver[] = [sqliteDriver];
 export const KNOWN_DRIVERS = [
   { id: 'postgres', label: 'PostgreSQL' },
   { id: 'mysql', label: 'MySQL and MariaDB' },
+  { id: 'dynamodb', label: 'Amazon DynamoDB (PartiQL)' },
 ] as const;
 
 export { sqliteDriver };

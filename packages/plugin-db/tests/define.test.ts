@@ -7,7 +7,7 @@ import { defineQueries, parseParams, queryUsage } from '../src/define.js';
 import { render, toCsv } from '../src/output.js';
 import { sql } from '../src/sql.js';
 import { putConnection } from '../src/store.js';
-import { capture, ctx, freshHome, installFake } from './helpers.js';
+import { capture, ctx, fakeDriver, freshHome, installFake } from './helpers.js';
 
 process.env.NO_COLOR = '1';
 const plain = out();
@@ -198,4 +198,12 @@ test('makeDb with a deny policy refuses writes and dry only reports them', async
   await dryDb.all('SELECT 1');
   assert.deepEqual(dry, ['DELETE FROM t']);
   assert.deepEqual(log, ['SELECT 1']);
+});
+
+test('Db.insert on a DynamoDB connection writes PartiQL VALUE {}', async () => {
+  const d = fakeDriver('dyn', 'dynamodb');
+  const db = makeDb(await d.connect('params', { host: 'h' }), 'dynamodb', 'main');
+  await db.insert('users', { id: 'a', n: 1 });
+  assert.deepEqual(d.log.at(-1), { text: `INSERT INTO "users" VALUE {'id': ?, 'n': ?}`, values: ['a', 1] });
+  assert.throws(() => db.insert('users', [{ id: 'a' }, { id: 'b' }]), /one item per statement/);
 });

@@ -164,6 +164,26 @@ export function insert(table: string, rows: Row | Row[], opts: InsertOptions = {
   return sql`INSERT INTO ${id(table)} (${join(columns.map((k) => id(k)))}) VALUES ${join(tuples)}${ret.length ? sql` RETURNING ${join(ret.map((k) => id(k)))}` : raw('')}`;
 }
 
+/**
+ * DynamoDB's PartiQL insert: `INSERT INTO "t" VALUE {'a': ?, 'b': ?}`. One item per statement, and no
+ * RETURNING (PartiQL INSERT does not offer it), so those are errors here rather than silent differences.
+ */
+export function insertItem(table: string, rows: Row | Row[], opts: InsertOptions = {}): SqlFragment {
+  const items = Array.isArray(rows) ? rows : [rows];
+  if (items.length !== 1) throw new SqlError('insert: DynamoDB inserts one item per statement');
+  const row = items[0]!;
+  if (opts.returning) throw new SqlError('insert: DynamoDB INSERT has no RETURNING');
+  const columns = keysOf('insert', row);
+  const chunks: Chunk[] = [text('INSERT INTO '), ...id(table).chunks, text(' VALUE {')];
+  columns.forEach((k, i) => {
+    if (k.includes('\0')) throw new SqlError('an attribute name may not contain a NUL character');
+    if (i > 0) chunks.push(text(', '));
+    chunks.push(text(`'${k.replace(/'/g, "''")}': `), ...cell(row[k]).chunks);
+  });
+  chunks.push(text('}'));
+  return new SqlFragment(chunks);
+}
+
 function requireWhere(what: string, w: Row | SqlFragment): SqlFragment {
   const c = w instanceof SqlFragment ? w : conditions(w);
   if (c.empty) throw new SqlError(`${what} needs a where (it would change every row)`);

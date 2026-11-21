@@ -10,7 +10,7 @@
 /** Revision of this contract. A driver written for a newer one is refused by `validateDbDriver`. */
 export const DB_API = 1;
 
-export const DIALECTS = ['postgres', 'mysql', 'sqlite'] as const;
+export const DIALECTS = ['postgres', 'mysql', 'sqlite', 'dynamodb'] as const;
 export type Dialect = (typeof DIALECTS)[number];
 
 /** One value `pf db add` asks for. A `secret` field is never stored in the connection file. */
@@ -34,7 +34,7 @@ export interface ConnectionForm {
 /** What a driver receives: the saved values plus the resolved secrets. Never log it. */
 export type ConnectionParams = Record<string, string | number | boolean>;
 
-/** SQL with its values separate. `text` uses the dialect's placeholder style (`$1` or `?`). */
+/** SQL with its values separate. `text` uses the dialect's placeholder style (`$1` or `?`; DynamoDB's PartiQL takes `?`). */
 export interface CompiledQuery {
   text: string;
   values: unknown[];
