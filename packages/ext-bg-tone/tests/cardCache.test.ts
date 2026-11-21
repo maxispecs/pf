@@ -13,7 +13,7 @@ const cached: CardSnapshot = {
 	commits: [{ hash: 'abc1234', title: 'Fix login bug', updatedAt: 6 }],
 	actions: { buttons: [{ id: 'dev', label: 'Run', icon: 'play' }], canEdit: true, hint: '' },
 	versions: {
-		rows: [{ target: 'stack', label: 'stack', version: '3.5', since: '2026-11-17', tips: { major: 'major 3.5 -> 4.0', minor: 'minor 3.5 -> 3.6' } }],
+		rows: [{ target: 'stack', label: 'stack', version: '3.5', since: '2026-11-17', featured: false, tips: { major: 'major 3.5 -> 4.0', minor: 'minor 3.5 -> 3.6' } }],
 		canBump: true,
 		stackDone: false,
 		hint: '',

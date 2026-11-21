@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 // Revision of this CLI, bumped whenever it changes. `--cli-version` prints it so the /ver skill
 // can tell whether a repo's copy is older than the skill's. Copies without it count as 0.
-const CLI_VERSION = 7;
+const CLI_VERSION = 8;
 const MANIFEST = 'versions.json';
 // Events a repo can hook into through the "hooks" key of versions.json.
 const HOOK_EVENTS = ['postSync', 'preCommit'];
@@ -43,6 +43,12 @@ Commands:
                           Bumping any number of packages also bumps the stack minor
                           once for this command. Each version this command changes
                           records today's date as "since".
+  feature <target> [<target> ...]
+                          Feature packages: they are listed first (after the stack), in the
+                          order featured. Stored in the "featured" array of versions.json.
+                          Does not change any version.
+  unfeature <target> [<target> ...]
+                          Remove packages from the featured list.
   init                    Create versions.json from discovered packages, or add newly
                           discovered packages to an existing one. New versions record
                           today's date as "since".
@@ -56,7 +62,7 @@ VER_STACK, VER_CHANGES (JSON), VER_FILES (newline separated).
 
 Options:
   --json                  (list) machine-readable output
-  --dry-run               (bump, init, sync) show changes without writing files
+  --dry-run               (bump, feature, unfeature, init, sync) show changes without writing files
   --no-hooks              (bump, sync, commit button) do not run hooks
   --prune                 (init) drop packages from versions.json that no longer exist
   --root <dir>            repo root (default: nearest dir with versions.json, or cwd for init)
@@ -645,7 +651,38 @@ function loadManifest(root) {
     }
   }
   loadHooks(data);
+  loadFeatured(data);
   return data;
+}
+
+// Validates the optional "featured" key: an ordered array of unique package paths.
+function loadFeatured(manifest) {
+  const raw = manifest.featured;
+  if (raw == null) return [];
+  if (!Array.isArray(raw) || raw.some((x) => typeof x !== 'string' || !x.trim())) {
+    throw new CliError(`Invalid "featured" in ${MANIFEST}: expected an array of package paths`);
+  }
+  const dup = raw.find((x, i) => raw.indexOf(x) !== i);
+  if (dup) throw new CliError(`Invalid "featured" in ${MANIFEST}: "${dup}" is listed twice`);
+  return raw;
+}
+
+// Packages as [rel, pkg, featured]: featured ones first in "featured" order (unknown paths are
+// skipped, collectWarnings reports them), then the rest in the manifest's sorted order.
+function orderedPackages(manifest) {
+  const featured = loadFeatured(manifest).filter((rel) => manifest.packages[rel]);
+  const first = featured.map((rel) => [rel, manifest.packages[rel], true]);
+  const rest = Object.entries(manifest.packages).filter(([rel]) => !featured.includes(rel))
+    .map(([rel, pkg]) => [rel, pkg, false]);
+  return [...first, ...rest];
+}
+
+const STAR = '★';
+
+// TARGET column text. When any package is featured, every row gets a 2 character lead so the
+// names stay aligned: a star for featured packages, blanks for the rest (and the stack).
+function targetLead(featured, anyFeatured) {
+  return featured ? `${STAR} ` : anyFeatured ? '  ' : '';
 }
 
 // Validates the optional "hooks" key and returns { event: [command, ...] }.
@@ -671,7 +708,14 @@ function loadHooks(manifest) {
 
 function saveManifest(root, data, dryRun) {
   const packages = Object.fromEntries(Object.entries(data.packages).sort(([a], [b]) => a.localeCompare(b)));
-  const text = `${JSON.stringify({ ...data, packages }, null, 2)}\n`;
+  // "featured" is written right after "stack" and omitted when empty.
+  const out = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (key === 'featured') continue;
+    out[key] = key === 'packages' ? packages : value;
+    if (key === 'stack' && data.featured?.length) out.featured = data.featured;
+  }
+  const text = `${JSON.stringify(out, null, 2)}\n`;
   if (!dryRun) writeAtomic(path.join(root, MANIFEST), text);
 }
 
@@ -744,6 +788,9 @@ function collectWarnings(root, manifest, discovered) {
   for (const [rel, type] of discovered.packages) {
     if (!manifest.packages[rel]) warnings.push(`${rel} (${type}) is on disk but not in ${MANIFEST}. Run "init" to add it.`);
   }
+  for (const rel of loadFeatured(manifest)) {
+    if (!manifest.packages[rel]) warnings.push(`featured ${rel} is not in ${MANIFEST} packages. Run "unfeature ${rel}" to remove it.`);
+  }
   for (const [rel, pkg] of Object.entries(manifest.packages)) {
     if (!isDir(path.join(root, rel))) {
       warnings.push(`${rel} is in ${MANIFEST} but not on disk. Run "init --prune" to remove it.`);
@@ -772,10 +819,11 @@ function cmdList(root, flags) {
   const prefix = bumpCommandPrefix(root);
   const cmd = (target, part) => `${prefix} ${target} ${part}`;
   const warnings = collectWarnings(root, manifest, discovered);
-  const packages = Object.entries(manifest.packages).map(([rel, pkg]) => ({
+  const packages = orderedPackages(manifest).map(([rel, pkg, featured]) => ({
     path: rel,
     name: readNative(root, rel, pkg.type).name,
     type: pkg.type,
+    featured,
     version: pkg.version,
     since: pkg.since ?? null,
     commands: { minor: cmd(rel, 'minor'), major: cmd(rel, 'major') },
@@ -802,14 +850,20 @@ function cmdList(root, flags) {
   const tooling = [discovered.turbo && 'turborepo', discovered.packageManager].filter(Boolean).join(', ');
   console.log(`${c.dim('Repo:')} ${c.bold(root)}${tooling ? ` ${c.dim(`(${tooling})`)}` : ''}\n`);
   const sinceCell = (since) => cell(since ?? '-', c.dim);
+  const anyFeatured = packages.some((p) => p.featured);
+  // Plain text sets the column width; the star is colored in the shown text.
+  const targetCell = (target, featured, paint) => {
+    const lead = targetLead(featured, anyFeatured);
+    return { text: lead + target, shown: (featured ? `${c.yellow(STAR)} ` : lead) + paint(target) };
+  };
   const rows = [
     header(['TARGET', 'TYPE', 'VERSION', 'SINCE', 'NAME']),
     [
-      cell('stack', c.boldMagenta), cell('stack', c.magenta), cell(manifest.stack.version, c.boldMagenta),
+      targetCell('stack', false, c.boldMagenta), cell('stack', c.magenta), cell(manifest.stack.version, c.boldMagenta),
       sinceCell(manifest.stack.since), cell(stackName(root), c.dim),
     ],
     ...packages.map((p) => [
-      cell(p.path, c.cyan), cell(p.type, colorType(p.type)), cell(p.version, c.bold),
+      targetCell(p.path, p.featured, c.cyan), cell(p.type, colorType(p.type)), cell(p.version, c.bold),
       sinceCell(p.since), cell(p.name ?? '-', c.dim),
     ]),
   ];
@@ -919,6 +973,33 @@ function cmdBump(root, positional, flags) {
   printSyncResults(root, results, flags.dryRun);
   printHooks(hooks, flags.dryRun);
   if (hookError) throw hookError;
+}
+
+// Adds (on) or removes (off) packages in the "featured" list. Only versions.json's "featured"
+// key changes: no version, since, stack bump, native sync or hook is involved.
+function cmdFeature(root, positional, flags, on) {
+  const verb = on ? 'feature' : 'unfeature';
+  if (!positional.length) throw new CliError(`Usage: ${verb} <target> [<target> ...]`);
+  const manifest = loadManifest(root);
+  const featured = [...loadFeatured(manifest)];
+  const rows = [];
+  for (const target of positional) {
+    const norm = toPosix(target).replace(/^\.\//, '').replace(/\/+$/, '');
+    // A stale entry (path gone from packages) can still be removed by its exact path.
+    const stale = !on && featured.includes(norm) && !manifest.packages[norm];
+    const rel = stale ? norm : resolveTarget(root, manifest, target);
+    if (!rel) throw new CliError(`The stack cannot be ${verb}d: only packages can.`);
+    const at = featured.indexOf(rel);
+    const changed = on ? at < 0 : at >= 0;
+    if (changed && on) featured.push(rel);
+    if (changed && !on) featured.splice(at, 1);
+    const outcome = changed ? (on ? 'featured' : 'unfeatured') : (on ? 'already featured' : 'not featured');
+    rows.push([cell(rel, c.cyan), cell(outcome, changed ? c.green : c.dim)]);
+  }
+  manifest.featured = featured;
+  saveManifest(root, manifest, flags.dryRun);
+  console.log(flags.dryRun ? c.yellow('Dry run, no files written:') : c.green(`Updated ${MANIFEST}:`));
+  console.log(table(rows, '  '));
 }
 
 // ---------- git helpers (interactive commit button)
@@ -1116,14 +1197,17 @@ function buildInteractiveView(root, flags, status, columns, hover, stackMinorDon
   const warnings = collectWarnings(root, manifest, discovered);
   const tooling = [discovered.turbo && 'turborepo', discovered.packageManager].filter(Boolean).join(', ');
 
+  const ordered = orderedPackages(manifest);
+  const anyFeatured = ordered.some(([, , featured]) => featured);
   const rows = [
     { target: 'stack', type: 'stack', version: manifest.stack.version, since: manifest.stack.since ?? '-', name: stackName(root) },
-    ...Object.entries(manifest.packages).map(([rel, pkg]) => ({
-      target: rel, type: pkg.type, version: pkg.version, since: pkg.since ?? '-',
+    ...ordered.map(([rel, pkg, featured]) => ({
+      target: rel, featured, type: pkg.type, version: pkg.version, since: pkg.since ?? '-',
       name: readNative(root, rel, pkg.type).name ?? '-',
     })),
   ];
-  const wTarget = Math.max('TARGET'.length, ...rows.map((r) => r.target.length));
+  for (const r of rows) r.lead = targetLead(r.featured, anyFeatured);
+  const wTarget = Math.max('TARGET'.length, ...rows.map((r) => r.lead.length + r.target.length));
   const wType = Math.max('TYPE'.length, ...rows.map((r) => r.type.length));
   const wVersion = Math.max('VERSION'.length, ...rows.map((r) => r.version.length));
   const wSince = Math.max('SINCE'.length, ...rows.map((r) => r.since.length));
@@ -1156,7 +1240,8 @@ function buildInteractiveView(root, flags, status, columns, hover, stackMinorDon
     const typePaint = colorType(r.type);
     const name = wName >= 4 && r.name.length > wName ? `${r.name.slice(0, wName - 1)}…` : r.name;
     lines.push([
-      (r.target === 'stack' ? c.boldMagenta : c.cyan)(pad(r.target, wTarget)),
+      (r.featured ? `${c.yellow(STAR)} ` : r.lead)
+        + (r.target === 'stack' ? c.boldMagenta : c.cyan)(pad(r.target, wTarget - r.lead.length)),
       typePaint(pad(r.type, wType)),
       `${plus(r, 'major', c.yellow)} ${c.bold(center(r.version, wVersion))} ${plus(r, 'minor', c.green)}`,
       c.dim(pad(r.since, wSince)),
@@ -1353,6 +1438,7 @@ function cmdInit(root, flags) {
         delete manifest.packages[rel];
       }
     }
+    if (manifest.featured) manifest.featured = manifest.featured.filter((rel) => manifest.packages[rel]);
   }
 
   saveManifest(root, manifest, flags.dryRun);
@@ -1429,6 +1515,7 @@ function main() {
   if (interactive) cmdInteractive(root, flags);
   else if (command === 'list') cmdList(root, flags);
   else if (command === 'bump') cmdBump(root, rest, flags);
+  else if (command === 'feature' || command === 'unfeature') cmdFeature(root, rest, flags, command === 'feature');
   else if (command === 'sync') cmdSync(root, flags);
   else throw new CliError(`Unknown command "${command}"\n\n${HELP}`);
 }

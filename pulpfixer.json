@@ -1,4 +1,5 @@
 {
+  "id": "pulpfixer-monorepo-a8faa389",
   "bgTone": {
     "color": "#eab308",
     "logo": "packages/pulpfixer/assets/pulpfixer-small.png"

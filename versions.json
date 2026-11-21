@@ -1,6 +1,6 @@
 {
   "stack": {
-    "version": "3.24",
+    "version": "3.26",
     "since": "2026-11-20"
   },
   "packages": {
@@ -20,12 +20,12 @@
       "type": "node"
     },
     "packages/docs": {
-      "version": "2.9",
+      "version": "2.11",
       "since": "2026-11-20",
       "type": "node"
     },
     "packages/ext-bg-tone": {
-      "version": "1.13",
+      "version": "1.15",
       "since": "2026-11-20",
       "type": "node"
     },
@@ -97,6 +97,11 @@
     "packages/template-query-package": {
       "version": "1.0",
       "since": "2026-11-19",
+      "type": "node"
+    },
+    "workbench": {
+      "version": "0.1",
+      "since": "2026-11-20",
       "type": "node"
     }
   }

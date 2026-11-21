@@ -54,10 +54,12 @@
 		const list = h('div', 'versions-list');
 		list.setAttribute('role', 'list');
 		for (const row of v.rows) {
-			const el = h('div', 'ver-row' + (row.target === 'stack' ? ' ver-stack' : ''));
+			const el = h('div', 'ver-row' + (row.target === 'stack' ? ' ver-stack' : '') + (row.featured ? ' ver-featured' : ''));
 			el.setAttribute('role', 'listitem');
-			const name = h('span', 'ver-name', row.label);
-			name.title = row.target + (row.since ? ' (since ' + row.since + ')' : '');
+			// Right-aligned and cut from the left (see .ver-name): the end of a path is the name that matters.
+			const name = h('span', 'ver-name');
+			name.append(h('bdi', undefined, row.label));
+			name.title = row.target + (row.featured ? ' (featured)' : '') + (row.since ? ' (since ' + row.since + ')' : '');
 			const control = h('span', 'ver-control');
 			control.append(plus(row, 'major', v.canBump, post), h('span', 'ver-version', row.version), plus(row, 'minor', v.canBump, post));
 			el.append(name, control);

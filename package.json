@@ -1,7 +1,7 @@
 {
   "name": "pulpfixer-monorepo",
   "private": true,
-  "version": "3.24.0",
+  "version": "3.26.0",
   "type": "module",
   "description": "pf: unified developer CLI for any repo, any language (monorepo root)",
   "license": "MIT",
@@ -23,12 +23,14 @@
     "ver": "node scripts/version.mjs",
     "logo": "node scripts/logo-art.mjs",
     "skills:sync": "node scripts/sync-skills.mjs",
-    "ask": "node scripts/tasks.mjs ask"
+    "ask": "node scripts/tasks.mjs ask",
+    "doc": "node scripts/tasks.mjs doc"
   },
   "scriptsInfo": {
     "Develop": {
       "dev": "Run pf from source (pnpm dev -- <args>)",
-      "pf": "Run the built pf from dist"
+      "pf": "Run the built pf from dist",
+      "doc": "Run the docs site locally (root script \"docs:dev\")"
     },
     "Docs": {
       "docs:dev": "Run the Nextra docs site locally on port 4400 (same as pf docs)",

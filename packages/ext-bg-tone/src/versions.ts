@@ -32,6 +32,8 @@ export interface VersionsFile {
 	data: Record<string, unknown> & { stack: Entry; packages: Record<string, Entry> };
 	stack: Entry;
 	packages: Record<string, Entry>;
+	/** The `featured` array (the ver CLI's `feature`): package paths to list first, in order. Unknown paths are skipped. */
+	featured: string[];
 }
 
 const has = (object: object, key: string): boolean => Object.prototype.hasOwnProperty.call(object, key);
@@ -68,7 +70,13 @@ export function parseVersionsFile(text: string | null): VersionsFile | undefined
 		}
 	}
 	data.packages = rawPackages;
-	return { data: data as VersionsFile['data'], stack: data.stack, packages: data.packages as Record<string, Entry> };
+	// A malformed `featured` is the CLI's error to report; here it only means nothing is featured (and it is kept on write).
+	const rawFeatured = data.featured;
+	const featured =
+		Array.isArray(rawFeatured) && rawFeatured.every(x => typeof x === 'string')
+			? rawFeatured.filter((x, i) => rawFeatured.indexOf(x) === i && has(rawPackages, x))
+			: [];
+	return { data: data as VersionsFile['data'], stack: data.stack, packages: data.packages as Record<string, Entry>, featured };
 }
 
 /** `major.minor` after a bump: major gives `X+1.0`, minor gives `X.Y+1`. */
@@ -194,6 +202,8 @@ export interface VersionRow {
 	label: string;
 	version: string;
 	since: string;
+	/** A featured package (listed first, name in bold). */
+	featured: boolean;
 	tips: { major: string; minor: string };
 }
 
@@ -224,20 +234,28 @@ export function versionsState(
 	if (!file) {
 		return NO_VERSIONS;
 	}
-	const row = (target: string, label: string, entry: Entry): VersionRow => ({
+	const row = (target: string, label: string, entry: Entry, featured = false): VersionRow => ({
 		target,
 		label,
 		version: entry.version,
 		since: typeof entry.since === 'string' ? entry.since : '',
+		featured,
 		tips: {
 			major: previewBump(file, target, 'major', options.stackDone),
 			minor: previewBump(file, target, 'minor', options.stackDone),
 		},
 	});
-	const paths = Object.keys(file.packages).sort((a, b) => a.localeCompare(b));
-	const shared = sharedFolder(paths);
+	// Featured packages first, in the order they were featured (as the CLI lists them); the rest alphabetically.
+	const rest = Object.keys(file.packages)
+		.filter(p => !file.featured.includes(p))
+		.sort((a, b) => a.localeCompare(b));
+	const shared = sharedFolder([...file.featured, ...rest]);
 	return {
-		rows: [row(STACK_TARGET, STACK_TARGET, file.stack), ...paths.map(p => row(p, p.slice(shared.length), file.packages[p]))],
+		rows: [
+			row(STACK_TARGET, STACK_TARGET, file.stack),
+			...file.featured.map(p => row(p, p.slice(shared.length), file.packages[p], true)),
+			...rest.map(p => row(p, p.slice(shared.length), file.packages[p])),
+		],
 		canBump: options.canBump,
 		stackDone: options.stackDone,
 		hint: options.hint ?? '',
@@ -253,10 +271,12 @@ export function parseVersionsState(raw: unknown): VersionsState {
 	if (!Array.isArray(s.rows)) {
 		return NO_VERSIONS;
 	}
-	const rows = s.rows.filter(
-		(r): r is VersionRow =>
-			!!r && typeof r.target === 'string' && typeof r.label === 'string' && typeof r.version === 'string' && typeof r.since === 'string' &&
-			!!r.tips && typeof r.tips.major === 'string' && typeof r.tips.minor === 'string',
-	);
+	const rows = s.rows
+		.filter(
+			(r): r is VersionRow =>
+				!!r && typeof r.target === 'string' && typeof r.label === 'string' && typeof r.version === 'string' && typeof r.since === 'string' &&
+				!!r.tips && typeof r.tips.major === 'string' && typeof r.tips.minor === 'string',
+		)
+		.map(r => ({ ...r, featured: r.featured === true }));
 	return { rows, canBump: s.canBump === true, stackDone: s.stackDone === true, hint: typeof s.hint === 'string' ? s.hint : '' };
 }

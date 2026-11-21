@@ -145,6 +145,34 @@ test('versionsState lists the stack first and drops the shared folder from the n
 	assert.deepEqual(versionsState(undefined, { stackDone: false, canBump: true }).rows, []);
 });
 
+test('featured packages are listed right after the stack, in featured order, and flagged', () => {
+	const text = JSON.stringify({
+		stack: { version: '1.0' },
+		featured: ['packages/kit', 'packages/gone', 'packages/aws'],
+		packages: {
+			'packages/aws': { version: '2.0', type: 'node' },
+			'packages/db': { version: '1.0', type: 'node' },
+			'packages/kit': { version: '1.4', type: 'node' },
+		},
+	});
+	const file = parseVersionsFile(text)!;
+	assert.deepEqual(file.featured, ['packages/kit', 'packages/aws']);
+	const state = versionsState(file, { stackDone: false, canBump: true });
+	assert.deepEqual(state.rows.map(r => [r.label, r.featured]), [
+		['stack', false],
+		['kit', true],
+		['aws', true],
+		['db', false],
+	]);
+	// A bump keeps the featured list where it is.
+	const plan = planBump(text, 'packages/db', 'minor', { stackDone: true, today: TODAY });
+	assert.equal(plan.ok && JSON.parse(plan.text).featured.join(), 'packages/kit,packages/gone,packages/aws');
+	assert.deepEqual(Object.keys(plan.ok ? JSON.parse(plan.text) : {}), ['stack', 'featured', 'packages']);
+	// A malformed featured list means nothing is featured.
+	assert.deepEqual(parseVersionsFile('{"stack":{"version":"1.0"},"featured":"kit"}')?.featured, []);
+	assert.deepEqual(parseVersionsFile('{"stack":{"version":"1.0"},"featured":[1]}')?.featured, []);
+});
+
 test('parseVersionsState keeps only well-formed rows', () => {
 	const state = versionsState(parseVersionsFile(FILE), { stackDone: true, canBump: true, hint: 'h' });
 	assert.deepEqual(parseVersionsState(JSON.parse(JSON.stringify(state))), state);
