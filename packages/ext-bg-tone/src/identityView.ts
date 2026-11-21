@@ -206,7 +206,7 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 				this.stopPolling();
 			}
 		}, null, this.disposables);
-		view.webview.onDidReceiveMessage((m: { type?: string; id?: unknown; target?: unknown; part?: unknown }) => {
+		view.webview.onDidReceiveMessage((m: { type?: string; id?: unknown; target?: unknown; part?: unknown; on?: unknown }) => {
 			if (m?.type === 'ready') {
 				this.refresh();
 				void this.actions.refresh();
@@ -220,6 +220,9 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 				// Only a target and a part come from the page; both are checked against versions.json.
 				const { target, part } = m as { target?: unknown; part?: unknown };
 				void this.versions.bump(target, part).then(() => this.refresh());
+			} else if (m?.type === 'feature') {
+				// A package path and a yes or no; both are checked against versions.json.
+				void this.versions.setFeatured(m.target, m.on).then(() => this.refresh());
 			} else if (m?.type === 'editActions') {
 				void vscode.commands.executeCommand('bgTone.openSettings', 'actions');
 			}
@@ -450,12 +453,14 @@ export class VersionsViewProvider implements vscode.WebviewViewProvider, vscode.
 				this.stopPolling();
 			}
 		}, null, this.disposables);
-		view.webview.onDidReceiveMessage((m: { type?: string; target?: unknown; part?: unknown }) => {
+		view.webview.onDidReceiveMessage((m: { type?: string; target?: unknown; part?: unknown; on?: unknown }) => {
 			if (m?.type === 'ready') {
 				this.refresh();
 			} else if (m?.type === 'bump') {
 				// Only a target and a part come from the page; both are checked against versions.json.
 				void this.versions.bump(m.target, m.part).then(() => this.refresh());
+			} else if (m?.type === 'feature') {
+				void this.versions.setFeatured(m.target, m.on).then(() => this.refresh());
 			}
 		}, null, this.disposables);
 	}

@@ -5,7 +5,7 @@ import type { ActionsService } from './actionsService.ts';
 import { runGit } from './git.ts';
 import { VERSIONS_FILE } from './stackVersion.ts';
 import { primaryFolder } from './store.ts';
-import { NO_VERSIONS, VersionsState, planBump, parseVersionsFile, stackBumpedSinceHead, versionsState } from './versions.ts';
+import { NO_VERSIONS, VersionsState, planBump, planFeature, parseVersionsFile, stackBumpedSinceHead, versionsState } from './versions.ts';
 
 function localFolder(): vscode.WorkspaceFolder | undefined {
 	const folder = primaryFolder();
@@ -80,6 +80,39 @@ export class VersionsService {
 		const result = this.queue.then(() => this.run(target, part));
 		this.queue = result.then(() => undefined, () => undefined);
 		return result;
+	}
+
+	/** Features or unfeatures one package (the star). Same queue and checks as a bump; no version changes, so no sync. */
+	setFeatured(target: unknown, on: unknown): Promise<boolean> {
+		const result = this.queue.then(() => this.runFeature(target, on));
+		this.queue = result.then(() => undefined, () => undefined);
+		return result;
+	}
+
+	private async runFeature(target: unknown, on: unknown): Promise<boolean> {
+		const folder = localFolder();
+		if (!folder) {
+			return false;
+		}
+		if (!vscode.workspace.isTrusted) {
+			void vscode.window.showWarningMessage('Background Tone: trust this workspace to feature packages.');
+			return false;
+		}
+		const plan = planFeature(readVersionsText(), target, on);
+		if (!plan.ok) {
+			void vscode.window.showErrorMessage(`Background Tone: cannot ${on === false ? 'unfeature' : 'feature'}: ${plan.reason}.`);
+			return false;
+		}
+		if (!plan.changed) {
+			return false;
+		}
+		try {
+			writeAtomic(path.join(folder.uri.fsPath, VERSIONS_FILE), plan.text);
+		} catch (e) {
+			void vscode.window.showErrorMessage(`Background Tone: could not write ${VERSIONS_FILE}: ${e instanceof Error ? e.message : String(e)}`);
+			return false;
+		}
+		return true;
 	}
 
 	private async run(target: unknown, part: unknown): Promise<boolean> {

@@ -7,6 +7,7 @@ import {
 	parseVersionsFile,
 	parseVersionsState,
 	planBump,
+	planFeature,
 	previewBump,
 	stackBumpedSinceHead,
 	versionsState,
@@ -182,4 +183,46 @@ test('parseVersionsState keeps only well-formed rows', () => {
 
 test('localDate is the local calendar day', () => {
 	assert.equal(localDate(new Date(2026, 0, 5)), '2026-01-05');
+});
+
+test('planFeature adds to and removes from the featured list, like the CLI', () => {
+	const doc = (featured?: string[]) =>
+		JSON.stringify({
+			stack: { version: '1.0' },
+			...(featured ? { featured } : {}),
+			hooks: { postSync: 'x' },
+			packages: { 'packages/b': { version: '1.0', type: 'node' }, 'packages/a': { version: '1.0', type: 'node' } },
+		});
+	const on = planFeature(doc(), 'packages/b', true);
+	assert.ok(on.ok && on.changed);
+	const next = on.ok ? JSON.parse(on.text) : {};
+	assert.deepEqual(next.featured, ['packages/b']);
+	assert.deepEqual(Object.keys(next), ['stack', 'featured', 'hooks', 'packages']);
+	assert.deepEqual(Object.keys(next.packages), ['packages/a', 'packages/b']);
+	assert.equal(next.packages['packages/b'].version, '1.0');
+	assert.equal(next.stack.version, '1.0');
+
+	// Appended last, stale entries kept.
+	const more = planFeature(doc(['packages/gone']), 'packages/a', true);
+	assert.deepEqual(more.ok ? JSON.parse(more.text).featured : null, ['packages/gone', 'packages/a']);
+
+	// Removing the last one drops the key.
+	const off = planFeature(doc(['packages/a']), 'packages/a', false);
+	assert.ok(off.ok && off.changed);
+	assert.equal(off.ok && 'featured' in JSON.parse(off.text), false);
+
+	// Nothing to do leaves the text alone.
+	const same = planFeature(doc(['packages/a']), 'packages/a', true);
+	assert.ok(same.ok && !same.changed && same.text === doc(['packages/a']));
+	assert.ok(planFeature(doc(), 'packages/a', false).ok);
+});
+
+test('planFeature refuses the stack, unknown targets, odd input and a malformed list', () => {
+	const text = '{"stack":{"version":"1.0"},"packages":{"packages/a":{"version":"1.0"}}}';
+	assert.equal(planFeature(text, 'stack', true).ok, false);
+	assert.equal(planFeature(text, 'packages/none', true).ok, false);
+	assert.equal(planFeature(text, '__proto__', true).ok, false);
+	assert.equal(planFeature(text, 'packages/a', 'yes').ok, false);
+	assert.equal(planFeature(null, 'packages/a', true).ok, false);
+	assert.equal(planFeature('{"stack":{"version":"1.0"},"featured":"a","packages":{"a":{"version":"1.0"}}}', 'a', true).ok, false);
 });

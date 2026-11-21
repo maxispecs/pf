@@ -29,6 +29,20 @@
 		return button;
 	}
 
+	/** The star: filled for a featured package, click to feature or unfeature it (the stack has none). */
+	function star(row, canEdit, post) {
+		const label = row.featured ? 'Unfeature ' + row.label + ' (stop listing it first)' : 'Feature ' + row.label + ' (list it first, in bold)';
+		const button = h('button', 'ver-star' + (row.featured ? ' ver-star-on' : ''));
+		button.type = 'button';
+		button.title = canEdit ? label : label + ' (trust this workspace to edit versions)';
+		button.setAttribute('aria-label', label);
+		button.setAttribute('aria-pressed', row.featured ? 'true' : 'false');
+		button.disabled = !canEdit;
+		button.append(h('span', 'codicon codicon-star-' + (row.featured ? 'full' : 'empty')));
+		button.addEventListener('click', () => post({ type: 'feature', target: row.target, on: !row.featured }));
+		return button;
+	}
+
 	let key = '';
 	let element = null;
 
@@ -62,7 +76,8 @@
 			name.title = row.target + (row.featured ? ' (featured)' : '') + (row.since ? ' (since ' + row.since + ')' : '');
 			const control = h('span', 'ver-control');
 			control.append(plus(row, 'major', v.canBump, post), h('span', 'ver-version', row.version), plus(row, 'minor', v.canBump, post));
-			el.append(name, control);
+			// The stack cannot be featured: an empty slot keeps the rows lined up.
+			el.append(row.target === 'stack' ? h('span', 'ver-star-slot') : star(row, v.canBump, post), name, control);
 			list.append(el);
 		}
 		section.append(list);

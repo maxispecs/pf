@@ -169,6 +169,52 @@ export function planBump(
 	return { ok: true, text: `${JSON.stringify({ ...data, packages }, null, 2)}\n`, changes };
 }
 
+export type FeaturePlan = { ok: true; text: string; changed: boolean } | { ok: false; reason: string };
+
+/**
+ * The new file text after featuring (`on`) or unfeaturing a package, like the CLI's `feature` / `unfeature`:
+ * a featured package is appended to the `featured` array (so it lists last among the featured), an unfeatured
+ * one is removed, and the array sits right after `stack` and is left out when empty. No version changes. The
+ * stack cannot be featured. Entries for packages that no longer exist are kept (the CLI warns about them).
+ */
+export function planFeature(text: string | null, target: unknown, on: unknown): FeaturePlan {
+	const file = parseVersionsFile(text);
+	if (!file) {
+		return { ok: false, reason: 'versions.json is missing or not a valid ver file' };
+	}
+	if (typeof on !== 'boolean') {
+		return { ok: false, reason: 'featuring needs a yes or no' };
+	}
+	if (typeof target !== 'string' || target === STACK_TARGET || !has(file.packages, target)) {
+		return { ok: false, reason: 'unknown package' };
+	}
+	const raw = file.data.featured;
+	if (raw !== undefined && (!Array.isArray(raw) || !raw.every(x => typeof x === 'string'))) {
+		return { ok: false, reason: 'the "featured" key of versions.json is not a list of package paths (fix it with the ver CLI)' };
+	}
+	const list: string[] = raw === undefined ? [] : [...(raw as string[])];
+	const at = list.indexOf(target);
+	if (on && at < 0) {
+		list.push(target);
+	} else if (!on && at >= 0) {
+		list.splice(at, 1);
+	} else {
+		return { ok: true, text: text as string, changed: false };
+	}
+	const packages = Object.fromEntries(Object.entries(file.data.packages).sort(([a], [b]) => a.localeCompare(b)));
+	const out: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(file.data)) {
+		if (key === 'featured') {
+			continue;
+		}
+		out[key] = key === 'packages' ? packages : value;
+		if (key === 'stack' && list.length > 0) {
+			out.featured = list;
+		}
+	}
+	return { ok: true, text: `${JSON.stringify(out, null, 2)}\n`, changed: true };
+}
+
 /**
  * Whether the stack was already bumped since the last commit: `HEAD` has no valid `versions.json`, or its
  * stack version differs from the working copy's. That also counts a bump made from a terminal.

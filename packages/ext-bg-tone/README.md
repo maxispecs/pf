@@ -40,7 +40,7 @@ customization keys are left alone.
   have uncommitted changes (`git status`, untracked files included), hidden at zero or outside a git repo. The number is a link: it asks for a commit message, then
   stages everything (`git add -A`) and commits (hooks run; nothing is pushed). Only in a trusted workspace.
 - **Versions**: in a repo with a `versions.json`, Source Control lists the stack and every package with its version and
-  two `[+]` buttons, like `pf v` (featured packages, the `featured` array the CLI's `feature` writes, come first with bold names) (the one before the version bumps major, the one after it minor; hover shows the
+  two `[+]` buttons, like `pf v` (featured packages, the `featured` array the CLI's `feature` writes, come first with bold names; the star at the left of a package row features or unfeatures it by editing the `featured` array) (the one before the version bumps major, the one after it minor; hover shows the
   result). A package bump also raises the stack minor, but only once until the next commit (the stack counts as
   already bumped when its version differs from `HEAD:versions.json`, so a bump made in a terminal counts too; a click
   on the stack itself always bumps it). A click edits `versions.json` (same format as the `ver` CLI) and runs

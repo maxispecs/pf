@@ -1,6 +1,6 @@
 {
   "stack": {
-    "version": "3.26",
+    "version": "3.29",
     "since": "2026-11-20"
   },
   "packages": {
@@ -20,17 +20,17 @@
       "type": "node"
     },
     "packages/docs": {
-      "version": "2.11",
+      "version": "2.12",
       "since": "2026-11-20",
       "type": "node"
     },
     "packages/ext-bg-tone": {
-      "version": "1.15",
+      "version": "2.1",
       "since": "2026-11-20",
       "type": "node"
     },
     "packages/kit": {
-      "version": "6.12",
+      "version": "6.13",
       "since": "2026-11-20",
       "type": "node"
     },
@@ -45,7 +45,7 @@
       "type": "node"
     },
     "packages/plugin-db": {
-      "version": "1.3",
+      "version": "1.4",
       "since": "2026-11-20",
       "type": "node"
     },
@@ -80,7 +80,7 @@
       "type": "node"
     },
     "packages/pulpfixer": {
-      "version": "7.4",
+      "version": "7.5",
       "since": "2026-11-20",
       "type": "node"
     },

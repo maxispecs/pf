@@ -70,3 +70,25 @@ body:has(.versions:not(.versions-card)) {
 .ver-plus:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
 .ver-plus:disabled { opacity: 0.4; cursor: default; }
 .versions-hint { margin-top: 4px; font-size: 0.9em; color: var(--vscode-descriptionForeground); }
+
+/* Featured: the star is always filled; an unfeatured package shows a faint star that fills in on row hover. */
+.ver-star, .ver-star-slot { flex: none; width: 18px; height: 18px; }
+.ver-star {
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--vscode-icon-foreground, var(--vscode-foreground));
+	opacity: 0;
+	cursor: pointer;
+}
+.ver-star .codicon { font-size: 14px; }
+.ver-row:hover .ver-star, .ver-star:focus-visible { opacity: 0.55; }
+.ver-star-on { opacity: 1; color: var(--vscode-charts-yellow, #cca700); }
+.ver-star:hover:not(:disabled) { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
+.ver-star:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.ver-star:disabled { cursor: default; }
+.ver-star-on:disabled { opacity: 0.7; }
