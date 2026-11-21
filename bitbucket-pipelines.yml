@@ -1,4 +1,4 @@
-# Bitbucket Pipelines: check every pull request and every push to dev / main, publish to the cellars staging registry on demand.
+# Bitbucket Pipelines: a pull request publishes to staging when it targets dev (else it only checks), publish to the cellars staging registry on demand.
 #
 # The publish step is the same thing `pf publish staging` / `pf ps` runs locally: `pnpm run publish:cellars`
 # (scripts/release.mjs --publish). It publishes every package whose version the registry lacks, in dependency
@@ -48,18 +48,32 @@ definitions:
           - pnpm run publish:cellars
 
 pipelines:
-  # No `default:` rule: it runs on every branch push, so a pushed branch with a pull request got two pipelines
-  # (push + PR), and the merge a third (push to the target). A feature branch is checked by its pull request
-  # pipeline; `dev` and `main` are checked on every push to them (merges and direct pushes).
+  # No `default:` and no `dev` rule: those fire on every branch push and on the merge, which gave a pull
+  # request several pipelines. A pull request is the one trigger: into `dev` it publishes to the cellars
+  # staging registry (the checks run first), into any other branch it only checks. Bitbucket cannot filter a
+  # pull-requests rule by destination (the pattern matches the source branch), so the step decides.
   branches:
-    dev:
-      - step: *check
     main:
       - step: *check
       - step: *publish-staging
   pull-requests:
     '**':
-      - step: *check
+      - step:
+          name: Pull request (publish to staging when it targets dev)
+          caches:
+            - pnpm
+          script:
+            - npm install -g pnpm@12
+            - test -n "$NPM_TOKEN" || { echo "NPM_TOKEN is not set (Repository settings -> Pipelines -> Repository variables)"; exit 1; }
+            - printf '//cellars.staging.pangenea.com/:_authToken=%s\n' "$NPM_TOKEN" > "$HOME/.npmrc"
+            - pnpm install --frozen-lockfile --filter '!@pulpfixer/docs'
+            - |
+              if [ "$BITBUCKET_PR_DESTINATION_BRANCH" = "dev" ]; then
+                # checks (typecheck, test, build), then pnpm publish of every new version
+                pnpm run publish:cellars
+              else
+                pnpm run typecheck && pnpm run test && pnpm run build
+              fi
   # Run from the Bitbucket UI (Pipelines -> Run pipeline -> Custom) to publish from any branch.
   # The first step of a pipeline cannot be manual, so this one drops the trigger.
   custom:
