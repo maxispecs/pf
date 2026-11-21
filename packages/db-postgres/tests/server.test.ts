@@ -177,3 +177,84 @@ test('live: typed values against PF_TEST_PG_URL', { skip: !live && 'set PF_TEST_
   assert.equal((await s.transaction(async (tx) => (await tx.execute({ text: 'SELECT 1 AS one', values: [] })).rows))[0]!.one, 1);
   await s.close();
 });
+
+async function collectBatches(it: AsyncIterable<Record<string, unknown>[]>): Promise<number[][]> {
+  const out: number[][] = [];
+  for await (const b of it) out.push(b.map((r) => Number(r.n)));
+  return out;
+}
+
+test('stream reads a portal a batch at a time, never more than the limit', async () => {
+  const s = await server();
+  const db = await postgresDriver.connect('dsn', { dsn: dsn(s) });
+  assert.ok(db.stream);
+  assert.deepEqual(await collectBatches(db.stream({ text: 'SELECT series 5', values: [] }, 2)), [[1, 2], [3, 4], [5]]);
+  assert.deepEqual(s.executes, [2, 2, 2]);
+  // A result that is an exact multiple of the batch size ends with an empty fetch, not an empty batch.
+  s.executes.length = 0;
+  assert.deepEqual(await collectBatches(db.stream({ text: 'SELECT series 4', values: [] }, 2)), [[1, 2], [3, 4]]);
+  assert.deepEqual(s.executes, [2, 2, 2]);
+  assert.deepEqual(await collectBatches(db.stream({ text: 'SELECT series 0', values: [] }, 3)), []);
+  // The connection is clean afterwards.
+  assert.deepEqual((await db.execute({ text: 'SELECT $1::int AS n', values: [9] })).rows, [{ n: 9 }]);
+  await db.close();
+});
+
+test('stopping a stream early closes the portal and frees the connection', async () => {
+  const s = await server();
+  const db = await postgresDriver.connect('dsn', { dsn: dsn(s) });
+  for await (const batch of db.stream!({ text: 'SELECT series 10', values: [] }, 3)) {
+    assert.equal(batch.length, 3);
+    break;
+  }
+  assert.deepEqual((await db.execute({ text: 'SELECT $1::int AS n', values: [5] })).rows, [{ n: 5 }]);
+  await db.close();
+});
+
+test('an error in the middle of a stream is thrown after the connection is cleaned up', async () => {
+  const s = await server();
+  const db = await postgresDriver.connect('dsn', { dsn: dsn(s) });
+  const seen: number[][] = [];
+  await assert.rejects(
+    (async () => {
+      for await (const b of db.stream!({ text: 'SELECT series 6 fail', values: [] }, 2)) seen.push(b.map((r) => Number(r.n)));
+    })(),
+    (e: unknown) => e instanceof PostgresError && e.code === '57014',
+  );
+  assert.deepEqual(seen, [[1, 2]]);
+  assert.deepEqual((await db.execute({ text: 'SELECT $1::int AS n', values: [3] })).rows, [{ n: 3 }]);
+  await db.close();
+});
+
+test('statements wait for a stream that is being read, and run after it', async () => {
+  const s = await server();
+  const db = await postgresDriver.connect('dsn', { dsn: dsn(s) });
+  const order: string[] = [];
+  const reading = (async () => {
+    for await (const b of db.stream!({ text: 'SELECT series 4', values: [] }, 2)) {
+      order.push(`batch ${b.length}`);
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  })();
+  await new Promise((r) => setTimeout(r, 5));
+  const other = db.execute({ text: 'SELECT $1::int AS n', values: [1] }).then(() => order.push('other'));
+  await Promise.all([reading, other]);
+  assert.deepEqual(order, ['batch 2', 'batch 2', 'other']);
+  await db.close();
+});
+
+test('a stream works inside a transaction', async () => {
+  const s = await server();
+  const db = await postgresDriver.connect('dsn', { dsn: dsn(s) });
+  const got = await db.transaction(async (tx) => collectBatches(tx.stream!({ text: 'SELECT series 3', values: [] }, 2)));
+  assert.deepEqual(got, [[1, 2], [3]]);
+  assert.deepEqual(s.statements, ['BEGIN', 'SELECT series 3', 'COMMIT']);
+  await db.close();
+});
+
+test('stream refuses a batch size that is not a whole number of at least 1', async () => {
+  const s = await server();
+  const db = await postgresDriver.connect('dsn', { dsn: dsn(s) });
+  assert.throws(() => db.stream!({ text: 'SELECT series 1', values: [] }, 0), /batch size/);
+  await db.close();
+});

@@ -1,0 +1,44 @@
+{
+  "summary": "A pipe package: @pulpfixer/pipe-<name>, scripted IO between a database and CSV files (or the other way), published to cellars",
+  "dir": "pipe-{{name}}",
+  "params": {
+    "name": {
+      "prompt": "Pipe package name",
+      "help": "pf <name> runs it; lowercase letters, digits and dashes",
+      "pattern": "[a-z0-9]+(-[a-z0-9]+)*"
+    },
+    "summary": {
+      "prompt": "One-line summary",
+      "default": "Pipes for {{name}}"
+    },
+    "input": {
+      "prompt": "Where the sample pipe reads from",
+      "help": "the sample pipe `copy` starts from this kind of input",
+      "choices": ["db", "csv"],
+      "default": "db"
+    },
+    "output": {
+      "prompt": "Where the sample pipe writes to",
+      "help": "the sample pipe `copy` ends in this kind of output",
+      "choices": ["csv", "db"],
+      "default": "csv"
+    },
+    "connection": {
+      "prompt": "pf db connection it uses (when an end is a database)",
+      "help": "the name users give pf db add",
+      "default": "{{name}}",
+      "pattern": "[a-z0-9][a-z0-9_-]{0,39}"
+    }
+  },
+  "rename": {
+    "_package.json": "package.json",
+    "_gitignore": ".gitignore",
+    "_npmrc": ".npmrc"
+  },
+  "next": [
+    "pnpm install",
+    "pf a   (ask the agent to write the pipes: it follows AGENTS.md and the pipe-package skill)",
+    "pnpm test",
+    "pf ps  (publish @pulpfixer/pipe-{{name}} to cellars; asks first)"
+  ]
+}

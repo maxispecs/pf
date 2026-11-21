@@ -1,7 +1,7 @@
 {
   "stack": {
-    "version": "3.20",
-    "since": "2026-11-19"
+    "version": "3.23",
+    "since": "2026-11-20"
   },
   "packages": {
     "packages/db-mysql": {
@@ -10,13 +10,13 @@
       "type": "node"
     },
     "packages/db-postgres": {
-      "version": "1.1",
-      "since": "2026-11-19",
+      "version": "1.2",
+      "since": "2026-11-20",
       "type": "node"
     },
     "packages/docs": {
-      "version": "2.5",
-      "since": "2026-11-19",
+      "version": "2.8",
+      "since": "2026-11-20",
       "type": "node"
     },
     "packages/ext-bg-tone": {
@@ -25,8 +25,8 @@
       "type": "node"
     },
     "packages/kit": {
-      "version": "6.10",
-      "since": "2026-11-19",
+      "version": "6.12",
+      "since": "2026-11-20",
       "type": "node"
     },
     "packages/plugin-aws": {
@@ -34,9 +34,24 @@
       "since": "2026-11-17",
       "type": "node"
     },
+    "packages/plugin-csv": {
+      "version": "1.0",
+      "since": "2026-11-20",
+      "type": "node"
+    },
     "packages/plugin-db": {
-      "version": "1.2",
-      "since": "2026-11-19",
+      "version": "1.3",
+      "since": "2026-11-20",
+      "type": "node"
+    },
+    "packages/plugin-io": {
+      "version": "1.0",
+      "since": "2026-11-20",
+      "type": "node"
+    },
+    "packages/plugin-pdf": {
+      "version": "1.0",
+      "since": "2026-11-20",
       "type": "node"
     },
     "packages/plugin-system": {
@@ -60,8 +75,18 @@
       "type": "node"
     },
     "packages/pulpfixer": {
-      "version": "7.1",
-      "since": "2026-11-19",
+      "version": "7.4",
+      "since": "2026-11-20",
+      "type": "node"
+    },
+    "packages/template-io-adapter": {
+      "version": "1.0",
+      "since": "2026-11-20",
+      "type": "node"
+    },
+    "packages/template-pipe-package": {
+      "version": "1.0",
+      "since": "2026-11-20",
       "type": "node"
     },
     "packages/template-query-package": {

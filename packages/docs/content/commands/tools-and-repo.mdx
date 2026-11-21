@@ -43,6 +43,7 @@ pf actions feature build --dry-run
 | `install`, `install:<to>` | `pf install [<to>]` | `desktop-download` | no |
 | `tools` | `pf tools` | `tools` | no |
 | `git:push` | `pf git push` (`pf gp`) | `repo-push` | yes (the repo needs a git remote) |
+| `repo:commit` | `pf repo commit` (`pf g`) | `git-commit` | no (any git repo; `pf actions feature repo:commit` makes it a Repo Identity button) |
 | a custom command | `pf <name>` | `terminal` | only with `"featured": true` |
 
 Only what the repo really has is listed, so a repo without a staging target has no deploy button. Production deploy and publish still ask before they run, because the button just runs `pf` in a terminal. Set `featured` and `icon` in [pulpfixer.json](/concepts/pulpfixer-json#actions); `pf actions feature` and `unfeature` write the `actions` section there, keeping the rest of the file. An older pf has no `actions` command, so the card shows a hint to update it.
@@ -115,6 +116,28 @@ pf repo --deploy      # run the deploy setup even when pf d already resolves
 ```
 
 It updates every older copy of the ver CLI, prints what it did and never commits. When everything succeeds it closes with the pulpfixer logo and a success message (just the message without a terminal). Run it again after `pf update`.
+
+### pf repo commit
+
+`pf repo commit` (short: `pf g`) commits everything uncommitted (staged, unstaged and untracked files) with a message written from the **last Cursor chat** of the repo, read from the transcripts Cursor keeps under `~/.cursor/projects/<repo>/agent-transcripts/`.
+
+```bash
+pf g                          # write the message from the last chat, show it, ask, commit
+pf g --dry-run                # show the files, the message and the git commands; change nothing
+pf g -m "fix: login redirect" # use this message, skip the chat
+pf g --chat <id>              # a chat other than the newest
+pf g --no-agent               # no agent: the message comes from the chat text alone
+pf g --agent claude           # which agent CLI writes the message (default: the one pf uses)
+pf g --yes                    # no confirmation (needed without a terminal)
+```
+
+- **The message.** The coding agent (Cursor, Claude Code or Codex, the one `pf agent` uses) is run once in print mode, with no pf tools and no permission to edit, and gets the chat's requests, its last answer, `git status` and `git diff --stat`. It returns a short subject (72 characters at most) and an optional body. Without an agent, with `--no-agent`, or when the agent gives nothing usable, the subject is the first sentence of the chat's first request and the body is the start of its last answer. Without any chat, give `-m` (in a terminal pf asks for one).
+- **What it commits.** `git add -A`, then `git commit` with the subject and body as two `-m` paragraphs. Hooks run (no `--no-verify`). It lists the files first, so untracked files are never staged unseen.
+- **Asking.** In a terminal it offers commit, edit the subject, or cancel. Without a terminal it needs `--yes` (exit 2 otherwise). A clean tree is "nothing to commit" and exit 0.
+- **Never pushes.** Push afterwards with `pf gp`. The chat text, the file status and the diff summary go to the agent CLI you already run, never file contents.
+- **Chats.** Only Cursor chats are read (Claude Code and Codex sessions are not).
+
+The menu lists it as `repo commit` in a git repo (`pf actions` id `repo:commit`, icon `git-commit`). It is not featured by default; `pf actions feature repo:commit` adds it to the Repo Identity buttons.
 
 ### Background tone
 

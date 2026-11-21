@@ -4,11 +4,12 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { clearDbDrivers, dbDriver } from '@pulpfixer/kit/db';
+import { clearIoAdapters, ioAdapter, ioAdapterOrigin } from '@pulpfixer/kit/io';
 import { allCommands } from '../src/commands/index.js';
-import { loadFailures, loadInstalledPlugin, loadInstalledPlugins, loadedPlugins, registerPluginDrivers, validatePlugin } from '../src/plugins/loader.js';
+import { loadFailures, loadInstalledPlugin, loadInstalledPlugins, loadedPlugins, registerPluginContributions, validatePlugin } from '../src/plugins/loader.js';
 import { builtinRows } from '../src/plugins/manage.js';
 import { BUILTIN_PLUGINS } from '../src/plugins/index.js';
-import { builtinOfPackage, builtinPackage, bundledVersion, candidatePackages, entryOf, installArgv, installedPlugins, isPluginPackage, isQueryPackage, parseSpec, pickBuiltinPackages, pickPluginPackages, pluginOfPackage, uninstallArgv } from '../src/plugins/registry.js';
+import { builtinOfPackage, builtinPackage, bundledVersion, candidatePackages, entryOf, installArgv, installedPlugins, isClearancePackage, isPluginPackage, parseSpec, pickBuiltinPackages, pickPluginPackages, pluginOfPackage, uninstallArgv } from '../src/plugins/registry.js';
 import { json, mkRepo } from './helpers.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -84,8 +85,15 @@ test('drivers and query packages install from the @pulpfixer scope under their o
   assert.equal(pluginOfPackage('@pulpfixer/db-'), null);
   assert.ok(isPluginPackage('@pulpfixer/db-mysql'));
   assert.ok(!isPluginPackage('@pulpfixer/preset-cursor'));
-  assert.ok(isQueryPackage('@pulpfixer/query-revrec'));
-  assert.ok(!isQueryPackage('@pulpfixer/db-mysql'));
+  assert.ok(isClearancePackage('@pulpfixer/query-revrec'));
+  assert.ok(isClearancePackage('@pulpfixer/pipe-billing'));
+  assert.ok(!isClearancePackage('@pulpfixer/db-mysql'));
+  assert.ok(!isClearancePackage('@pulpfixer/io-s3'));
+  assert.ok(isPluginPackage('@pulpfixer/io-s3'));
+  assert.ok(isPluginPackage('@pulpfixer/pipe-billing'));
+  assert.deepEqual(candidatePackages('pipe-billing'), ['@pulpfixer/pipe-billing']);
+  assert.deepEqual(candidatePackages('io-s3'), ['@pulpfixer/io-s3']);
+  assert.equal(pluginOfPackage('@pulpfixer/pipe-billing'), 'pipe-billing');
   // A query package has one possible home: it is never looked up under another scope.
   assert.deepEqual(candidatePackages('db-mysql'), ['@pulpfixer/db-mysql']);
   assert.deepEqual(candidatePackages('query-revrec'), ['@pulpfixer/query-revrec']);
@@ -124,7 +132,7 @@ test('a driver plugin needs api 2, is validated, and is registered when it loads
     assert.equal(dbDriver('olddb'), undefined);
     assert.match(loadFailures().find((f) => f.package === '@pulpfixer/db-old')!.error, /needs "api": 2/);
     clearDbDrivers();
-    registerPluginDrivers(loadedPlugins().map((l) => l.plugin));
+    registerPluginContributions(loadedPlugins().map((l) => l.plugin));
     assert.ok(dbDriver('fakedb'));
   } finally {
     delete process.env.PF_HOME;
@@ -147,6 +155,47 @@ test('a driver plugin installed during a run is loaded and registered on its own
     delete process.env.PF_HOME;
     clearDbDrivers();
     await loadInstalledPlugins();
+  }
+});
+
+const ADAPTER_JS = (api: string) =>
+  `export default { name: 'io-fakeio', ${api} summary: 'adapter', commands: [], ioAdapters: [{ id: 'fakeio', label: 'Fake', describe: () => 'x', source: async () => ({ batches: async function* () {}, close: async () => undefined }) }] };\n`;
+
+test('an IO adapter plugin needs api 3, is validated, and is registered with where it came from', async () => {
+  const adapter = { id: 'a', label: 'A', describe: () => '', source: async () => ({}) };
+  const base = { name: 'x', commands: [] };
+  assert.match(validatePlugin({ default: { ...base, api: 2, ioAdapters: [adapter] } }) as string, /needs "api": 3/);
+  assert.match(validatePlugin({ default: { ...base, api: 3, ioAdapters: 'nope' } }) as string, /array/);
+  assert.match(validatePlugin({ default: { ...base, api: 3, ioAdapters: [{ ...adapter, id: 'Bad' }] } }) as string, /lowercase id/);
+  assert.match(validatePlugin({ default: { ...base, api: 3, ioAdapters: [{ ...adapter, source: undefined }] } }) as string, /source\(\) or sink\(\)/);
+  assert.equal(typeof validatePlugin({ default: { ...base, api: 3, ioAdapters: [adapter] } }), 'object');
+
+  clearIoAdapters();
+  process.env.PF_HOME = homeWith({ '@pulpfixer/io-fakeio': ADAPTER_JS('api: 3,'), '@pulpfixer/io-old': ADAPTER_JS('').replace('fakeio', 'oldio').replace('io-oldio', 'io-old') });
+  try {
+    await loadInstalledPlugins();
+    assert.equal(ioAdapter('fakeio')?.label, 'Fake');
+    assert.equal(ioAdapterOrigin('fakeio'), 'plugin io-fakeio');
+    assert.equal(ioAdapter('oldio'), undefined);
+    assert.match(loadFailures().find((f) => f.package === '@pulpfixer/io-old')!.error, /needs "api": 3/);
+  } finally {
+    delete process.env.PF_HOME;
+    clearIoAdapters();
+    registerPluginContributions(BUILTIN_PLUGINS, true);
+    await loadInstalledPlugins();
+  }
+});
+
+test('plugin-io, plugin-csv and plugin-pdf are built in: pf io, pf csv, pf pdf, and the db, csv, pdf, memory and stdout adapters', () => {
+  assert.deepEqual(BUILTIN_PLUGINS.map((p) => p.name).slice(-4), ['db', 'io', 'csv', 'pdf']);
+  assert.ok(allCommands().some((c) => c.name === 'pdf'));
+  assert.ok(allCommands().some((c) => c.name === 'io'));
+  assert.ok(allCommands().some((c) => c.name === 'csv'));
+  clearIoAdapters();
+  registerPluginContributions(BUILTIN_PLUGINS, true);
+  for (const id of ['db', 'csv', 'pdf', 'memory', 'stdout']) {
+    assert.ok(ioAdapter(id), id);
+    assert.equal(ioAdapterOrigin(id), 'built in');
   }
 });
 

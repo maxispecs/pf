@@ -31,6 +31,12 @@ export interface FakeDriver extends DbDriver {
   connects: { form: string; params: ConnectionParams }[];
   /** What the next statements answer. Default: `SELECT 1` -> one row, anything else no rows. */
   respond: (q: CompiledQuery) => QueryResult;
+  /** Give sessions a `stream` (cuts what `respond` answers into batches). Off: sessions cannot stream. */
+  streaming: boolean;
+  /** The batch size of each `stream` call. */
+  streamSizes: number[];
+  /** Sessions closed so far. */
+  closed: number;
 }
 
 /** A driver that runs nothing: it records statements and answers from `respond`. */
@@ -41,6 +47,9 @@ export function fakeDriver(id = 'fake', dialect: DbDriver['dialect'] = 'mysql'):
     dialect,
     log: [],
     connects: [],
+    streaming: false,
+    streamSizes: [],
+    closed: 0,
     respond: (q) => (q.text === 'SELECT 1' ? { rows: [{ '1': 1 }] } : { rows: [] }),
     forms: [
       {
@@ -58,13 +67,23 @@ export function fakeDriver(id = 'fake', dialect: DbDriver['dialect'] = 'mysql'):
     describe: (form, p) => (form === 'dsn' ? 'dsn' : `${String(p.host)}:${String(p.port ?? '')}`),
     async connect(form, params) {
       d.connects.push({ form, params: { ...params } });
-      return makeSession(
+      const session = makeSession(
         async (q) => {
           d.log.push(q);
           return d.respond(q);
         },
-        async () => undefined,
+        async () => void d.closed++,
       );
+      if (d.streaming) {
+        session.stream = (q, size) =>
+          (async function* () {
+            d.log.push(q);
+            d.streamSizes.push(size);
+            const rows = d.respond(q).rows;
+            for (let i = 0; i < rows.length; i += size) yield rows.slice(i, i + size);
+          })();
+      }
+      return session;
     },
   };
   return d;

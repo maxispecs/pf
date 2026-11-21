@@ -77,6 +77,11 @@ test('pf template is a command, and template packages are not pinned by core', (
   assert.ok(isPreset({ name: '@pulpfixer/template-query-package' }));
   assert.equal(templatePackage('query-package'), '@pulpfixer/template-query-package');
   assert.equal(templateOfPackage('@pulpfixer/template-query-package'), 'query-package');
+  for (const t of ['pipe-package', 'io-adapter']) {
+    assert.ok(isPreset({ name: `@pulpfixer/template-${t}` }));
+    assert.equal(templatePackage(t), `@pulpfixer/template-${t}`);
+    assert.equal(templateOfPackage(`@pulpfixer/template-${t}`), t);
+  }
   assert.equal(templateOfPackage('@pulpfixer/preset-cursor'), null);
   assert.deepEqual(
     pickTemplatePackages([{ name: '@pulpfixer/template-b', version: '1.0.0' }, { name: '@pulpfixer/plugin-db', version: '1.0.0' }, { name: '@pulpfixer/template-a', version: '2.0.0', description: 'A' }]).map((t) => t.name),
@@ -239,4 +244,60 @@ test('the query-package template renders a query package wired to this pf', () =
   assert.match(byPath['src/index.ts']!, /driver: 'mysql'/);
   assert.equal(JSON.parse(byPath['pulpfixer.json']!).name, 'query-revrec');
   for (const [p, content] of Object.entries(byPath)) assert.doesNotMatch(content, /\{\{/, p);
+});
+
+function renderBundled(name: string, given: Record<string, string>) {
+  const dir = path.join(repoRoot, 'packages', `template-${name}`);
+  const cached = readTemplateDir(name, dir);
+  assert.ok(cached?.template, cached?.problem ?? 'not found');
+  const t = cached.template;
+  const resolved = resolveParams(t.params, given);
+  assert.ok('values' in resolved, JSON.stringify(resolved));
+  const versions = bundledVersions();
+  const r = renderTemplate(path.join(dir, 'files'), t, resolved.values, versions);
+  assert.ok('files' in r, JSON.stringify(r));
+  const byPath = Object.fromEntries(r.files.map((f) => [f.path, String(f.content)]));
+  assert.ok(!Object.keys(byPath).some((p) => p.startsWith('_')));
+  for (const [p, content] of Object.entries(byPath)) assert.doesNotMatch(content, /\{\{/, p);
+  assert.match(byPath['.npmrc']!, /_authToken=\$\{NPM_TOKEN\}/);
+  return { t, values: resolved.values, byPath, pkg: JSON.parse(byPath['package.json']!), versions, dir };
+}
+
+test('the pipe-package template renders a pipe package wired to this pf', () => {
+  const r = renderBundled('pipe-package', { name: 'orders', input: 'csv', output: 'db' });
+  assert.deepEqual(r.values, { name: 'orders', summary: 'Pipes for orders', input: 'csv', output: 'db', connection: 'orders' });
+  assert.deepEqual(renderDir(r.t, r.values), { dir: 'pipe-orders' });
+  for (const p of ['package.json', '.gitignore', '.npmrc', 'pulpfixer.json', 'AGENTS.md', 'README.md', 'src/index.ts', 'tests/pipes.test.ts', 'tsconfig.json']) assert.ok(p in r.byPath, p);
+  assert.equal(r.pkg.name, '@pulpfixer/pipe-orders');
+  for (const dep of ['kit', 'plugin-io', 'plugin-db', 'plugin-csv']) assert.equal(r.pkg.dependencies[`@pulpfixer/${dep}`], `^${r.versions[`@pulpfixer/${dep}`]}`, dep);
+  assert.ok(r.pkg.scripts['publish:cellars']);
+  assert.match(r.byPath['src/index.ts']!, /const INPUT = 'csv' as string/);
+  assert.match(r.byPath['src/index.ts']!, /const OUTPUT = 'db' as string/);
+  assert.match(r.byPath['src/index.ts']!, /CONNECTION = 'orders'/);
+  assert.equal(JSON.parse(r.byPath['pulpfixer.json']!).name, 'pipe-orders');
+  assert.deepEqual(resolveParams(r.t.params, { name: 'orders', input: 'xml' }), { error: '--input must be one of db, csv (got "xml")' });
+});
+
+test('the io-adapter template renders an adapter add-on that registers itself', () => {
+  const r = renderBundled('io-adapter', { name: 'acme-api' });
+  assert.deepEqual(r.values, { name: 'acme-api', summary: 'The acme-api IO adapter for pf pipes' });
+  assert.deepEqual(renderDir(r.t, r.values), { dir: 'io-acme-api' });
+  for (const p of ['package.json', '.gitignore', '.npmrc', 'pulpfixer.json', 'AGENTS.md', 'README.md', 'src/index.ts', 'src/adapter.ts', 'tests/adapter.test.ts']) assert.ok(p in r.byPath, p);
+  assert.equal(r.pkg.name, '@pulpfixer/io-acme-api');
+  assert.deepEqual(Object.keys(r.pkg.dependencies), ['@pulpfixer/kit']);
+  assert.equal(r.pkg.dependencies['@pulpfixer/kit'], `^${r.versions['@pulpfixer/kit']}`);
+  assert.match(r.byPath['src/index.ts']!, /name: 'io-acme-api'/);
+  assert.match(r.byPath['src/index.ts']!, /api: 3/);
+  assert.match(r.byPath['src/adapter.ts']!, /const ID = 'acme-api'/);
+  assert.ok(resolveParams(r.t.params, { name: 'Bad Name' }) && 'error' in resolveParams(r.t.params, { name: 'Bad Name' }));
+  assert.ok('error' in resolveParams(r.t.params, { name: '1abc' }));
+});
+
+test('the bundled skills for pipes and adapters exist and name their template', () => {
+  for (const [skill, template] of [['pipe-package', 'pf template apply pipe-package'], ['io-adapter', 'pf template apply io-adapter']] as const) {
+    const text = fs.readFileSync(path.join(repoRoot, 'packages', 'pulpfixer', 'assets', 'skills', skill, 'SKILL.md'), 'utf8');
+    assert.match(text, new RegExp(`^---\\nname: ${skill}\\n`));
+    assert.ok(text.includes(template), skill);
+    assert.doesNotMatch(text, /NPM_TOKEN=\S/);
+  }
 });

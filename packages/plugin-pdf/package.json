@@ -1,0 +1,31 @@
+{
+  "name": "@pulpfixer/plugin-pdf",
+  "version": "1.0.0",
+  "description": "pf PDF plugin: read text and data out of PDF files and write PDF files from layout templates, as IO adapter for pipes (pf pdf)",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./api": {
+      "source": "./src/api.ts",
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@pulpfixer/kit": "workspace:*"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  }
+}

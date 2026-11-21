@@ -1,0 +1,86 @@
+---
+title: Writing an IO adapter
+---
+
+# Writing an IO adapter
+
+An IO adapter teaches [pipes](/plugins/io) one more kind of input and output: a web API, a queue, a bucket, a file format. pf ships `db`, `csv`, `memory` and `stdout`; the rest are add-on packages named `@pulpfixer/io-<name>`. Unlike pipe and query packages they are **open** (no clearance), so keep anything private out of them: an adapter is a way to talk to a kind of thing, and the pipe says which thing.
+
+## Start from the template
+
+```bash
+pf template apply io-adapter acme-api --summary "Acme API as rows"
+cd io-acme-api
+pnpm install
+pf a "read orders from the Acme API (paged, bearer token from ACME_TOKEN) and write them back in bulk"
+pnpm test
+pf ps                                      # publish @pulpfixer/io-acme-api to cellars, asks first
+```
+
+The repo has a working sample (`src/adapter.ts` reads and writes JSON Lines files) with tests for the contract, a round trip, a failed pipe and a dry run; the cellars `.npmrc` and `publish:cellars` script; pf's repo setup; and an `AGENTS.md` with the rules below. The agent follows it with the bundled `io-adapter` skill.
+
+Once published, a user runs `pf plugin install io-acme-api` and `pf io` lists the adapter with where it came from.
+
+## The contract
+
+`@pulpfixer/kit/io` holds it:
+
+```ts
+import { ioRef, type IoAdapter, type IoRef } from '@pulpfixer/kit/io';
+
+interface Config { baseUrl: string; tokenEnv: string }
+
+export const adapter: IoAdapter<Config> = {
+  id: 'acme-api',                         // lowercase letters, digits, dashes; what pipes and pf io show
+  label: 'Acme API',
+  describe: (c) => `Acme API at ${c.baseUrl}`,            // one safe line for confirmations: no secrets
+  async source(config, io) {              // optional: present when it can be read
+    return {
+      batches: () => pages(config, io.batchSize),         // an AsyncIterable<Row[]>: at most io.batchSize rows each
+      close: async () => undefined,
+    };
+  },
+  async sink(config, io) {                // optional: present when it can be written to
+    return {
+      write: async (batch) => { /* stage this batch */ },
+      close: async (ok) => { /* ok: make it visible; !ok: discard it. Release every handle either way */ },
+    };
+  },
+};
+
+export const source = (config: Config): IoRef<Config> => ioRef('acme-api', config);   // what pipes call
+export const sink = (config: Config): IoRef<Config> => ioRef('acme-api', config);
+```
+
+| Piece | Meaning |
+|-------|---------|
+| `describe(config)` | one line shown before a pipe writes (`Acme API at https://...`). Never a secret, a token or a password |
+| `source(config, io)` | opens a read. `batches()` yields arrays of rows (plain objects) of at most `io.batchSize`; never read everything at once when the backend can page |
+| `sink(config, io)` | opens a write. `write(batch)` arrives in order; `close(ok)` ends it: `true` commit, `false` roll back or delete the temporary file |
+| `io.dryRun` | when true a sink changes nothing and says what it would do with `io.log(line)`. Reads are fine |
+| `io.ctx` | the pf context (the repo, the working directory) |
+| `harmless` | `true` only when writing changes nothing outside this process (memory, the terminal): pf then does not ask before a pipe writes to it. Leave it off otherwise |
+
+A `source` or `sink` that fails throws an `Error`; its message is shown to the user, so say what to fix. A `hint` string property on the error is printed as the "try" line.
+
+## The plugin
+
+The package default-exports a plugin that carries the adapter:
+
+```ts
+export default { name: 'io-acme-api', api: 3, commands: [], ioAdapters: [adapter] };
+```
+
+`api: 3` is what a plugin that brings IO adapters declares (revision 3 added `ioAdapters`; see [Writing a plugin](/plugins/writing-a-plugin)); pf refuses `ioAdapters` below it. pf registers the adapters when it loads the plugin, in a registry every plugin's copy of the kit shares (on `globalThis`, because each registry plugin installs its own kit). An adapter with the same id as an earlier one replaces it, so never reuse `db`, `csv`, `memory` or `stdout`. Export `source` and `sink` by name too: a pipe package imports them for its inputs and outputs.
+
+## Rules
+
+1. **Stream** in batches; do not hold a whole input in memory.
+2. **All or nothing** when the backend allows it: nothing visible before `close(true)`, everything discarded on `close(false)`.
+3. **Dry run changes nothing.**
+4. **No secrets in `describe`, logs or errors**, and none in the code or the pipe's config: take a name or a reference (an environment variable name, a keychain item) and resolve it when the adapter opens. A pipe's config is committed in a repo.
+5. **No third-party runtime dependencies** in pf's own adapters. An add-on may have npm dependencies (they install into `~/.pf/plugins` with it); keep them few.
+
+## Testing
+
+Test against a fake of the service, never the real one. The template's `tests/adapter.test.ts` shows the shape: `validateIoAdapter(adapter)` from `@pulpfixer/kit/io` (the same check pf runs at load), a round trip through a sink and a source, `close(false)` leaving nothing, a dry run. To test a pipe that uses the adapter, register it with `registerIoAdapters([adapter], 'test')` and run the pipe's command.

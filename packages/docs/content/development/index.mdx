@@ -12,6 +12,9 @@ pf is a pnpm workspace. The shipped packages are versioned together by `versions
 | `packages/plugin-aws` | `@pulpfixer/plugin-aws` | The AWS plugin. Depends only on kit |
 | `packages/plugin-db` | `@pulpfixer/plugin-db` | The database plugin (`pf db`, the `sql` and `Db` helpers, `defineQueries`). Depends only on kit |
 | `packages/db-postgres`, `db-mysql` | `@pulpfixer/db-<name>` | Database drivers: registry plugins with a `dbDrivers` list. Neither has an npm runtime dependency: each is a hand-written protocol client (PostgreSQL; MySQL / MariaDB) on Node's `net`, `tls` and `crypto`. Published alone, not a dependency of core. SQLite needs no npm package (`node:sqlite`), so it is built into `plugin-db` (`src/drivers/sqlite.ts`) |
+| `packages/plugin-io` | `@pulpfixer/plugin-io` | The IO plugin: IO adapters and pipes (`definePipes`, the chain helpers, `pf io`). Depends only on kit |
+| `packages/plugin-csv` | `@pulpfixer/plugin-csv` | The CSV plugin: the `csv` adapter and `pf csv`. Depends only on kit |
+| `packages/plugin-pdf` | `@pulpfixer/plugin-pdf` | The PDF plugin: a hand-written PDF reader and writer, layout templates, the `pdf` adapter and `pf pdf`. Depends only on kit |
 | `packages/plugin-system` | `@pulpfixer/plugin-system` | The system plugin (`pf sys`). Depends only on kit |
 | `packages/plugin-yubikey` | `@pulpfixer/plugin-yubikey` | The YubiKey plugin. Depends only on kit |
 | `packages/preset-cursor` | `@pulpfixer/preset-cursor` | Data only: the standard Cursor extensions and settings. Published alone, not a dependency of core: `pf sys apply cursor` fetches its latest version |
@@ -26,6 +29,12 @@ flowchart LR
   core --> ykPlugin[plugin-yubikey]
   core --> sysPlugin[plugin-system]
   core --> dbPlugin[plugin-db]
+  core --> ioPlugin[plugin-io]
+  core --> csvPlugin[plugin-csv]
+  core --> pdfPlugin[plugin-pdf]
+  ioPlugin --> kit
+  csvPlugin --> kit
+  pdfPlugin --> kit
   dbPlugin --> kit
   core --> kit
   awsPlugin --> kit

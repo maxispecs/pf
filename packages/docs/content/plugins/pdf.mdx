@@ -1,0 +1,161 @@
+---
+title: PDF plugin
+---
+
+# PDF plugin
+
+The built-in `pdf` plugin (`@pulpfixer/plugin-pdf`) reads and writes PDF files. It registers the `pdf` [IO adapter](/plugins/io): as an **input** a pipe gets whatever can be extracted from a PDF (lines of text, pages, positioned text, metadata, form fields), and as an **output** it turns rows into a PDF through a **layout template**. A template is built in (`text`, `lines`, `table`, `records`), a JSON layout file, or code from a [pipe package](/plugins/writing-a-pipe-package). The plugin also adds `pf pdf` to look at files and make PDFs from the shell.
+
+It is hand-written, with no npm dependency, and deliberately "standard":
+
+- **Reading** handles unencrypted PDFs (classic and compressed cross-reference tables, object streams, broken files are rebuilt by scanning). Text comes out in reading order from the fonts' encodings and `ToUnicode` maps. A **scanned** PDF has no text to extract (there is no OCR), and an **encrypted** file is refused with a hint to decrypt it first.
+- **Writing** uses the standard Helvetica, Times and Courier fonts (regular, bold, italic), Latin-1 text and compressed content streams. A character the fonts cannot show (say `€` is fine, but `Ω` or an emoji is not) becomes `?` and pf says how many were replaced.
+
+```bash
+pf pdf info report.pdf                         # pages, size, title, author, dates, version
+pf pdf text report.pdf                         # the text, to standard output
+pf pdf text report.pdf --pages 2-4
+pf pdf show report.pdf                         # the lines as a table (page, line, text, y)
+pf pdf show report.pdf --extract items --json  # every positioned piece of text
+pf pdf write out.pdf --from orders.csv         # a table
+pf pdf write out.pdf --from notes.ndjson --template lines --option lineNumbers=true
+```
+
+Every command prints its messages to standard error, so `pf pdf text f.pdf > f.txt` and `pf pdf show f.pdf --json | jq` stay clean.
+
+## `pf pdf` commands
+
+| Command | What it does |
+|---------|--------------|
+| `pf pdf info <file> [--json]` | version, page count, the size of each page, and the document information |
+| `pf pdf text <file> [--pages 1-3]` | the text of the pages, one line per line of the page, pages separated by a blank line |
+| `pf pdf show <file> [--extract lines\|pages\|items\|fields\|meta] [--pages 1-3] [--limit n] [--json]` | the rows a pipe would get, as a table (default `--limit 20`) or JSON |
+| `pf pdf write <out.pdf> --from <file> [options]` | rows from a CSV, JSON (a list of objects) or NDJSON file (`-` is standard input, give `--format`) into a PDF |
+| `pf pdf templates [--json]` | the built-in templates and your saved layouts |
+| `pf pdf templates new <name> [--dir <folder>] [--dry-run]` | save a starter layout you can edit |
+
+`pf pdf write` options: `--template <id\|file.json\|name>` (default `table`), `--option name=value` (repeatable; a value that is a number, `true` / `false` or JSON is read as such), `--title`, `--author`, `--size A4` (also `A3`, `A5`, `Letter`, `Legal`), `--orientation portrait\|landscape`, `--margin <pt>`, `--format csv\|json\|ndjson` (else taken from the extension), `--overwrite`, `--dry-run` and `--yes`.
+
+It refuses a file that exists unless you give `--overwrite`, which asks before replacing (`--yes` without a terminal, otherwise it fails). Under `--dry-run` it renders the PDF in memory (so a bad template or option is still an error) and says `would write ...` without writing anything. Exit codes: 2 for usage, 1 for a failure.
+
+## The adapter: reading
+
+```ts
+import { pdfSource } from '@pulpfixer/plugin-pdf/api';
+
+inputs: { lines: pdfSource({ path: 'invoice.pdf', extract: 'lines', pages: '1-2' }) },
+```
+
+| Source option | Meaning |
+|---------------|---------|
+| `path` | the file, or `-` for standard input |
+| `extract` | what a row is (below), `lines` by default |
+| `pages` | `"1-3,5"`, `"4-"`, a number or a list of numbers (default: all). A page that does not exist is an error |
+
+| `extract` | One row per | Columns |
+|-----------|-------------|---------|
+| `lines` | line of text | `page`, `line`, `text`, `y` |
+| `pages` | page | `page`, `text`, `width`, `height` |
+| `items` | piece of positioned text | `page`, `x`, `y`, `width`, `size`, `font`, `text` |
+| `text` | the whole selection (one row) | `pages`, `text` |
+| `meta` | file (one row) | `title`, `author`, `subject`, `keywords`, `creator`, `producer`, `created`, `modified`, `pages`, `version` |
+| `fields` | AcroForm form field | `name`, `type`, `value` |
+
+Coordinates are PDF points from the bottom left of the page (72 points to an inch). Lines are rebuilt from the text by baseline, and a space is added where the gap between two pieces is wider than about 15% of the font size. Dates are ISO strings.
+
+A PDF is not a table: pf gives you the text and where it is, and the pipe decides what it means (`flow.filter`, a regular expression, a column by `x`). Pages with no text (scans, drawings) give no rows; images are not extracted.
+
+## The adapter: writing
+
+```ts
+import { pdfSink } from '@pulpfixer/plugin-pdf/api';
+
+outputs: { report: pdfSink({ path: 'report.pdf', template: 'table', options: { title: 'Orders', columns: ['id', 'customer', 'total'] }, title: 'Orders', author: 'Billing' }) },
+```
+
+| Sink option | Meaning |
+|-------------|---------|
+| `path` | the file, or `-` for standard output (refused when that is a terminal) |
+| `template` | a built-in id, the path of a `.json` layout, the name of a saved layout, or a `PdfTemplate` object. Default `table` |
+| `options` | handed to the template (below) |
+| `page` | `{ size, orientation, margin }`; overrides the template's own page setup key by key |
+| `title`, `author`, `subject`, `keywords` | the document information |
+| `mode` | `create` (default) refuses a file that exists, `overwrite` replaces it |
+
+The PDF is made in memory while the pipe runs and written when it succeeds: a temporary file next to the target, moved into place (`create` never replaces a file that appeared in the meantime, `overwrite` keeps the file's permissions). A failed pipe leaves nothing. Under `--dry-run` it renders anyway and says `would write ...`.
+
+### Built-in templates
+
+All of them accept `title` (a heading on the first page), `pageNumbers` (`Page n of N`, default `true`), `size` (font size) and `font` (`Helvetica`, `Times-Roman`, `Courier`, with `-Bold` / `-Italic`, or `sans` / `serif` / `mono`). An option a template does not know is an error, so a typo does not pass quietly.
+
+| Template | Draws | Own options |
+|----------|-------|-------------|
+| `text` | the `text` column of each row (else the only column) as a paragraph | `field` |
+| `lines` | one monospaced line per row; a list value gives one line per item | `field`, `lineNumbers`, `wrap` |
+| `table` | the rows as a table, header repeated on each page, numbers right aligned | `columns`, `zebra`, `header` |
+| `records` | each row as a block of `label: value` lines | `columns`, `titleField` |
+
+`columns` is a list of names, or objects `{ "key": "total", "title": "Total", "width": 80, "align": "right" }`. Without it the table uses the columns of the first rows (a row may not bring new ones later).
+
+### JSON layouts
+
+A layout file says what goes where and holds **no code**. Save a starter with `pf pdf templates new invoice`: it lands in `~/.pf/pdf/templates/invoice.json` (under `PF_HOME` if set), and from then on `--template invoice` and `template: 'invoice'` find it. A path (`./layouts/invoice.json`) works too, and so does a layout inside a repo.
+
+```json
+{
+  "schema": 1,
+  "page": { "size": "A4", "margin": 54 },
+  "header": { "left": "{{param.company}}", "right": "{{date}}", "rule": true },
+  "footer": { "center": "Page {{page}} of {{pages}}" },
+  "start": [{ "type": "heading", "text": "{{param.title}}" }],
+  "body": { "layout": "table", "columns": ["id", "name"] },
+  "end": [{ "type": "text", "text": "{{count}} rows" }]
+}
+```
+
+- `body` is either a built-in layout with its options (`{ "layout": "table", ... }`) or `{ "each": [blocks] }`, which draws the blocks once for every row.
+- **Blocks:** `text` (`text`, optional `font`, `size`, `color`, `bold`, `italic`, `align`, `after`), `heading` (`text`, `level`), `line`, `space` (`height`), `pageBreak` and `fields` (`label` / `value` pairs, drawn as aligned lines). `start` blocks come before the rows, `end` blocks after.
+- **Bands:** `header` and `footer` each have `left`, `center`, `right`, `size`, `color`, `rule`, and are drawn on every page.
+- **Placeholders** `{{name}}`: a column of the row (in `each`), `index` (the row number, in `each`), `count` (the number of rows, in `end`), `title`, `date`, `page` and `pages` (bands only), and `param.<option>` for the sink's `options` (`--option company=Acme`). A placeholder with no value is an error rather than blank text.
+- Colors are `"#rrggbb"`, one of `black`, `white`, `gray`, `red`, `green`, `blue`, or `[r, g, b]` (0 to 1).
+
+The file is checked strictly: an unknown key, a wrong type or an over-long text is an error that names the path (`body.each[0].size: must be a number from 4 to 72`). A layout is data; it cannot read files or run anything.
+
+### Templates in code
+
+A pipe package (or any plugin) can write a template as code and hand it to the sink. It gets the drawing API of `PdfDoc`:
+
+```ts
+import { definePdfTemplate, pdfSink } from '@pulpfixer/plugin-pdf/api';
+
+export const invoice = definePdfTemplate({
+  id: 'invoice',
+  summary: 'One invoice: a header, the lines as a table, a total',
+  options: { customer: 'who it is for' },
+  start(ctx) {
+    ctx.doc.heading(`Invoice for ${String(ctx.options.customer)}`, 1);
+    ctx.state.total = 0;
+  },
+  write(rows, ctx) {
+    ctx.doc.table(
+      [{ title: 'Item' }, { title: 'Amount', align: 'right' }],
+      rows.map((r) => [String(r.item), String(r.amount)]),
+    );
+    for (const r of rows) ctx.state.total = (ctx.state.total as number) + Number(r.amount);
+  },
+  finish(ctx) {
+    ctx.doc.space(8);
+    ctx.doc.paragraph(`Total: ${ctx.state.total}`, { bold: true, align: 'right' });
+  },
+});
+
+outputs: { pdf: pdfSink({ path: 'invoice.pdf', template: invoice, options: { customer: 'Acme' } }) },
+```
+
+`start` runs once, `write` once per batch of rows (in order), `finish` once. `ctx` holds `doc`, `options`, `title`, `date` (`YYYY-MM-DD`), `rowCount` and `state` (yours, fresh for each PDF: never keep per-PDF data on the template). `PdfDoc` has a flow cursor that adds pages for you (`paragraph`, `heading`, `rule`, `space`, `lines`, `table` / `beginTable`, `newPage`, `ensure`) and absolute drawing (`text`, `line`, `rect`, `textWidth`, `wrap`), plus `onEachPage(hook)` for headers and footers (it runs when the document is finished, so the page count is known). Text is Latin-1; anything else is replaced by `?` and reported.
+
+## Notes
+
+- **No agent or MCP tools.** A PDF can hold user data, so the plugin gives the agent nothing to read or write one with. The command line and pipes are the way in.
+- **Fonts are not embedded.** The 14 standard fonts are assumed by every viewer, which keeps files small and the writer simple. A PDF with other scripts or a corporate font needs an adapter or template package that brings a writer with embedding.
+- Text extraction is a best effort for what a PDF is: it has glyphs at positions and no notion of paragraphs or tables. Columns, rotated text and unusual fonts can come out in an order you did not expect: use `--extract items` to see where each piece sits.

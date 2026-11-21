@@ -1,0 +1,49 @@
+{
+  "name": "@pulpfixer/io-{{name}}",
+  "version": "1.0.0",
+  "description": "{{summary}}",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "prepack": "pnpm run build",
+    "publish:cellars": "pnpm run typecheck && pnpm run test && pnpm publish --no-git-checks"
+  },
+  "scriptsInfo": {
+    "Build & check": {
+      "build": "Compile src/ to dist/",
+      "typecheck": "Type-check without emitting",
+      "test": "Run the adapter tests (contract, round trip, rollback, dry run)",
+      "prepack": "Build before the package is packed (publish runs it)"
+    },
+    "Deploy": {
+      "publish:cellars": "Check, test and publish @pulpfixer/io-{{name}} to cellars (what pf ps runs)"
+    }
+  },
+  "dependencies": {
+    "@pulpfixer/kit": "^{{version:@pulpfixer/kit}}"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.0",
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  }
+}

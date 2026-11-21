@@ -14,6 +14,7 @@ import {
   copyFail,
   describePortal,
   execute,
+  flush,
   MessageReader,
   parse,
   parseAuth,
@@ -340,6 +341,124 @@ export class PgConnection {
         }
       }
     });
+  }
+
+  /**
+   * One statement that reads, as batches of at most `batchSize` rows. The rows are fetched a batch at a
+   * time from one portal (Execute with a row limit), so a big result is never held whole. The connection
+   * is used by this statement until the iteration ends: finish it or stop it (`return()`, which `for await`
+   * does on `break`), and other statements wait their turn meanwhile.
+   */
+  stream(text: string, values: readonly unknown[], batchSize: number): AsyncGenerator<Record<string, unknown>[]> {
+    if (!Number.isInteger(batchSize) || batchSize < 1) throw new Error('the batch size must be a whole number of at least 1');
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
+    return (async function* () {
+      const prev = self.chain;
+      let release: () => void = () => undefined;
+      self.chain = prev.then(() => new Promise<void>((resolve) => (release = resolve)));
+      await prev;
+      if (self.closed) {
+        release();
+        throw self.closed;
+      }
+      const wire = self.wire;
+      let phase: 'open' | 'syncing' | 'done' = 'open';
+      try {
+        wire.send(Buffer.concat([parse(text), bind(values.map(encodeParam)), describePortal(), execute(batchSize), flush()]));
+        let fields: Field[] = [];
+        let batch: Record<string, unknown>[] = [];
+        let error: Error | null = null;
+        const endPortal = (): void => {
+          if (phase !== 'open') return;
+          phase = 'syncing';
+          wire.send(sync());
+        };
+        for (;;) {
+          const m = await wire.next();
+          switch (m.type) {
+            case 'T':
+              fields = parseRowDescription(m.body);
+              break;
+            case 'D':
+              if (error) break;
+              try {
+                batch.push(decodeRow(fields, parseDataRow(m.body)));
+              } catch (e) {
+                error = e as Error;
+                endPortal();
+              }
+              break;
+            case 's': // PortalSuspended: a full batch
+              if (error || phase !== 'open') break;
+              if (batch.length > 0) {
+                const full = batch;
+                batch = [];
+                yield full;
+              }
+              if (phase === 'open') wire.send(Buffer.concat([execute(batchSize), flush()]));
+              break;
+            case 'C':
+              endPortal();
+              break;
+            case 'E': {
+              const e = new PostgresError(parseErrorFields(m.body));
+              if (e.fatal) throw e;
+              error ??= e;
+              // After an error the server skips everything up to Sync.
+              endPortal();
+              break;
+            }
+            case 'G':
+              wire.send(Buffer.concat([copyFail('pf does not support COPY'), sync()]));
+              phase = 'syncing';
+              break;
+            case 'H':
+            case 'W':
+              error ??= new Error('pf does not support COPY');
+              endPortal();
+              break;
+            case 'Z':
+              phase = 'done';
+              if (error) throw error;
+              if (batch.length > 0) yield batch;
+              return;
+            case '1': // ParseComplete
+            case '2': // BindComplete
+            case 'n': // NoData
+            case 'I': // EmptyQueryResponse
+            case 'd': // CopyData
+            case 'c': // CopyDone
+            case 'N': // NoticeResponse
+            case 'A': // NotificationResponse
+              break;
+            case 'S':
+              self.parameters.set(...parseParameterStatus(m.body));
+              break;
+            default:
+              throw new ProtocolError(`unexpected message "${m.type}"`);
+          }
+        }
+      } catch (e) {
+        if (e instanceof ProtocolError || (e instanceof PostgresError && e.fatal)) wire.fail(e);
+        throw e;
+      } finally {
+        try {
+          // Stopped early (or failed): close the portal and read up to ReadyForQuery so the connection is clean.
+          if (phase === 'open' && !wire.failed) {
+            phase = 'syncing';
+            wire.send(sync());
+          }
+          while (phase === 'syncing' && !wire.failed) {
+            if ((await wire.next()).type === 'Z') phase = 'done';
+          }
+        } catch {
+          // the connection is gone; nothing to clean
+        } finally {
+          release();
+        }
+      }
+    })();
   }
 
   /** Terminate after the statements already queued. */

@@ -54,6 +54,11 @@ export interface DbSession {
   /** Run `fn` between BEGIN and COMMIT on one connection (ROLLBACK when it throws). */
   transaction<T>(fn: (tx: DbSession) => Promise<T>): Promise<T>;
   close(): Promise<void>;
+  /**
+   * Optional: run a statement that reads and hand the rows over in batches of at most `batchSize`, without
+   * holding the whole result. Without it, a reader runs `execute` and cuts the rows into batches itself.
+   */
+  stream?(query: CompiledQuery, batchSize: number): AsyncIterable<Record<string, unknown>[]>;
 }
 
 export interface DbDriver {

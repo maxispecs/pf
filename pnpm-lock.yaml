@@ -96,7 +96,25 @@ importers:
         specifier: workspace:*
         version: link:../kit
 
+  packages/plugin-csv:
+    dependencies:
+      '@pulpfixer/kit':
+        specifier: workspace:*
+        version: link:../kit
+
   packages/plugin-db:
+    dependencies:
+      '@pulpfixer/kit':
+        specifier: workspace:*
+        version: link:../kit
+
+  packages/plugin-io:
+    dependencies:
+      '@pulpfixer/kit':
+        specifier: workspace:*
+        version: link:../kit
+
+  packages/plugin-pdf:
     dependencies:
       '@pulpfixer/kit':
         specifier: workspace:*
@@ -126,15 +144,45 @@ importers:
       '@pulpfixer/plugin-aws':
         specifier: workspace:*
         version: link:../plugin-aws
+      '@pulpfixer/plugin-csv':
+        specifier: workspace:*
+        version: link:../plugin-csv
       '@pulpfixer/plugin-db':
         specifier: workspace:*
         version: link:../plugin-db
+      '@pulpfixer/plugin-io':
+        specifier: workspace:*
+        version: link:../plugin-io
+      '@pulpfixer/plugin-pdf':
+        specifier: workspace:*
+        version: link:../plugin-pdf
       '@pulpfixer/plugin-system':
         specifier: workspace:*
         version: link:../plugin-system
       '@pulpfixer/plugin-yubikey':
         specifier: workspace:*
         version: link:../plugin-yubikey
+
+  packages/template-io-adapter:
+    devDependencies:
+      '@pulpfixer/kit':
+        specifier: workspace:*
+        version: link:../kit
+
+  packages/template-pipe-package:
+    devDependencies:
+      '@pulpfixer/kit':
+        specifier: workspace:*
+        version: link:../kit
+      '@pulpfixer/plugin-csv':
+        specifier: workspace:*
+        version: link:../plugin-csv
+      '@pulpfixer/plugin-db':
+        specifier: workspace:*
+        version: link:../plugin-db
+      '@pulpfixer/plugin-io':
+        specifier: workspace:*
+        version: link:../plugin-io
 
   packages/template-query-package:
     devDependencies:

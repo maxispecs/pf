@@ -114,6 +114,24 @@ await db.close();
 
 A statement can also be a plain string (`db.all('SELECT 1')`). `withDb(name, fn)` opens, runs and always closes. `connectWith(driver, form, params)` opens a database from values you hold, without a saved connection. The helpers do not touch the agent: there are no database tools for it, because results can hold user data.
 
+## The database as an IO adapter
+
+The plugin also registers the `db` [IO adapter](/plugins/io), so a [pipe](/plugins/writing-a-pipe-package) can read from a connection or write into one. The connection is a saved one (`pf db add`); the pipe only names it.
+
+```ts
+import { dbSink, dbSource, sql } from '@pulpfixer/plugin-db/api';
+
+dbSource({ connection: 'billing', query: sql`SELECT id, amount FROM invoices WHERE period = ${month}` })   // input
+dbSink({ connection: 'reporting', table: 'invoices_copy' })                                               // output: batched INSERTs
+dbSink({ connection: 'reporting', write: (db, rows) => db.exec(sql`...`) })                              // output: your own write
+```
+
+- A **source** is opened read-only (`writes: 'deny'`) and streams the result in batches through `db.stream(query, batchSize)`. A driver that can fetch in pieces never holds the whole table: PostgreSQL does (a portal fetched `batchSize` rows at a time, the connection held until the stream ends), and so does SQLite. A driver without `stream` falls back to reading the whole result and slicing it, so every driver works, only the big-table case differs.
+- A **sink** runs in one transaction held open for the whole pipe: committed when the pipe worked, rolled back when it failed. Under `--dry-run` it opens no transaction and reports what it would insert (`would insert 42 rows into invoices_copy`; a `write` sink prints each statement).
+- A `table` sink inserts the row keys as columns; consecutive rows with the same keys share one `INSERT`, and no statement binds more than 30000 values. Table and column names go through `sql.id`.
+
+`db.stream(q, batchSize = 500)` is also in the `Db` helpers for your own scripts: an async iterable of row arrays.
+
 ## Writing a driver
 
 A driver is a registry plugin (`@pulpfixer/db-<name>`) that default-exports a plugin with `api: 2` and a `dbDrivers` list. Kit's `@pulpfixer/kit/db` has the contract:
@@ -140,5 +158,7 @@ const driver: DbDriver = {
 const plugin: Plugin = { name: 'db-mydb', api: 2, summary: 'My database driver', commands: [], dbDrivers: [driver] };
 export default plugin;
 ```
+
+A driver may also give its session an optional `stream(query, batchSize)` that yields row batches (an async iterable) for big results; without it `Db.stream` buffers the result and slices it.
 
 pf registers a driver when it loads the plugin, in a registry that every plugin's copy of the kit shares. A driver may have npm dependencies: they install into `~/.pf/plugins` with it. pf's own drivers have none (PostgreSQL and MySQL speak their protocols themselves), and SQLite, built on Node's own `node:sqlite`, is small enough to live inside `@pulpfixer/plugin-db` (`src/drivers/sqlite.ts`) instead of in a package of its own.

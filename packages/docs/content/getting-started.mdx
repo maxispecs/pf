@@ -50,7 +50,7 @@ The full one-liner already ran the first two steps below (after the only-pf one,
 | Step | Command | What it does |
 |------|---------|--------------|
 | The pulpfixer suite | `pf sys apply suite` | Applies the standard Cursor setup (extensions and `settings.json` values) and installs the suite extensions, today [Background Tone](/plugins/bg-tone) (a per-repo color tint and logo, plus action buttons for the repo). Additive: nothing is uninstalled, your other settings stay, and the old file is backed up first. Shows the plan and asks (`--yes` skips the question and is needed without a terminal, `--dry-run` previews). Reload the Cursor window afterwards |
-| Skills | `pf skill install --all` | Installs the registry skills into `~/.pf/skills` (`pf skill available` lists them; `--to claude`, `--to cursor` or `--to agents` puts them where that agent looks). pf also ships a few skills of its own (`pf-repo`, `ship-staging`, `fix-failing`, `deploy-setup`, `troubleshoot`, `query-package`), and `pf update` keeps the `ver` and `pnpm` skills current on its own |
+| Skills | `pf skill install --all` | Installs the registry skills into `~/.pf/skills` (`pf skill available` lists them; `--to claude`, `--to cursor` or `--to agents` puts them where that agent looks). pf also ships a few skills of its own (`pf-repo`, `ship-staging`, `fix-failing`, `deploy-setup`, `troubleshoot`, `query-package`, `pipe-package`, `io-adapter`), and `pf update` keeps the `ver` and `pnpm` skills current on its own |
 | Check the machine | `pf doctor` | Checks the install, the registry, skills and agents, your config and the repo you are in |
 | Plugins | `pf plugin available`, then `pf plugin install <name>` | Optional registry plugins (`@pf-plugins/<name>`) that add commands. The AWS, YubiKey and system plugins are built in |
 | Your repos | `pf rp` (in each repo) | Links the repo to this machine, wires pf's versioning and pnpm helpers into it, sets the Background Tone logo and offers the suite install if Cursor lacks it |
@@ -66,6 +66,7 @@ pf r                  # = pf dev: run the repo, whatever its stack
 pf il                 # = pf install local: the repo's own local install target
 pf ds                 # = pf deploy staging: finds the target itself
 pf d "fix login"      # deploy (staging, else production) with a message
+pf g                  # = pf repo commit: commit everything, message from the last chat
 pf gp                 # = pf git push: the primary remote, then the backup remotes
 pf ps                 # = pf publish staging: runs the repo's publish:cellars, asks first
 pf docs               # = pf doc: run the repo's docs site

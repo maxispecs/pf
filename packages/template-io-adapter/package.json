@@ -1,0 +1,23 @@
+{
+  "name": "@pulpfixer/template-io-adapter",
+  "version": "1.0.0",
+  "description": "pf template: a new IO adapter add-on (@pulpfixer/io-<name>), created by pf template apply io-adapter <name>",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./template.json": "./template.json"
+  },
+  "files": [
+    "template.json",
+    "files"
+  ],
+  "devDependencies": {
+    "@pulpfixer/kit": "workspace:*"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  }
+}

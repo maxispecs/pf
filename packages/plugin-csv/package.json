@@ -1,0 +1,31 @@
+{
+  "name": "@pulpfixer/plugin-csv",
+  "version": "1.0.0",
+  "description": "pf CSV plugin: read and write CSV files as IO adapter for pipes (pf csv)",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./api": {
+      "source": "./src/api.ts",
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@pulpfixer/kit": "workspace:*"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  }
+}

@@ -49,17 +49,19 @@ export function bundledVersion(plugin: string): string {
 }
 
 /**
- * Database drivers and query packages live in the company scope next to the built-in plugins:
- * `@pulpfixer/db-<name>` (a driver for `pf db`, open to everyone) and `@pulpfixer/query-<name>` (queries on
- * a database; cellars marks the prefix as clearance, so only cleared users can see or install them).
- * Their plugin name keeps the prefix: `db-mysql`, `query-revrec`.
+ * Database drivers, IO adapters, query packages and pipe packages live in the company scope next to the
+ * built-in plugins: `@pulpfixer/db-<name>` (a driver for `pf db`) and `@pulpfixer/io-<name>` (an adapter for
+ * pipes) are open to everyone; `@pulpfixer/query-<name>` (queries on a database) and `@pulpfixer/pipe-<name>`
+ * (pipes that move rows between databases and files) hold data access, so cellars marks those prefixes as
+ * clearance and only cleared users can see or install them.
+ * Their plugin name keeps the prefix: `db-mysql`, `io-s3`, `query-revrec`, `pipe-billing`.
  */
-const SCOPED_RE = new RegExp(`^${BUILTIN_SCOPE}/((?:db|query)-${NAME})$`);
-const SCOPED_NAME_RE = new RegExp(`^(?:db|query)-${NAME}$`);
+const SCOPED_RE = new RegExp(`^${BUILTIN_SCOPE}/((?:db|io|query|pipe)-${NAME})$`);
+const SCOPED_NAME_RE = new RegExp(`^(?:db|io|query|pipe)-${NAME}$`);
 
-/** `@pulpfixer/query-revrec` -> true. Such packages need clearance on the registry when they are queries. */
-export function isQueryPackage(name: string): boolean {
-  return new RegExp(`^${BUILTIN_SCOPE}/query-${NAME}$`).test(name);
+/** `@pulpfixer/query-revrec` or `@pulpfixer/pipe-billing` -> true. The registry answers 404 for these when the account lacks clearance. */
+export function isClearancePackage(name: string): boolean {
+  return new RegExp(`^${BUILTIN_SCOPE}/(?:query|pipe)-${NAME}$`).test(name);
 }
 
 export function isPluginPackage(name: string): boolean {
@@ -233,8 +235,8 @@ export function viewRemote(pluginOrPackage: string, version?: string, timeoutMs 
     if (!/E404|404/.test(error)) break;
   }
   if (/E404|404/.test(error)) {
-    // The registry answers 404 for a package the account may not read, so a query package may only be out of reach.
-    if (candidates.length === 1 && isQueryPackage(candidates[0]!)) return { error: `no ${candidates[0]} on the registry, or your account lacks the clearance to see it` };
+    // The registry answers 404 for a package the account may not read, so a query or pipe package may only be out of reach.
+    if (candidates.length === 1 && isClearancePackage(candidates[0]!)) return { error: `no ${candidates[0]} on the registry, or your account lacks the clearance to see it` };
     return { error: `no ${candidates.join(' or ')} on the registry` };
   }
   return { error };

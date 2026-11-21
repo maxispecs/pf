@@ -22,7 +22,8 @@ Run `pf list` for the list that applies in the current directory, and `pf help` 
 | `pf actions [--all] [--json]` | The repo's actions (run, deploy, publish, docs, custom commands) with an icon and a featured flag: the buttons of the Background Tone card. `pf actions feature\|unfeature <id...>` chooses them. See [Tools and repo setup](/commands/tools-and-repo#pf-actions) |
 | `pf init` | Write `pulpfixer.json` for this repo from what was detected |
 | `pf repo` | Hook pf's tools into this repo (link, pnpm commands, versioning, background tone logo and extension, `.pf/` in `.gitignore`, deploy), or update them |
-| `pf template [list \| apply <template> ...]` | Create a new repo from a template fetched from cellars, for example a query package. See [Templates](/templates) |
+| `pf repo commit` (`pf g`) | Commit everything uncommitted with a message the agent writes from the last Cursor chat; shows the files and message and asks first. See [Tools and repo setup](/commands/tools-and-repo#pf-repo-commit) |
+| `pf template [list \| apply <template> ...]` | Create a new repo from a template fetched from cellars, for example a query package, a pipe package or an IO adapter. See [Templates](/templates) |
 | `pf agent [prompt]` | Open the coding agent (Claude Code, Codex or Cursor). See [Agent](/agent) |
 | `pf troubleshoot [prompt]` (`pf t`) | Find out what is wrong with this repo's deployment on AWS: pf reads how it deploys, links the AWS profile, then starts the agent with scoped AWS access. See [Troubleshoot](/agent/troubleshoot) |
 | `pf profile [...]` | Project profiles: which AWS account a repo uses and what the agent may read there |
@@ -33,6 +34,7 @@ Run `pf list` for the list that applies in the current directory, and `pf help` 
 | `pf s3 <file...>`, `pf dl [name]` | AWS plugin: upload to and download from a shared exchange bucket |
 | `pf sys [list\|diff\|apply\|capture]` | System plugin: apply the standard Cursor setup (extensions and settings) from a preset. See [System plugin](/plugins/system) |
 | `pf otp`, `pf yk` | YubiKey plugin: OATH codes and a security audit |
+| `pf io [adapters]`, `pf csv [show\|columns]`, `pf pdf [info\|text\|show\|write\|templates]` | IO plugin: list the IO adapters pipes use; CSV plugin: look at a CSV file; PDF plugin: look at a PDF, or make one from rows with a template. Pipes themselves are plugins (`pf <pipe-package> <pipe>`). See [IO plugin](/plugins/io), [CSV plugin](/plugins/csv) and [PDF plugin](/plugins/pdf) |
 | `pf host ...` | pf on EC2 instances. See [Host mode](/host) |
 | `pf art [list\|show <name>]` | List the pictures pf prints and which commands show them |
 | `pf setup`, `update`, `uninstall`, `doctor` | Machine tooling |

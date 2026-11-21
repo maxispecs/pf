@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { registerDbDrivers, validateDbDriver } from '@pulpfixer/kit/db';
+import { registerIoAdapters, validateIoAdapter } from '@pulpfixer/kit/io';
 import { PLUGIN_API, type Plugin } from '@pulpfixer/kit/plugin';
 import { readJson } from '@pulpfixer/kit/util';
 import { entryOf, installedPlugins, type InstalledPlugin } from './registry.js';
@@ -44,12 +45,26 @@ export function validatePlugin(value: unknown): Plugin | string {
       if (problem) return problem;
     }
   }
+  if (p.ioAdapters !== undefined) {
+    if (!Array.isArray(p.ioAdapters)) return 'ioAdapters must be an array of IO adapters';
+    if ((p.api ?? 1) < 3) return 'ioAdapters needs "api": 3';
+    for (const a of p.ioAdapters) {
+      const problem = validateIoAdapter(a);
+      if (problem) return problem;
+    }
+  }
   return p as Plugin;
 }
 
-/** Make the database drivers of these plugins known to `pf db` and to query packages. */
-export function registerPluginDrivers(plugins: readonly Plugin[]): void {
-  for (const p of plugins) if (p.dbDrivers?.length) registerDbDrivers(p.dbDrivers);
+/**
+ * Make what these plugins contribute known: their database drivers (for `pf db` and query packages) and
+ * their IO adapters (for pipes). `builtin` says they ship inside pf, which `pf io adapters` shows.
+ */
+export function registerPluginContributions(plugins: readonly Plugin[], builtin = false): void {
+  for (const p of plugins) {
+    if (p.dbDrivers?.length) registerDbDrivers(p.dbDrivers);
+    if (p.ioAdapters?.length) registerIoAdapters(p.ioAdapters, builtin ? 'built in' : `plugin ${p.name}`);
+  }
 }
 
 async function loadOne(info: InstalledPlugin): Promise<LoadedPlugin | string> {
@@ -64,7 +79,7 @@ async function loadOne(info: InstalledPlugin): Promise<LoadedPlugin | string> {
   }
 }
 
-/** Import one plugin installed after startup and register its database drivers. Returns why it failed, or null. */
+/** Import one plugin installed after startup and register its database drivers and IO adapters. Returns why it failed, or null. */
 export async function loadInstalledPlugin(name: string): Promise<string | null> {
   const info = installedPlugins().find((p) => p.name === name);
   if (!info) return `${name} is not installed`;
@@ -75,7 +90,7 @@ export async function loadInstalledPlugin(name: string): Promise<string | null> 
     return r;
   }
   loaded = [...loaded.filter((l) => l.package !== info.package), r];
-  registerPluginDrivers([r.plugin]);
+  registerPluginContributions([r.plugin]);
   return null;
 }
 
@@ -98,7 +113,7 @@ export async function loadInstalledPlugins(reservedNames: string[] = []): Promis
     } else {
       taken.add(r.plugin.name);
       loaded.push(r);
-      registerPluginDrivers([r.plugin]);
+      registerPluginContributions([r.plugin]);
     }
   }
 }

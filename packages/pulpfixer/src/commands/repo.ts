@@ -17,6 +17,7 @@ import type { Command } from '@pulpfixer/kit/types';
 import { startAgent } from '../agent/launch.js';
 import { homeSkillFile } from '../skills/stack.js';
 import { pickDeploy, runDeployAuto } from './deploy.js';
+import { REPO_COMMIT_USAGE, runRepoCommit } from './repocommit.js';
 import { setupTone } from './tone.js';
 import { cliRevision, resolveVerCli } from './ver.js';
 
@@ -331,9 +332,10 @@ export const repoCommand: Command = {
   name: 'repo',
   summary: 'Hook pf tools into this repo (link, pnpm commands, versioning, background tone, local settings, deploy), or update them',
   group: 'Tools',
-  usage: 'pf repo [--dry-run] [--no-link] [--no-pnpm] [--no-ver] [--no-tone] [--no-local] [--no-deploy] [--deploy] | pf repo --list',
+  usage: `pf repo [--dry-run] [--no-link] [--no-pnpm] [--no-ver] [--no-tone] [--no-local] [--no-deploy] [--deploy] | pf repo --list | ${REPO_COMMIT_USAGE}`,
   async run(ctx: Context, args: string[]) {
     const c = err();
+    if (args[0] === 'commit') return runRepoCommit(ctx, args.slice(1));
     const rest = [...args];
     if (takeFlag(rest, '--list', '-l')) return listLinks();
     const dryRun = takeFlag(rest, '--dry-run', '-n');

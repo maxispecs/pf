@@ -11,7 +11,7 @@ import { printActionArt } from './art/index.js';
 import { err, out } from '@pulpfixer/kit/ui/palette';
 import { badge, h2, promptLine, termLine } from '@pulpfixer/kit/ui/text';
 import { BUILTIN_PLUGINS } from './plugins/index.js';
-import { loadInstalledPlugins, registerPluginDrivers } from './plugins/loader.js';
+import { loadInstalledPlugins, registerPluginContributions } from './plugins/loader.js';
 import { installDbDriver } from './plugins/manage.js';
 import { setDbDriverInstaller } from '@pulpfixer/kit/db';
 import { cachedLatest, refreshInBackground } from './update/check.js';
@@ -79,7 +79,7 @@ function suggest(name: string, ctx: Context): string[] {
 export async function main(argv: string[]): Promise<number> {
   const ctx = buildContext();
   const first = argv[0];
-  registerPluginDrivers(BUILTIN_PLUGINS);
+  registerPluginContributions(BUILTIN_PLUGINS, true);
   await loadInstalledPlugins(BUILTIN_PLUGINS.map((p) => p.name));
   setDbDriverInstaller(installDbDriver);
   // Set by the ./pf launcher. Read it once and drop it so commands pf starts (a global pf) don't inherit it.

@@ -4,7 +4,7 @@ title: Templates
 
 # Templates
 
-`pf template` creates a new repo from a **template**: a data package `@pulpfixer/template-<name>` on cellars. pf installs the template's latest version every time it applies one, so a template changes with a version bump on the registry and needs no new pf. The first template is `query-package`, the starting point of a [query package](/plugins/writing-a-query-package).
+`pf template` creates a new repo from a **template**: a data package `@pulpfixer/template-<name>` on cellars. pf installs the template's latest version every time it applies one, so a template changes with a version bump on the registry and needs no new pf. The templates are `query-package` (the starting point of a [query package](/plugins/writing-a-query-package)), `pipe-package` (a [pipe package](/plugins/writing-a-pipe-package)) and `io-adapter` (an [IO adapter add-on](/plugins/writing-an-io-adapter)).
 
 ```bash
 pf template                                         # list templates: cached here and on the registry
@@ -12,6 +12,8 @@ pf template apply query-package revrec --driver mysql
 pf template apply query-package revrec --connection billing --driver mysql --summary "Revenue recognition"
 pf template apply query-package revrec --driver mysql --dry-run    # the file list, nothing written
 pf template apply query-package revrec --driver mysql --dir ~/dev/query-revrec
+pf template apply pipe-package orders --input db --output csv --connection billing
+pf template apply io-adapter acme-api
 ```
 
 In a terminal, pf asks for each value you did not pass, with its default filled in. Without one, it uses the defaults and stops with the usage line when a required value is missing, so scripts and agents pass flags.
@@ -67,6 +69,31 @@ pf ps            # publish to cellars, asks first
 ```
 
 The agent uses the bundled `query-package` skill: it asks you for the schema (it has no database tools and never connects), writes each query with the `sql` template, adds a test per query, runs the checks, bumps the version, and leaves publishing to you.
+
+## The pipe-package template
+
+`pf template apply pipe-package <name>` creates a [pipe package](/plugins/writing-a-pipe-package) repo (`pipe-<name>/`, package `@pulpfixer/pipe-<name>`):
+
+| Value | Default | Meaning |
+|-------|---------|---------|
+| `name` | (required) | the command (`pf <name>`) and the package name |
+| `--summary` | `Pipes for <name>` | one line for the command list |
+| `--input` | `db` | what the sample `copy` pipe reads: `db` or `csv` |
+| `--output` | `csv` | what the sample pipe writes: `csv` or `db` |
+| `--connection` | `<name>` | the `pf db` connection, when an end is a database |
+
+It has `src/index.ts` (`definePipes` with the `copy` pipe to replace), `tests/pipes.test.ts` (memory adapter, fake driver and temp files, no database), `package.json` (depending on `plugin-io`, `plugin-db`, `plugin-csv` and `kit` at the versions this pf ships, and `publish:cellars`), `AGENTS.md` with the rules for the agent, the cellars `.npmrc`, and the rest. The agent side is the bundled `pipe-package` skill.
+
+## The io-adapter template
+
+`pf template apply io-adapter <name>` creates an [IO adapter add-on](/plugins/writing-an-io-adapter) repo (`io-<name>/`, package `@pulpfixer/io-<name>`):
+
+| Value | Default | Meaning |
+|-------|---------|---------|
+| `name` | (required) | the adapter id, starting with a letter: lowercase letters, digits and dashes |
+| `--summary` | `The <name> IO adapter for pf pipes` | one line for `pf io` |
+
+It has `src/adapter.ts` (a working JSON Lines adapter to replace), `src/index.ts` (the plugin: `api: 3` and `ioAdapters`), `tests/adapter.test.ts` (contract, round trip, failed pipe, dry run), `package.json` (depending on `kit` only), `AGENTS.md`, the cellars `.npmrc` and the rest. The agent side is the bundled `io-adapter` skill.
 
 ## Writing a template
 

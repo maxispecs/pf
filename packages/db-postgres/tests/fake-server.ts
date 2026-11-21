@@ -27,6 +27,8 @@ export interface FakeServer {
   startupParams: Record<string, string>;
   /** Message types received, `X` for Terminate. */
   received: string[];
+  /** The row limit of each Execute message, in order (0 = no limit). */
+  executes: number[];
   close(): Promise<void>;
 }
 
@@ -78,7 +80,7 @@ export const TYPED: [string, number, string | null][] = [
 
 export async function fakeServer(o: FakeOptions = {}): Promise<FakeServer> {
   const password = o.password ?? 'secret';
-  const state: FakeServer = { port: 0, statements: [], lastValues: [], startupParams: {}, received: [], close: async () => undefined };
+  const state: FakeServer = { port: 0, statements: [], lastValues: [], startupParams: {}, received: [], executes: [], close: async () => undefined };
   const sockets = new Set<net.Socket>();
 
   const server = net.createServer((socket) => {
@@ -94,6 +96,8 @@ export async function fakeServer(o: FakeOptions = {}): Promise<FakeServer> {
     let scram: { bare: string; serverFirst: string; salted: Buffer } | null = null;
     let batchFailed = false;
     let text = '';
+    // `SELECT series N` answers N rows (`n` = 1..N) through a portal, `SELECT series N fail` errors on the second Execute.
+    let streaming: { total: number; sent: number; fail: boolean; ignoring: boolean } | null = null;
 
     const loggedIn = (): void => {
       socket.write(
@@ -192,6 +196,9 @@ export async function fakeServer(o: FakeOptions = {}): Promise<FakeServer> {
         const r = new Reader(m.body);
         r.cstring();
         text = r.cstring();
+        const series = /^SELECT series (\d+)( fail)?$/.exec(text);
+        streaming = series ? { total: Number(series[1]), sent: 0, fail: series[2] !== undefined, ignoring: false } : null;
+        if (streaming) state.statements.push(text);
         if (text === 'FATAL') {
           socket.end(error('57P01', 'terminating connection due to administrator command', 'FATAL'));
           batchFailed = true;
@@ -210,6 +217,35 @@ export async function fakeServer(o: FakeOptions = {}): Promise<FakeServer> {
           const len = r.i32();
           state.lastValues.push(len === -1 ? null : r.bytes(len).toString('utf8'));
         }
+        return;
+      }
+      if (streaming && m.type === 'D') {
+        socket.write(Buffer.concat([msg('1'), msg('2'), rowDescription([['n', 23]])]));
+        return;
+      }
+      if (streaming && m.type === 'E') {
+        const r = new Reader(m.body);
+        r.cstring();
+        const max = r.i32();
+        state.executes.push(max);
+        if (streaming.ignoring) return;
+        if (streaming.fail && streaming.sent > 0) {
+          streaming.ignoring = true;
+          socket.write(error('57014', 'canceling statement due to statement timeout'));
+          return;
+        }
+        const count = max === 0 ? streaming.total - streaming.sent : Math.min(max, streaming.total - streaming.sent);
+        const out: Buffer[] = [];
+        for (let i = 1; i <= count; i++) out.push(dataRow([String(streaming.sent + i)]));
+        streaming.sent += count;
+        // Like the real server: a full batch is PortalSuspended even when nothing is left, the next Execute then completes.
+        out.push(max !== 0 && count === max ? msg('s') : complete(`SELECT ${streaming.sent}`));
+        socket.write(Buffer.concat(out));
+        return;
+      }
+      if (streaming && m.type === 'S') {
+        streaming = null;
+        socket.write(ready(tx));
         return;
       }
       if (m.type === 'S') {

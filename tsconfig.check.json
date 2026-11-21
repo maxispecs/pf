@@ -9,7 +9,11 @@
   "include": [
     "packages/*/src",
     "packages/*/tests",
-    "packages/template-query-package/files/src"
+    "packages/template-query-package/files/src",
+    "packages/template-pipe-package/files/src",
+    "packages/template-pipe-package/files/tests",
+    "packages/template-io-adapter/files/src",
+    "packages/template-io-adapter/files/tests"
   ],
   "exclude": [
     "packages/ext-bg-tone"

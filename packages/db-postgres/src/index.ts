@@ -49,10 +49,12 @@ export const postgresDriver: DbDriver = {
   },
   async connect(form, params) {
     const conn = await PgConnection.open(connectionConfig(form, params));
-    return makeSession(
+    const session = makeSession(
       async (q) => toResult(await conn.query(q.text, q.values)),
       () => conn.close(),
     );
+    session.stream = (q, batchSize) => conn.stream(q.text, q.values, batchSize);
+    return session;
   },
 };
 

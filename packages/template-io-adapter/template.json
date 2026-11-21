@@ -1,0 +1,26 @@
+{
+  "summary": "An IO adapter add-on: @pulpfixer/io-<name>, a new kind of input and output for pf pipes, published to cellars",
+  "dir": "io-{{name}}",
+  "params": {
+    "name": {
+      "prompt": "Adapter name",
+      "help": "the adapter id pipes use (and pf io adapters shows); lowercase letters, digits and dashes",
+      "pattern": "[a-z][a-z0-9]*(-[a-z0-9]+)*"
+    },
+    "summary": {
+      "prompt": "One-line summary",
+      "default": "The {{name}} IO adapter for pf pipes"
+    }
+  },
+  "rename": {
+    "_package.json": "package.json",
+    "_gitignore": ".gitignore",
+    "_npmrc": ".npmrc"
+  },
+  "next": [
+    "pnpm install",
+    "pf a   (ask the agent to write the adapter: it follows AGENTS.md and the io-adapter skill)",
+    "pnpm test",
+    "pf ps  (publish @pulpfixer/io-{{name}} to cellars; asks first)"
+  ]
+}

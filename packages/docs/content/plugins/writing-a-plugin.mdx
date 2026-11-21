@@ -30,7 +30,7 @@ export default plugin;
 
 A `Plugin` has `name`, `summary` and `commands`, plus optional `entries(ctx)` (menu entries), `tools(ctx)` (agent tools served by `pf mcp`) and `api` (the plugin interface revision the plugin was written for, default 1). A command's `run` returns the exit code.
 
-A plugin that needs the newer interface says so with `api`. Revision 2 added `dbDrivers` (database drivers for `pf db`, needs `api: 2`; see [Database plugin](/plugins/db#writing-a-driver)). A plugin of revision 1 keeps working.
+A plugin that needs the newer interface says so with `api`. Revision 2 added `dbDrivers` (database drivers for `pf db`, needs `api: 2`; see [Database plugin](/plugins/db#writing-a-driver)). Revision 3 added `ioAdapters` (IO adapters for pipes, needs `api: 3`; see [Writing an IO adapter](/plugins/writing-an-io-adapter)). A plugin of an older revision keeps working.
 
 A built-in plugin lives in `packages/plugin-<name>` instead, and also needs to be added to the build, the release order, the `core` dependencies and `packages/pulpfixer/src/plugins/index.ts`. See [Development](/development).
 

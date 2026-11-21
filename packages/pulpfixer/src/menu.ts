@@ -200,6 +200,14 @@ export function entriesFor(ctx: Context): Entry[] {
         });
       }
       fromRepo.push({
+        name: 'repo commit',
+        summary: 'Commit everything with a message written from the last chat',
+        group: 'Develop',
+        ...action('repo:commit', ['repo', 'commit']),
+        detail: 'pf g, asks first',
+        run: () => repoCommand.run(ctx, ['commit']),
+      });
+      fromRepo.push({
         name: 'git',
         summary: gitCommand.summary,
         group: 'Develop',

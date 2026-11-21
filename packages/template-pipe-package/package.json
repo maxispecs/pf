@@ -1,0 +1,26 @@
+{
+  "name": "@pulpfixer/template-pipe-package",
+  "version": "1.0.0",
+  "description": "pf template: a new pipe package (@pulpfixer/pipe-<name>), created by pf template apply pipe-package <name>",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./template.json": "./template.json"
+  },
+  "files": [
+    "template.json",
+    "files"
+  ],
+  "devDependencies": {
+    "@pulpfixer/kit": "workspace:*",
+    "@pulpfixer/plugin-csv": "workspace:*",
+    "@pulpfixer/plugin-db": "workspace:*",
+    "@pulpfixer/plugin-io": "workspace:*"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  }
+}

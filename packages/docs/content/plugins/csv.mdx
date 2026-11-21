@@ -1,0 +1,53 @@
+---
+title: CSV plugin
+---
+
+# CSV plugin
+
+The built-in `csv` plugin (`@pulpfixer/plugin-csv`) reads and writes CSV (and TSV) files. It registers the `csv` [IO adapter](/plugins/io), so a pipe can read a file as an input or write one as an output, and it adds a small command to look at files.
+
+```bash
+pf csv show orders.csv                 # the first 20 rows as a table
+pf csv show orders.csv --limit 100 --json
+pf csv show data.tsv --delimiter tab --no-header
+pf csv columns orders.csv              # just the column names
+```
+
+`pf csv show` takes `--limit <n>`, `--delimiter <c>` (`tab` for a tab), `--no-header` (the file has no header line: columns are named `column1`, `column2`, ...) and `--json`. It reads the file in a stream, so a big file only costs what you ask to see.
+
+## The parser
+
+- Fields may be quoted with `"`; a quote inside is doubled (`""`). Quoted fields can hold the delimiter, quotes and line breaks.
+- Lines end with LF, CRLF or CR. A UTF-8 byte order mark is dropped. Blank lines are skipped.
+- Every cell comes out as **text**: `1` is the string `"1"` and an empty cell is the empty string. Convert in the pipe (`Number(row.cents)`), on purpose.
+- A header with an empty or repeated column name is an error (set `columns` to name them yourself). A record with more or fewer cells than the columns is an error that names the record.
+
+## The adapter
+
+```ts
+import { csvSink, csvSource } from '@pulpfixer/plugin-csv/api';
+
+inputs:  { rows: csvSource({ path: 'in.csv', delimiter: ',', header: true }) },
+outputs: { file: csvSink({ path: 'out.csv', mode: 'create' }) },
+```
+
+| Source option | Meaning |
+|---------------|---------|
+| `path` | the file, or `-` for standard input |
+| `delimiter` | one character, `,` by default (`'\t'` for TSV) |
+| `header` | the first line holds the column names (default `true`) |
+| `columns` | the column names: they name the fields when there is no header and replace the names in it when there is |
+
+| Sink option | Meaning |
+|-------------|---------|
+| `path` | the file, or `-` for standard output |
+| `mode` | `create` (default) refuses a file that exists, `overwrite` replaces it, `append` adds to it |
+| `columns` | the columns and their order (default: the keys of the first batch; a later row may not add more) |
+| `header` | write the header line (default `true`; not written again when appending to a file that already has one) |
+| `delimiter` | as for the source |
+
+A sink never leaves a half-written file. It writes a temporary file next to the target and moves it into place when the pipe worked; `create` uses a no-clobber move, so a file that appears while the pipe runs is not overwritten, and `overwrite` keeps the existing file's permissions. `append` copies the existing file first, so a failed pipe leaves the original as it was. Values are written as text: `null` and `undefined` are empty cells, dates are ISO strings, objects are JSON, bytes show as `<n bytes>`. A cell that starts with `=`, `+`, `-` or `@` is **not** altered: if the file will be opened in a spreadsheet from untrusted data, sanitise those cells in the pipe.
+
+Under `--dry-run` a CSV sink writes nothing and says `would write N rows to <file>`. With `path: '-'` the sink prints to standard output (pipeable: pf's own messages go to stderr).
+
+The helpers behind it are in the API too: `parseCsv(text)`, `toCsv(rows)` and the chunk-safe `CsvParser`.

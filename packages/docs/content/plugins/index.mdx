@@ -12,6 +12,9 @@ A plugin adds commands (and menu entries) to pf. Some ship inside pf; the rest c
 | `system` (built in) | `@pulpfixer/plugin-system` | `pf sys`: apply standard app configuration (Cursor extensions and settings) from presets published as `@pulpfixer/preset-<name>`. See [System plugin](/plugins/system) and the [Background Tone extension](/plugins/bg-tone) |
 | `yubikey` (built in) | `@pulpfixer/plugin-yubikey` | `pf otp`, `pf yk`. See [YubiKey plugin](/plugins/yubikey) |
 | `db` (built in) | `@pulpfixer/plugin-db` | `pf db`: saved database connections and one set of query helpers. SQLite is built in; the other drivers (`@pulpfixer/db-postgres`, `db-mysql`) are plugins `pf db` installs when you first need one; query packages (`@pulpfixer/query-<name>`) are clearance-only plugins that hold queries. See [Database plugin](/plugins/db) and [Writing a query package](/plugins/writing-a-query-package) |
+| `io` (built in) | `@pulpfixer/plugin-io` | `pf io`: IO adapters and **pipes**, scripted IO that reads rows from inputs and writes them to outputs. Pipe packages (`@pulpfixer/pipe-<name>`) are clearance-only plugins that hold pipes; adapter add-ons (`@pulpfixer/io-<name>`) bring new kinds of input and output. See [IO plugin](/plugins/io), [Writing a pipe package](/plugins/writing-a-pipe-package) and [Writing an IO adapter](/plugins/writing-an-io-adapter) |
+| `csv` (built in) | `@pulpfixer/plugin-csv` | `pf csv`: look at CSV files, and the `csv` IO adapter pipes read and write. See [CSV plugin](/plugins/csv) |
+| `pdf` (built in) | `@pulpfixer/plugin-pdf` | `pf pdf`: look at PDF files (info, text, extracted rows) and make a PDF from rows with a layout template, and the `pdf` IO adapter: read what a PDF holds, write rows through built-in, JSON or code templates. See [PDF plugin](/plugins/pdf) |
 | registry plugins | `@pf-plugins/<name>` | whatever the plugin defines |
 
 ## Managing registry plugins
@@ -29,7 +32,7 @@ Installed plugins live in an npm prefix at `~/.pf/plugins`. Its `package.json` `
 
 ## Safety
 
-- Only the `@pf-plugins` scope installs (plus `@pulpfixer/db-<name>` drivers and `@pulpfixer/query-<name>` packages), because a plugin runs inside pf with your rights.
+- Only the `@pf-plugins` scope installs (plus `@pulpfixer/db-<name>` drivers, `@pulpfixer/io-<name>` adapters, and `@pulpfixer/query-<name>` and `@pulpfixer/pipe-<name>` packages), because a plugin runs inside pf with your rights.
 - A plugin can add commands, but never replaces a built-in one. Plugin commands are appended after every built-in and de-duplicated.
 - A plugin that throws on load is skipped, with a note in `pf plugin list`. A failing plugin never stops pf.
 - `PF_NO_PLUGINS=1` skips loading registry plugins, to debug.

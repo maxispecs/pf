@@ -1,0 +1,89 @@
+---
+title: IO plugin
+---
+
+# IO plugin
+
+The built-in `io` plugin (`@pulpfixer/plugin-io`) is the base of pf's data plumbing. It lets one piece of code **read rows from somewhere and write them somewhere else** without knowing what either end is. Each kind of place is an **IO adapter**:
+
+| Adapter | From | What it reads and writes | Read | Write |
+|---------|------|--------------------------|------|-------|
+| `db` | [database plugin](/plugins/db) | a pf db connection: a query in, a table (or your own write) out | yes | yes |
+| `csv` | [CSV plugin](/plugins/csv) | a CSV file, or standard input / output | yes | yes |
+| `pdf` | [PDF plugin](/plugins/pdf) | a PDF file: lines, pages, positioned text, metadata or form fields in; rows through a layout template out | yes | yes |
+| `memory` | `io` | rows in an array (tests, small glue code) | yes | yes |
+| `stdout` | `io` | the terminal: `ndjson`, `csv` or `table` | - | yes |
+| `<name>` | `@pulpfixer/io-<name>` | whatever the add-on brings, see [Writing an IO adapter](/plugins/writing-an-io-adapter) | | |
+
+```bash
+pf io                  # the adapters, what each can do and where it came from
+pf io adapters --json  # the same, for scripts
+pf plugin install io-<name>   # an adapter add-on from the registry
+```
+
+Rows are plain objects (column name to value). They travel in **batches** (500 by default, `--batch-size`), so a big table or file never has to fit in memory.
+
+## Pipes
+
+A **pipe** is a scripted IO method: it declares its inputs and outputs and the code couples them. Pipes live in their own repos, as [pipe packages](/plugins/writing-a-pipe-package) (`@pulpfixer/pipe-<name>`), the way queries live in query packages. Running one:
+
+```bash
+pf orders export --month 2026-10 --out orders.csv
+```
+
+```
+reads  revenue: database "billing" (query)
+writes file: csv file orders.csv (create)
+"orders export" writes to csv file orders.csv. Run it? [y/N]
+read revenue 4210 rows
+wrote file 4210 rows
+```
+
+Every pipe takes the same flags next to its own params:
+
+| Flag | Meaning |
+|------|---------|
+| `--dry-run` | read the inputs, write nothing: each output says what it would do (`would insert 4210 rows into archive`) |
+| `--yes` | do not ask before writing (needed without a terminal) |
+| `--batch-size <n>` | rows per batch |
+
+pf shows where the pipe reads and writes, and **asks before it writes** to anything that is not harmless (the terminal and memory are). Without a terminal and without `--yes` it refuses. Exit codes: 0 done, 1 failed or declined, 2 usage.
+
+### All or nothing
+
+The outputs are closed after the body ran, and each is told whether the pipe worked:
+
+- a **database** output is one transaction: committed when the pipe worked, rolled back when it did not;
+- a **CSV** output writes a temporary file next to the target and moves it into place at the end, so a failed pipe leaves the old file (or none) untouched;
+- if one output fails to commit, the outputs after it are told to discard.
+
+## Writing pipes in code
+
+A pipe package default-exports `definePipes(...)`; see [Writing a pipe package](/plugins/writing-a-pipe-package) for the whole picture. Inside a pipe, the helpers chain:
+
+```ts
+import { from } from '@pulpfixer/plugin-io/api';
+
+async run({ inputs, outputs }) {
+  const result = await from(inputs.orders!)
+    .filter((r) => r.paid === 1)
+    .map((r) => ({ id: r.id, euros: Number(r.cents) / 100 }))
+    .to(outputs.paid!, outputs.audit!);        // every row goes to every sink
+  // result = { rows, batches }
+}
+```
+
+| Helper | Does |
+|--------|------|
+| `from(source)`, `fromRows(rows)`, `concat(a, b, ...)` | start a chain from an input, an array, or several chains in a row |
+| `.map(fn)`, `.flatMap(fn)`, `.filter(fn)`, `.tap(fn)` | change, expand, drop or look at each row (`fn` may be async) |
+| `.pick(...cols)`, `.omit(...cols)`, `.rename({ old: 'new' })` | reshape the columns |
+| `.take(n)`, `.batch(n)` | stop early, regroup into batches of `n` |
+| `.to(...sinks)` | write to the outputs, in order, and return `{ rows, batches }` |
+| `.rows()`, `.collect()`, `.count()` | iterate the rows, or collect / count them (collect keeps everything in memory: only for small inputs) |
+
+A chain is lazy and can be used once. `pf` opens and closes the inputs and outputs: a pipe never opens a file or a connection itself.
+
+## No agent tools
+
+There are no agent or MCP tools for IO, for the same reason as the database: rows can hold user data. The agent helps *write* pipes (the bundled `pipe-package` and `io-adapter` skills) and never runs one.

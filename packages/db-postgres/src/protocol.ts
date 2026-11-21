@@ -157,9 +157,15 @@ export function describePortal(): Buffer {
   return message('D', new Writer().bytes(Buffer.from('P', 'latin1')).cstring(''));
 }
 
-/** Execute the unnamed portal, every row. */
-export function execute(): Buffer {
-  return message('E', new Writer().cstring('').i32(0));
+/** Execute the unnamed portal: every row, or at most `maxRows` (the server then answers PortalSuspended and waits for another Execute). */
+export function execute(maxRows = 0): Buffer {
+  if (!Number.isInteger(maxRows) || maxRows < 0) throw new Error('maxRows must be a whole number of 0 or more');
+  return message('E', new Writer().cstring('').i32(maxRows));
+}
+
+/** Ask the server to send what it has so far, without ending the statement (Sync does that). */
+export function flush(): Buffer {
+  return message('H');
 }
 
 export function sync(): Buffer {

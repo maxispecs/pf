@@ -26,6 +26,7 @@ const RETURNS_ROWS = /^\s*(select|with|pragma|values|explain)\b|\breturning\b/i;
 
 interface Statement {
   columns?(): unknown[];
+  iterate?(...v: SqlValue[]): Iterable<Record<string, unknown>>;
   all(...v: SqlValue[]): Record<string, unknown>[];
   run(...v: SqlValue[]): { changes: number | bigint; lastInsertRowid: number | bigint };
 }
@@ -38,6 +39,23 @@ export function runStatement(stmt: Statement, q: CompiledQuery): QueryResult {
   const r = stmt.run(...values);
   const insertId = Number(r.lastInsertRowid);
   return { rows: [], affected: Number(r.changes), ...(insertId && /^\s*(insert|replace)\b/i.test(q.text) ? { insertId } : {}) };
+}
+
+/** The rows of a statement that reads, in batches, one row at a time out of SQLite. Exported for tests. */
+export function streamStatement(stmt: Statement, q: CompiledQuery, batchSize: number): AsyncGenerator<Record<string, unknown>[]> {
+  return (async function* () {
+    if (typeof stmt.iterate !== 'function') throw new Error('this SQLite cannot iterate a statement');
+    if (typeof stmt.columns === 'function' ? stmt.columns().length === 0 : !RETURNS_ROWS.test(q.text)) throw new Error('only a statement that returns rows can be streamed');
+    let batch: Record<string, unknown>[] = [];
+    for (const row of stmt.iterate(...q.values.map(bindValue))) {
+      batch.push({ ...row });
+      if (batch.length >= batchSize) {
+        yield batch;
+        batch = [];
+      }
+    }
+    if (batch.length) yield batch;
+  })();
 }
 
 /** SQLite through Node's own `node:sqlite` (22.13+), loaded on connect so pf still starts on older Node. */
@@ -59,9 +77,11 @@ export const sqliteDriver: DbDriver = {
       throw new Error(`SQLite needs Node 22.13 or newer (this is ${process.version})`);
     }
     const db = new sqlite.DatabaseSync(file, { readOnly: params.readonly === true });
-    return makeSession(
+    const session = makeSession(
       async (q) => runStatement(db.prepare(q.text) as unknown as Statement, q),
       async () => db.close(),
     );
+    session.stream = (q, batchSize) => streamStatement(db.prepare(q.text) as unknown as Statement, q, batchSize);
+    return session;
   },
 };

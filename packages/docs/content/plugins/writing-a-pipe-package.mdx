@@ -1,0 +1,122 @@
+---
+title: Writing a pipe package
+---
+
+# Writing a pipe package
+
+A pipe package is a plugin that holds scripted IO for one job (say, the monthly billing export to CSV, or loading a vendor's CSV into the reporting database) and turns it into a command. A **pipe** declares its inputs and outputs and your code decides how rows flow between them. It uses the [IO plugin](/plugins/io) for the run (confirmation, batches, transactions, dry run) and the adapters for the places: the [database plugin](/plugins/db) (`dbSource`, `dbSink`), the [CSV plugin](/plugins/csv) (`csvSource`, `csvSink`), the [PDF plugin](/plugins/pdf) (`pdfSource`, `pdfSink` and `definePdfTemplate` for a layout in code) and any [IO adapter add-on](/plugins/writing-an-io-adapter). It contains data handling and nothing about how to connect or how to write a file.
+
+## Start from the template
+
+A pipe package lives in its own repo, like a [query package](/plugins/writing-a-query-package). `pf template apply pipe-package` creates one that builds, tests and publishes as it is (see [Templates](/templates)):
+
+```bash
+pf template apply pipe-package orders --input db --output csv --connection billing
+cd pipe-orders
+pnpm install
+pf a "write the monthly export pipe; the tables are in ../billing/migrations"
+pnpm test
+pf ps                                      # publish @pulpfixer/pipe-orders to cellars, asks first
+```
+
+The repo has `src/index.ts` (a `definePipes` with one sample `copy` pipe from the kind of input to the kind of output you chose), tests that need no database (memory adapter, fake driver, temp files), the cellars `.npmrc` and `publish:cellars` script, pf's repo setup (link, pnpm commands, versioning), and an `AGENTS.md` with the rules below. The coding agent follows it with the bundled `pipe-package` skill: it asks you for the schema and a sample of each CSV (it has no database tools and never connects), writes the pipes, adds tests, runs the checks and bumps the version. It never runs a pipe that writes; running and publishing stay your steps.
+
+```ts
+// @pulpfixer/pipe-orders: src/index.ts
+import { csvSink } from '@pulpfixer/plugin-csv/api';
+import { dbSource, sql } from '@pulpfixer/plugin-db/api';
+import { definePipes } from '@pulpfixer/plugin-io/api';
+
+export default definePipes({
+  name: 'orders',
+  summary: 'Order data out of the billing database',
+  pipes: {
+    export: {
+      summary: 'Orders of a month to a CSV file',
+      params: { month: { required: true, help: 'YYYY-MM' }, out: { required: true, help: 'the CSV file to create' } },
+      inputs: ({ month }) => ({
+        orders: dbSource({ connection: 'billing', query: sql`SELECT id, customer, cents FROM orders WHERE period = ${month}` }),
+      }),
+      outputs: ({ out }) => ({ file: csvSink({ path: String(out) }) }),
+      transform: (row) => ({ id: row.id, customer: row.customer, euros: Number(row.cents) / 100 }),
+    },
+  },
+});
+```
+
+```bash
+pf orders                                   # lists the pipes and their flags
+pf orders export --month 2026-10 --out orders.csv --dry-run   # reads, shows what it would write
+pf orders export --month 2026-10 --out orders.csv             # asks, then writes
+pf orders export --month 2026-10 --out orders.csv --yes       # no question (needed without a terminal)
+```
+
+## Pipes
+
+Each entry in `pipes` has:
+
+| Field | Meaning |
+|-------|---------|
+| `summary` | one line for the list |
+| `params` | the flags it takes, by name: `{ type?: 'string' \| 'number' \| 'boolean', required?, default?, help?, choices? }`, the same as a query's. A param named `minCents` is `--min-cents` |
+| `inputs` | where rows come from: an object of named references (`{ orders: dbSource({ ... }) }`), or a function of the params that returns one |
+| `outputs` | where rows go, the same shape |
+| `transform(row, params)` | optional: change each row on its way. Return a row, an array of rows, or `null` to drop it. It may be async |
+| `run(p)` | optional: the coupling, in code. Use one of `transform` and `run`, not both |
+
+Without `run`, a pipe copies its **one** input to **every** output, through `transform` when there is one (a pipe with several inputs needs a `run`). `run` receives `{ params, inputs, outputs, from, ctx, dryRun, log }`: the opened handles by the names you declared, and `from(source)`, the start of a chain (see [the helpers](/plugins/io#writing-pipes-in-code)):
+
+```ts
+async run({ inputs, outputs, from, log }) {
+  const customers = new Map((await from(inputs.customers!).collect()).map((c) => [c.id, c.name]));   // a small lookup, in memory
+  const result = await from(inputs.orders!)
+    .map((o) => ({ ...o, customer: customers.get(o.customerId) ?? 'unknown' }))
+    .filter((o) => Number(o.cents) > 0)
+    .to(outputs.report!, outputs.archive!);
+  log(`${result.rows} orders`);
+},
+```
+
+pf shows the inputs and outputs before anything runs, so declare every one of them: **never open a file or a connection inside `transform` or `run`**. pf opens them, hands them over, closes them, and rolls the outputs back if the pipe fails.
+
+### Rules
+
+- **Stream.** A chain moves one batch at a time. `collect()` keeps everything in memory: use it for small lookups only.
+- **Fail loudly.** Do not catch an error to carry on: a failed pipe discards what it wrote (rolled back transaction, no file), a half-successful one cannot be told apart from a finished one.
+- **SQL only through the `sql` tagged template.** Values are bound parameters; `sql.id` is for names from a fixed list. A db source can only read.
+- **CSV cells are text.** Convert (`Number`, dates) in `transform`, on purpose. Money and big numbers stay strings or are converted deliberately, never through floating point.
+- **No connection details or secrets in the code.** The connection name is the only link to the database; credentials live in `pf db`.
+
+### Database outputs
+
+`dbSink({ connection, table })` inserts the rows in batches inside one transaction (the columns are the row's keys; consecutive rows with the same keys go into one `INSERT`, and no statement binds more than 30000 values). For an upsert, an update or several tables give it your own write instead:
+
+```ts
+outputs: { archive: dbSink({ connection: 'reporting', write: (db, rows) => db.exec(sql`...`) }) },   // db is the transaction
+```
+
+`write(db, rows)` runs once per batch on that transaction. Under `--dry-run` the statements are printed (`would run ...`) and not run.
+
+## Publishing with clearance
+
+Name the package `@pulpfixer/pipe-<name>` and depend on `@pulpfixer/plugin-io`, `@pulpfixer/kit` and the adapters you use (`@pulpfixer/plugin-db`, `@pulpfixer/plugin-csv`). Cellars treats `@pulpfixer/pipe-` as a **clearance** prefix, like `@pulpfixer/query-`: a package first published under it is created restricted, so only users with the clearance role can see or install it, and everyone else gets a 404. The one-time setup by a cellars administrator is the same as for [query packages](/plugins/writing-a-query-package#publishing-with-clearance) (mark the `@pulpfixer/pipe-` prefix before the first publish).
+
+For the user:
+
+```bash
+pf plugin install pipe-orders      # installs @pulpfixer/pipe-orders
+pf db add billing --driver mysql   # the connection it expects, with the credentials the user is entitled to
+```
+
+A pipe that names an adapter pf does not have stops with `no IO adapter "x" is installed` and the command that installs it (`pf plugin install io-x`).
+
+## Testing
+
+A pipe is plain code, so test it without any real place:
+
+- **Logic:** `runPipe` with `memorySource([...rows])` and `memorySink(out)` (from `@pulpfixer/plugin-io/api`); the memory adapter is harmless, so it runs without a confirmation. Or test `transform` as a function.
+- **SQL:** register a fake driver (`registerDbDrivers` from `@pulpfixer/kit/db`, `putConnection` from `@pulpfixer/plugin-db`) and run `plugin.commands[0].run(ctx, ['export', '--yes', ...])`, then check the statements it sent. Register the adapters the way pf does at startup (`registerIoAdapters([dbAdapter, csvAdapter, memoryAdapter], 'test')` from `@pulpfixer/kit/io`).
+- **Files:** write a CSV into a temp folder, run the pipe, read the result back.
+- **Dry run:** check that `--dry-run` writes nothing.
+
+With a `PF_HOME` in a temp directory nothing touches your real connections. The template's `tests/pipes.test.ts` is set up this way.

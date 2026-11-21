@@ -22,6 +22,7 @@ export const SHORTCUTS: Shortcut[] = [
   { names: ['i'], target: ['install'], summary: 'Install: the repo\'s install target, else dependencies', group: 'Develop' },
   { names: ['il', 'install-local'], target: ['install', 'local'], summary: 'Install locally (the repo\'s install:local)', group: 'Develop' },
   { names: ['gp'], target: ['git', 'push'], summary: 'Push to the primary remote and the backup remotes set up here', group: 'Develop' },
+  { names: ['g'], target: ['repo', 'commit'], summary: 'Commit everything with a message written from the last chat', group: 'Develop' },
   { names: ['rp'], target: ['repo'], summary: 'Hook pf tools into this repo or update them', group: 'Tools' },
   { names: ['u'], target: ['update'], summary: 'Update pf, its plugins and skills', group: 'Tools' },
   { names: ['v'], target: ['ver'], summary: 'List versions and bump them', group: 'Tools' },

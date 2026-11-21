@@ -32,6 +32,12 @@ export interface Db {
   one<T extends Row = Row>(q: SqlLike): Promise<T | undefined>;
   /** The first column of the first row, or undefined. */
   value<T = unknown>(q: SqlLike): Promise<T | undefined>;
+  /**
+   * Rows of a statement that reads, in batches of at most `batchSize` (default 500). When the driver can,
+   * the rows are fetched a batch at a time; otherwise the whole result is read and cut up. Read it to the
+   * end, or stop with `break` (a `for await` does), before running other statements on this handle.
+   */
+  stream<T extends Row = Row>(q: SqlLike, batchSize?: number): AsyncIterable<T[]>;
   /** Run a statement that changes data. */
   exec(q: SqlLike): Promise<QueryResult>;
   insert(table: string, rows: Row | Row[], opts?: InsertOptions): Promise<QueryResult>;
@@ -66,6 +72,18 @@ export function makeDb(session: DbSession, dialect: Dialect, name: string, opts:
     value: async <T>(q: SqlLike) => {
       const row = (await run(q, false)).rows[0];
       return row ? (Object.values(row)[0] as T | undefined) : undefined;
+    },
+    stream: <T extends Row>(q: SqlLike, batchSize = 500): AsyncIterable<T[]> => {
+      if (!Number.isInteger(batchSize) || batchSize < 1) throw new DbError(`the batch size must be a whole number of at least 1 (got ${String(batchSize)})`);
+      const compiled = compile(q, dialect);
+      return (async function* () {
+        if (session.stream) {
+          yield* session.stream(compiled, batchSize) as AsyncIterable<T[]>;
+          return;
+        }
+        const rows = (await session.execute(compiled)).rows as T[];
+        for (let i = 0; i < rows.length; i += batchSize) yield rows.slice(i, i + batchSize);
+      })();
     },
     exec: (q) => run(q, true),
     insert: (table, rows, o) => run(insert(table, rows, o), true),
