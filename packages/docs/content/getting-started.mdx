@@ -9,10 +9,10 @@ title: Getting started
 One line, with Node >= 18 and npm. No token is needed: pf and all its packages are public on the cellars registry.
 
 ```bash
-[ -w "$(npm root -g)" ] || { mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global && export PATH="$HOME/.npm-global/bin:$PATH" && echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.$(basename "$SHELL")rc; }; npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup --yes && pf skill install --all && pf sys apply suite --yes
+[ -w "$(npm root -g)" ] || { mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global && export PATH="$HOME/.npm-global/bin:$PATH" && echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.$(basename "$SHELL")rc; }; npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup --yes && pf skill install --all && pf suite enable --yes
 ```
 
-This is the full install: pf, then `pf setup --yes` (the machine), `pf skill install --all` (the agent skills) and `pf sys apply suite --yes` (the pulpfixer suite: the standard Cursor extensions and settings, plus [Background Tone](/plugins/bg-tone)). The suite step needs Cursor on the machine; without it that last step reports so and everything before it is already done.
+This is the full install: pf, then `pf setup --yes` (the machine), `pf skill install --all` (the agent skills) and `pf suite enable --yes` (the pulpfixer suite's default features: the standard Cursor extensions and settings, plus [Background Tone](/plugins/bg-tone); optional features such as Obsidian stay off until you name them). The suite step needs Cursor on the machine; without it that last step reports so and everything before it is already done.
 
 ### Only pf
 
@@ -22,7 +22,7 @@ To install just pf, without the skills and the suite:
 [ -w "$(npm root -g)" ] || { mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global && export PATH="$HOME/.npm-global/bin:$PATH" && echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.$(basename "$SHELL")rc; }; npm install -g pulpfixer --registry https://cellars.staging.pangenea.com/ && pf setup
 ```
 
-Add the rest later with `pf skill install --all` and `pf sys apply suite`.
+Add the rest later with `pf skill install --all` and `pf suite enable`.
 
 ### What the one-liners do
 
@@ -49,7 +49,7 @@ The full one-liner already ran the first two steps below (after the only-pf one,
 
 | Step | Command | What it does |
 |------|---------|--------------|
-| The pulpfixer suite | `pf sys apply suite` | Applies the standard Cursor setup (extensions and `settings.json` values) and installs the suite extensions, today [Background Tone](/plugins/bg-tone) (a per-repo color tint and logo, plus action buttons for the repo). Additive: nothing is uninstalled, your other settings stay, and the old file is backed up first. Shows the plan and asks (`--yes` skips the question and is needed without a terminal, `--dry-run` previews). Reload the Cursor window afterwards |
+| The pulpfixer suite | `pf suite enable` (list it with `pf suite`) | Applies the standard Cursor setup (extensions and `settings.json` values) and installs the suite extensions, today [Background Tone](/plugins/bg-tone) (a per-repo color tint and logo, plus action buttons for the repo). Additive: nothing is uninstalled, your other settings stay, and the old file is backed up first. Shows the plan and asks (`--yes` skips the question and is needed without a terminal, `--dry-run` previews). Reload the Cursor window afterwards. Optional features are named: `pf suite enable obsidian` applies the standard Obsidian settings to one vault (`--vault`), configuring the plugins the vault already has and never installing any |
 | Skills | `pf skill install --all` | Installs the registry skills into `~/.pf/skills` (`pf skill available` lists them; `--to claude`, `--to cursor` or `--to agents` puts them where that agent looks). pf also ships a few skills of its own (`pf-repo`, `ship-staging`, `fix-failing`, `deploy-setup`, `troubleshoot`, `query-package`, `pipe-package`, `io-adapter`), and `pf update` keeps the `ver` and `pnpm` skills current on its own |
 | Check the machine | `pf doctor` | Checks the install, the registry, skills and agents, your config and the repo you are in |
 | Plugins | `pf plugin available`, then `pf plugin install <name>` | Optional registry plugins (`@pf-plugins/<name>`) that add commands. The AWS, YubiKey and system plugins are built in |

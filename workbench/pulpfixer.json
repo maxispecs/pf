@@ -13,7 +13,7 @@
     },
     "wb-promote": {
       "run": "node tools/wb-promote/index.mjs",
-      "description": "Make a scratch tool permanent: wb-promote <name> \"<what it does>\"",
+      "description": "Make a scratch tool permanent: wb-promote <name> \"<what it does>\" (--repo: a repo of its own in the repos folder)",
       "group": "Workbench"
     }
   }

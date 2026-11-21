@@ -1,8 +1,9 @@
 import type { Entry } from '@pulpfixer/kit/types';
 import type { Plugin } from '@pulpfixer/kit/plugin';
+import { suiteCommand } from './commands/suite.js';
 import { sysCommand } from './commands/sys.js';
 
-export { BG_TONE_EXTENSION, SUITE_PRESET, bgToneStatus, installSuite, updateSuiteExtensions, type BgToneStatus } from './suite.js';
+export { BG_TONE_EXTENSION, CURSOR_FEATURE, bgToneStatus, enableFeatures, featureStatuses, installSuite, updateSuiteExtensions, type BgToneStatus } from './suite.js';
 
 export { systemVersions, type SystemVersions } from './versions.js';
 
@@ -15,7 +16,7 @@ export { systemVersions, type SystemVersions } from './versions.js';
 export const systemPlugin: Plugin = {
   name: 'system',
   summary: 'Apply standard app configuration presets (pf sys)',
-  commands: [sysCommand],
+  commands: [sysCommand, suiteCommand],
   entries(ctx): Entry[] {
     return [
       {
@@ -24,6 +25,13 @@ export const systemPlugin: Plugin = {
         group: 'Tools',
         detail: 'pf sys list, diff and apply',
         run: () => sysCommand.run(ctx, []),
+      },
+      {
+        name: 'suite',
+        summary: 'The pulpfixer suite: enable Cursor setup and optional Obsidian',
+        group: 'Tools',
+        detail: 'pf suite list and enable',
+        run: () => suiteCommand.run(ctx, []),
       },
     ];
   },

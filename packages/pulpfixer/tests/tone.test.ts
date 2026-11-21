@@ -96,7 +96,7 @@ test('without a terminal, or on a dry run, the extension is only mentioned', asy
   const done: string[] = [];
   await setupToneExtension(false, done, quiet);
   assert.equal(quiet.installed, 0);
-  assert.match(done[0]!, /run .*pf sys apply suite.* to install it/);
+  assert.match(done[0]!, /run .*pf suite enable cursor.* to install it/);
 
   const dry = deps();
   const d2: string[] = [];

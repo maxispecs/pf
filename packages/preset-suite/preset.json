@@ -1,8 +1,0 @@
-{
-  "app": "cursor",
-  "summary": "The pulpfixer suite: the standard Cursor setup plus the extensions that go with pf",
-  "includes": ["cursor"],
-  "packages": [
-    "@pulpfixer/ext-bg-tone"
-  ]
-}

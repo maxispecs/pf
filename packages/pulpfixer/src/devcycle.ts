@@ -37,11 +37,11 @@ export function shipsChange(file: string): boolean {
 
 /**
  * A package fetched live at its latest version, so core does not pin it: a preset (`@pulpfixer/preset-<name>`,
- * data), a template (`@pulpfixer/template-<name>`, data), a suite extension (`@pulpfixer/ext-<name>`, a `.vsix`)
+ * data), the suite list (`@pulpfixer/suite`, data), a template (`@pulpfixer/template-<name>`, data), a suite extension (`@pulpfixer/ext-<name>`, a `.vsix`)
  * or a database driver (`@pulpfixer/db-<name>`) or an IO adapter (`@pulpfixer/io-<name>`), registry plugins installed
  * with `pf plugin install`.
  */
-export const isPreset = (p: Pick<CyclePackage, 'name'>): boolean => ['preset-', 'ext-', 'db-', 'io-', 'template-'].some((k) => p.name.startsWith(`@pulpfixer/${k}`));
+export const isPreset = (p: Pick<CyclePackage, 'name'>): boolean => p.name === '@pulpfixer/suite' || ['preset-', 'ext-', 'db-', 'io-', 'template-'].some((k) => p.name.startsWith(`@pulpfixer/${k}`));
 
 /** True when the package has a published version that is current with its package.json and changed since. */
 function needsBump(p: CyclePackage): boolean {

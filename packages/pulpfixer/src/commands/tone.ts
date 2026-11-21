@@ -82,9 +82,9 @@ export async function setupToneExtension(dryRun: boolean, done: string[], deps: 
     done.push(`extension: Background Tone${s.installed ? ` v${short(s.installed)}` : ''} is installed in Cursor (pf update keeps it current)`);
     return 0;
   }
-  const hint = termLine('pf sys apply suite', c);
+  const hint = termLine('pf suite enable cursor', c);
   if (dryRun) {
-    done.push('extension: Background Tone is not in Cursor, pf rp would offer to install it (pf sys apply suite)');
+    done.push('extension: Background Tone is not in Cursor, pf rp would offer to install it (pf suite enable cursor)');
     return 0;
   }
   if (!deps.interactive()) {

@@ -5,15 +5,16 @@ import { compareVersions, takeFlag, takeOption } from '@pulpfixer/kit/util';
 import { applyPreset, fail, prepare, short } from '../apply.js';
 import { APPS, findApp } from '../apps/index.js';
 import { capturePreset, describePlan, isEmptyPlan } from '../plan.js';
+import { detectObsidian } from '../obsidian/vaults.js';
 import { cachedPresets, searchPresets } from '../presets.js';
-import { updateSuiteExtensions } from '../suite.js';
+import { installSuite, updateSuiteExtensions } from '../suite.js';
 
 const USAGE = `Usage:
   pf sys                                 list presets, with what this machine has
   pf sys diff <preset>                   fetch the latest preset and show what would change
   pf sys apply <preset> [--yes] [--dry-run] [--offline]
                                          fetch the latest preset and apply it (additive)
-  pf sys apply suite                     the whole setup: the Cursor standard plus the pulpfixer suite extensions
+  pf sys apply suite                     same as pf suite enable: the default features of the suite (the Cursor setup)
   pf sys update [--check] [--dry-run] [--offline]
                                          update the suite extensions that are already installed
   pf sys capture <app> [--setting <key>]...
@@ -30,15 +31,20 @@ export function listPresets(): number {
     w(c.dim('no presets found.'));
   } else {
     const width = Math.max(8, ...names.map((n) => n.length));
-    w(c.bold('Presets') + c.dim('  @pulpfixer/preset-<name>, applied with pf sys apply <name> (suite: Cursor extensions that come with pf)'));
+    w(c.bold('Presets') + c.dim('  @pulpfixer/preset-<name>, applied with pf sys apply <name> (the suite is pf suite)'));
     for (const name of names) {
       const mine = cached.find((p) => p.name === name);
       const latest = remote.presets?.find((p) => p.name === name);
-      const app = findApp(mine?.preset?.app ?? name);
+      const appId = mine?.preset?.app ?? name;
+      const app = findApp(appId);
       const have = mine ? `v${short(mine.version)}` : 'not fetched';
       const state = mine && !mine.preset
         ? c.red(`unusable: ${mine.problem}`)
-        : !app
+        : appId === 'obsidian'
+          ? detectObsidian()
+            ? c.green('Obsidian found') + c.dim(' (pf suite enable obsidian)')
+            : c.dim('Obsidian not found here')
+          : !app
           ? c.dim('no adapter for this app')
           : !app.detect()
             ? c.dim(`${app.label} not found here`)
@@ -106,6 +112,10 @@ export const sysCommand: Command = {
       if (!name) {
         process.stderr.write(`${badgeLabel('error', err())} which preset? (pf sys list)\n${USAGE}\n`);
         return 2;
+      }
+      if (name === 'suite') {
+        // The suite is not a preset any more: pf suite owns it. Kept so older docs and one-liners still work.
+        return installSuite({ yes, dryRun: dryRun || sub === 'diff', offline });
       }
       const target = prepare(name, offline);
       if (!target) return 1;

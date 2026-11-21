@@ -3,6 +3,7 @@ import path from 'node:path';
 import { PACKAGE_NAME } from '@pulpfixer/kit/constants';
 import { buildContext } from '@pulpfixer/kit/context';
 import { capture, runCmd } from '@pulpfixer/kit/exec';
+import { reposDir, shortHome } from '@pulpfixer/kit/suite-settings';
 import { err, out } from '@pulpfixer/kit/ui/palette';
 import { ask } from '@pulpfixer/kit/ui/prompt';
 import { badgeLabel, h2, termLine } from '@pulpfixer/kit/ui/text';
@@ -20,7 +21,9 @@ const USAGE = `Usage:
   pf template                            list templates (cached here and on the registry)
   pf template apply <template> [<value>] [--<param> <value>...] [--dir <path>]
                     [--dry-run] [--offline] [--no-git] [--no-repo]
-                                         fetch the latest template and create a repo from it`;
+                                         fetch the latest template and create a repo from it,
+                                         in the suite's repos folder (pf suite config, ~/dev by default)
+                                         or in --dir (relative to here)`;
 
 const short = (v: string): string => v.replace(/^(\d+\.\d+)\.0$/, '$1');
 
@@ -114,6 +117,18 @@ function insideGitRepo(dir: string): boolean {
   return capture(['git', 'rev-parse', '--is-inside-work-tree'], { cwd: probe }).stdout.trim() === 'true';
 }
 
+/** Where the new repo goes: `--dir` (relative to the current folder), else the template's folder inside the repos folder. */
+export function templateTarget(o: { cwd: string; dirOpt?: string | undefined; dir: string; reposDir: string }): string {
+  return o.dirOpt ? path.resolve(o.cwd, o.dirOpt) : path.join(o.reposDir, o.dir);
+}
+
+/** A folder as it is shown and as a shell takes it: `~/dev/x` when under home, quoted when it holds odd characters. */
+export function shellPath(abs: string): string {
+  const shown = shortHome(abs);
+  if (/^[\w@%+=:,./~-]+$/.test(shown)) return shown;
+  return `'${abs.replaceAll("'", "'\\''")}'`;
+}
+
 async function applyTemplate(cwd: string, args: string[]): Promise<number> {
   const c = err();
   const rest = [...args];
@@ -141,16 +156,16 @@ async function applyTemplate(cwd: string, args: string[]): Promise<number> {
   if ('error' in resolved) return fail(`${resolved.error}\n  ${c.dim('usage')} ${termLine(applyUsage(name, template), c)}`, 2);
   const values = resolved.values;
 
-  let target: string;
-  if (dirOpt) target = path.resolve(cwd, dirOpt);
-  else {
-    const d = renderDir(template, values);
-    if ('error' in d) return fail(`template ${name} is unusable: ${d.error}`);
-    target = path.resolve(cwd, d.dir);
+  const d = renderDir(template, values);
+  if ('error' in d) return fail(`template ${name} is unusable: ${d.error}`);
+  const base = reposDir();
+  const target = templateTarget({ cwd, dirOpt, dir: d.dir, reposDir: base });
+  if (!dirOpt && fs.existsSync(base) && !fs.statSync(base).isDirectory()) {
+    return fail(`the repos folder ${shortHome(base)} is not a folder: change it with pf suite config set reposDir <folder>, or give --dir`);
   }
   const rendered = renderTemplate(path.join(fetched.dir, 'files'), template, values, bundledVersions());
   if ('error' in rendered) return fail(`template ${name} is unusable: ${rendered.error}`);
-  const rel = path.relative(cwd, target) || '.';
+  const rel = dirOpt ? path.relative(cwd, target) || '.' : shortHome(target);
 
   const conflicts = rendered.files.filter((f) => fs.existsSync(path.join(target, ...f.path.split('/'))));
   if (conflicts.length) {
@@ -185,7 +200,7 @@ async function applyTemplate(cwd: string, args: string[]): Promise<number> {
     }
   }
 
-  const next = [`cd ${rel}`, ...template.next].map((line) => {
+  const next = [`cd ${dirOpt ? rel : shellPath(target)}`, ...template.next].map((line) => {
     const r = substitute(line, values);
     return 'text' in r ? r.text : line;
   });

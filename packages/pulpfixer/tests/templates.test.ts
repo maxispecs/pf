@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { buildContext } from '@pulpfixer/kit/context';
 import { allCommands } from '../src/commands/index.js';
-import { applyUsage, bundledVersions, takeParams, templateCommand } from '../src/commands/template.js';
+import { applyUsage, bundledVersions, shellPath, takeParams, templateCommand, templateTarget } from '../src/commands/template.js';
 import { templatesSection } from '../src/commands/versions.js';
 import { isPreset } from '../src/devcycle.js';
 import { paramFlag, renderDir, renderTemplate, resolveParams, safeRelPath, substitute, validateTemplate, type Template } from '../src/templates/render.js';
@@ -183,14 +183,87 @@ test('takeParams and applyUsage follow the params', () => {
   assert.equal(applyUsage('demo', t), 'pf template apply demo <name> [--label <label>] --kind <kind>');
 });
 
+/** Run `fn` with PF_REPOS_DIR set to `dir` (unset when undefined), then put it back. */
+async function withReposDir<T>(dir: string | undefined, fn: () => Promise<T>): Promise<T> {
+  const prev = process.env.PF_REPOS_DIR;
+  if (dir === undefined) delete process.env.PF_REPOS_DIR;
+  else process.env.PF_REPOS_DIR = dir;
+  try {
+    return await fn();
+  } finally {
+    if (prev === undefined) delete process.env.PF_REPOS_DIR;
+    else process.env.PF_REPOS_DIR = prev;
+  }
+}
+
+test('templateTarget: --dir is relative to the current folder, else the repos folder', () => {
+  const t = { cwd: path.resolve('/work/here'), dir: 'query-x', reposDir: path.resolve('/home/me/dev') };
+  assert.equal(templateTarget(t), path.join(t.reposDir, 'query-x'));
+  assert.equal(templateTarget({ ...t, dirOpt: 'other/place' }), path.join(t.cwd, 'other', 'place'));
+  assert.equal(templateTarget({ ...t, dirOpt: path.resolve('/abs/x') }), path.resolve('/abs/x'));
+});
+
+test('shellPath shortens home and quotes odd paths', () => {
+  const home = process.env.HOME ?? '';
+  if (home) assert.equal(shellPath(path.join(home, 'dev', 'query-x')), `~${path.sep}dev${path.sep}query-x`);
+  assert.equal(shellPath('/srv/repos/x'), '/srv/repos/x');
+  assert.equal(shellPath('/srv/my repos/x'), "'/srv/my repos/x'");
+  assert.equal(shellPath("/srv/it's/x"), "'/srv/it'\\''s/x'");
+});
+
+test('pf template apply puts the repo in the repos folder (created on demand), --dir stays relative to cwd', async () => {
+  cacheDemo();
+  const cwd = mkRepo();
+  const repos = path.join(mkRepo(), 'not', 'yet');
+  await withReposDir(repos, async () => {
+    const dry = await apply(cwd, 'demo', 'abc', '--kind', 'a', '--offline', '--dry-run', '--no-git', '--no-repo');
+    assert.equal(dry.code, 0, dry.stderr);
+    assert.equal(fs.existsSync(repos), false, 'a dry run creates nothing, not even the repos folder');
+    assert.equal(fs.existsSync(path.join(cwd, 'demo-abc')), false);
+
+    const r = await apply(cwd, 'demo', 'abc', '--kind', 'a', '--offline', '--no-git', '--no-repo');
+    assert.equal(r.code, 0, r.stderr);
+    assert.ok(fs.existsSync(path.join(repos, 'demo-abc', 'README.md')));
+    assert.equal(fs.existsSync(path.join(cwd, 'demo-abc')), false, 'nothing lands in the current folder');
+    assert.ok(r.stderr.includes(`cd ${shellPath(path.join(repos, 'demo-abc'))}`), r.stderr);
+
+    const into = await apply(cwd, 'demo', 'abc', '--kind', 'a', '--offline', '--no-git', '--no-repo', '--dir', 'here');
+    assert.equal(into.code, 0, into.stderr);
+    assert.ok(fs.existsSync(path.join(cwd, 'here', 'README.md')));
+    assert.match(into.stderr, /cd here\b/);
+  });
+});
+
+test('pf template apply refuses a default repos folder that is a file', async () => {
+  cacheDemo();
+  const cwd = mkRepo();
+  const fakeHome = mkRepo();
+  fs.writeFileSync(path.join(fakeHome, 'dev'), 'x');
+  const prevHome = process.env.HOME;
+  process.env.HOME = fakeHome; // os.homedir() follows it, so ~/dev is the file
+  try {
+    await withReposDir(undefined, async () => {
+      const r = await apply(cwd, 'demo', 'abc', '--kind', 'a', '--offline', '--no-git', '--no-repo', '--dry-run');
+      assert.equal(r.code, 1);
+      assert.match(r.stderr, /is not a folder/);
+      assert.match(r.stderr, /pf suite config set reposDir/);
+    });
+  } finally {
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+  }
+});
+
 test('pf template apply writes the rendered tree, refuses conflicts, and --dry-run writes nothing', async () => {
   cacheDemo();
   const cwd = mkRepo();
+  const repos = mkRepo();
+  process.env.PF_REPOS_DIR = repos;
   const dry = await apply(cwd, 'demo', 'abc', '--kind', 'a', '--offline', '--dry-run', '--no-git', '--no-repo');
   assert.equal(dry.code, 0, dry.stderr);
-  assert.match(dry.stderr, /Would create demo-abc/);
+  assert.match(dry.stderr, /Would create .*demo-abc/);
   assert.match(dry.stderr, /\+ src\/abc.txt/);
-  assert.equal(fs.existsSync(path.join(cwd, 'demo-abc')), false);
+  assert.equal(fs.existsSync(path.join(repos, 'demo-abc')), false);
 
   const missing = await apply(cwd, 'demo', 'abc', '--offline', '--no-git', '--no-repo');
   assert.equal(missing.code, 2);
@@ -199,7 +272,7 @@ test('pf template apply writes the rendered tree, refuses conflicts, and --dry-r
 
   const r = await apply(cwd, 'demo', 'abc', '--kind', 'b', '--offline', '--no-git', '--no-repo');
   assert.equal(r.code, 0, r.stderr);
-  const out = path.join(cwd, 'demo-abc');
+  const out = path.join(repos, 'demo-abc');
   assert.equal(fs.readFileSync(path.join(out, 'README.md'), 'utf8'), '# The abc thing\n');
   assert.equal(fs.readFileSync(path.join(out, '.gitignore'), 'utf8'), 'dist/\n');
   assert.equal(fs.readFileSync(path.join(out, 'src', 'abc.txt'), 'utf8'), 'kind b\n');
@@ -215,6 +288,7 @@ test('pf template apply writes the rendered tree, refuses conflicts, and --dry-r
 
   assert.equal((await apply(cwd, 'demo', 'abc', '--kind', 'b', 'extra', '--offline')).code, 2);
   assert.equal((await capture(() => templateCommand.run(buildContext(cwd), ['nope']))).code, 2);
+  delete process.env.PF_REPOS_DIR;
 });
 
 test('the query-package template renders a query package wired to this pf', () => {

@@ -1,7 +1,7 @@
 {
-  "name": "@pulpfixer/preset-suite",
-  "version": "1.2.0",
-  "description": "pf preset: the pulpfixer suite, the extensions that go with pf (Background Tone), applied by pf sys apply suite",
+  "name": "@pulpfixer/preset-obsidian",
+  "version": "1.0.0",
+  "description": "pf preset: the standard Obsidian setup (core plugins, community plugin settings, theme, hotkeys) applied to a vault by pf suite enable obsidian",
   "license": "MIT",
   "type": "module",
   "exports": {

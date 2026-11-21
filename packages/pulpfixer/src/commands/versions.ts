@@ -149,23 +149,28 @@ export function systemSections(sys: SystemVersions): VersionSection[] {
   const presets: VersionSection = {
     id: 'presets',
     title: 'Presets',
-    hint: '~/.pf/sys/presets, fetched by pf sys apply',
+    hint: '~/.pf/sys/presets, fetched by pf suite enable and pf sys apply',
     empty: 'none fetched yet (pf sys list)',
-    rows: sys.presets.map((p) => (p.problem ? row(p.name, p.version, `unusable: ${p.problem}`, 'bad') : row(p.name, p.version, p.package))),
+    rows: [
+      ...(sys.suite
+        ? [sys.suite.problem ? row('suite', sys.suite.version, `unusable: ${sys.suite.problem}`, 'bad') : row('suite', sys.suite.version, `${sys.suite.package} (${sys.suite.features.join(', ')})`)]
+        : []),
+      ...sys.presets.map((p) => (p.problem ? row(p.name, p.version, `unusable: ${p.problem}`, 'bad') : row(p.name, p.version, p.package))),
+    ],
   };
   const app = sys.app.label;
   const extensions: VersionSection = {
     id: 'extensions',
     title: `${app} extensions`,
     hint: 'the pulpfixer suite',
-    empty: 'none (pf sys apply suite)',
+    empty: 'none (pf suite enable cursor)',
     rows: sys.extensions.map((e) => {
       const name = e.package.replace(/^@pulpfixer\/ext-/, '');
       const id = e.id ?? e.package;
       if (e.problem) return row(name, e.version, `unusable: ${e.problem}`, 'bad');
       if (!sys.app.found) return row(name, e.version, `${id}, fetched; ${app} not found here`);
       if (!sys.app.readable) return row(name, e.version, `${id}, fetched; ${app} extensions could not be read`, 'warn');
-      if (e.installed === null) return row(name, '', `${id}, not installed in ${app} (v${short(e.version)} fetched): pf sys apply suite`, 'warn');
+      if (e.installed === null) return row(name, '', `${id}, not installed in ${app} (v${short(e.version)} fetched): pf suite enable cursor`, 'warn');
       if (e.installed && e.version && compareVersions(e.version, e.installed) > 0) {
         return row(name, e.installed, `${id}, v${short(e.version)} fetched: pf update`, 'warn');
       }

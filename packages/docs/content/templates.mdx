@@ -11,7 +11,7 @@ pf template                                         # list templates: cached her
 pf template apply query-package revrec --driver mysql
 pf template apply query-package revrec --connection billing --driver mysql --summary "Revenue recognition"
 pf template apply query-package revrec --driver mysql --dry-run    # the file list, nothing written
-pf template apply query-package revrec --driver mysql --dir ~/dev/query-revrec
+pf template apply query-package revrec --driver mysql --dir ../query-revrec   # relative to this folder
 pf template apply pipe-package orders --input db --output csv --connection billing
 pf template apply io-adapter acme-api
 ```
@@ -21,17 +21,17 @@ In a terminal, pf asks for each value you did not pass, with its default filled 
 ## What apply does
 
 1. Installs `@pulpfixer/template-<name>@latest` into `~/.pf/templates`. With `--offline`, or when the registry cannot be reached, it uses the copy fetched last time.
-2. Fills the template's files with the values and writes them into the new folder (`query-<name>/` for the query package, `--dir` for another place). If any of the files already exists there, nothing is written.
+2. Fills the template's files with the values and writes them into the new folder: `<repos folder>/query-<name>/` for the query package (the repos folder is `~/dev` unless `pf suite config set reposDir <folder>` says otherwise, and pf creates it when it is missing), or `--dir` for another place. If any of the files already exists there, nothing is written.
 3. Runs `git init` in the folder, unless it is already inside a git repo (`--no-git` skips this).
 4. Runs `pf repo --no-deploy` on the new repo: the pf link, the pnpm commands, versioning and the background tone (`--no-repo` skips this).
-5. Prints the next steps.
+5. Prints the next steps, starting with `cd <the new folder>`: the repo is not made in the folder you ran pf from, so the path is shown (`~/dev/query-revrec`).
 
 A template is data. pf never runs anything from a template: the only commands are pf's own `git init` and `pf repo`.
 
 | Flag | Meaning |
 |------|---------|
 | `--<param> <value>` | a template value (`--driver mysql`); the first one can also be given without its flag (`revrec`) |
-| `--dir <path>` | where to create the repo instead of the template's folder name |
+| `--dir <path>` | where to create the repo instead of `<repos folder>/<template folder>`; relative to the folder you run pf in |
 | `--dry-run` | list the files and the steps, write nothing |
 | `--offline` | use the cached template, no registry |
 | `--no-git`, `--no-repo` | skip `git init`, skip `pf repo` |
@@ -61,7 +61,7 @@ It creates a repo that builds, tests and publishes as it is:
 Then:
 
 ```bash
-cd query-revrec
+cd ~/dev/query-revrec     # the folder pf printed
 pnpm install
 pf a "write the queries: monthly revenue per product, from these tables: ..."   # follows AGENTS.md and the query-package skill
 pnpm test

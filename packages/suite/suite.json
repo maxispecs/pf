@@ -1,0 +1,17 @@
+{
+  "summary": "The pulpfixer suite: system additions that go with pf",
+  "features": [
+    {
+      "id": "cursor",
+      "summary": "The standard Cursor setup plus the Background Tone extension",
+      "preset": "cursor",
+      "packages": ["@pulpfixer/ext-bg-tone"]
+    },
+    {
+      "id": "obsidian",
+      "summary": "Obsidian: core plugins, community plugin settings, theme and hotkeys for a vault",
+      "preset": "obsidian",
+      "optional": true
+    }
+  ]
+}

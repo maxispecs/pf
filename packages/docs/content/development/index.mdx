@@ -18,8 +18,9 @@ pf is a pnpm workspace. The shipped packages are versioned together by `versions
 | `packages/plugin-system` | `@pulpfixer/plugin-system` | The system plugin (`pf sys`). Depends only on kit |
 | `packages/plugin-yubikey` | `@pulpfixer/plugin-yubikey` | The YubiKey plugin. Depends only on kit |
 | `packages/preset-cursor` | `@pulpfixer/preset-cursor` | Data only: the standard Cursor extensions and settings. Published alone, not a dependency of core: `pf sys apply cursor` fetches its latest version |
-| `packages/preset-suite` | `@pulpfixer/preset-suite` | Data only: the pulpfixer suite, a list of extension packages. Published alone: `pf sys apply suite` fetches its latest version |
-| `packages/ext-bg-tone` | `@pulpfixer/ext-bg-tone` | The Background Tone extension for Cursor, shipped as a `.vsix`. Published alone, never a dependency of core: `pf sys apply suite` and `pf update` fetch its latest version. Type-checked on its own (it targets the VS Code API) |
+| `packages/preset-obsidian` | `@pulpfixer/preset-obsidian` | Data only: the standard Obsidian setup (core plugins, community plugin settings, theme, hotkeys). Published alone, not a dependency of core: `pf suite enable obsidian` fetches its latest version and applies it to one vault; it never installs a plugin |
+| `packages/suite` | `@pulpfixer/suite` | Data only (`suite.json`): the pulpfixer suite, a list of features (a preset each, plus extension packages; Obsidian is optional). Published alone: `pf suite` fetches its latest version |
+| `packages/ext-bg-tone` | `@pulpfixer/ext-bg-tone` | The Background Tone extension for Cursor, shipped as a `.vsix`. Published alone, never a dependency of core: `pf suite enable cursor` and `pf update` fetch its latest version. Type-checked on its own (it targets the VS Code API) |
 | `packages/pulpfixer` | `pulpfixer` | The `pf` binary: built-in commands, agent, host mode, skills, install and update. Depends on kit and every plugin |
 | `packages/docs` | `@pulpfixer/docs` | This documentation site (Nextra). Private, never published |
 
@@ -82,7 +83,7 @@ cd ~/some/repo && ~/dev/agents/pulpfixer/pf dev --dry-run
 | `packages/kit/src/ui/` | Palette, picker, prompts, text helpers |
 | `packages/plugin-aws/src/`, `plugin-system/src/`, `plugin-yubikey/src/` | The built-in plugins |
 | `packages/preset-cursor/preset.json` | The Cursor standard that `pf sys apply cursor` applies |
-| `packages/preset-suite/preset.json`, `packages/ext-bg-tone/` | The suite (`pf sys apply suite`) and the Background Tone extension it installs |
+| `packages/suite/suite.json`, `packages/preset-obsidian/preset.json`, `packages/ext-bg-tone/` | The suite (`pf suite`), the Obsidian preset it can apply and the Background Tone extension it installs |
 | `packages/docs/content/` | This site's pages |
 | `scripts/` | Cross-package commands: build, test, release, ver, logo, ask |
 

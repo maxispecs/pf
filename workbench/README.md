@@ -18,6 +18,7 @@ pf wb-new my-task                         # a new one-off in scratch/my-task (fr
 node scratch/my-task/index.mjs            # simulates: reads run, writes are only logged
 node scratch/my-task/index.mjs --live     # writes for real
 pf wb-promote my-task "what it does"      # keep it: moves it to tools/ and registers `pf my-task`
+pf wb-promote my-task --repo              # or give it a repo of its own, in the suite's repos folder (see below)
 pf ddb-check --connection=sdlc-ddb        # a permanent tool: check a saved DynamoDB connection
 pf                                        # the menu lists every registered tool
 ```
@@ -26,6 +27,16 @@ pf                                        # the menu lists every registered tool
 - **A tool is a folder with an `index.mjs`** that calls `runTool(import.meta.url, async (ctx) => { ... })` (see `lib/tool.mjs`). Its name is the folder name.
 - **Logs** go to `files/<tool>/logs/`. They are never deleted: once a tool has more than 20, the older ones are *moved* (not copied or compressed) to `files/<tool>/logs/archive/<year-month>/`, so you can always look back, e.g. to see what a PII anonymization run changed.
 - **Secrets** never go in the repo. AWS uses your profiles, `pf db add` stores only references to secrets, and any `.env*` is git-ignored.
+
+## A tool of its own: `--repo`
+
+`pf wb-promote <name> --repo ["what it does"] [--dry-run] [--no-git] [--no-repo]` turns a scratch tool into a repo at `<repos folder>/<name>` (the folder `pf suite config` sets, `~/dev` by default; `pf suite config get reposDir` prints it). The repo holds `tools/<name>/` (moved from `scratch/`), a copy of `lib/`, `pulpfixer.json` (registers `pf <name>`), `package.json` (kit, plugin-db and db-dynamodb at the versions in this repo), `.gitignore`, `.npmrc` (`${NPM_TOKEN}`), a README and `files/`. It then runs `git init` and `pf repo --no-deploy` there.
+
+- It refuses when the target folder already exists or the scratch tool is missing, and `--dry-run` writes nothing.
+- `files/<name>/` stays here (it can hold user data): copy what the tool needs yourself.
+- The scratch tool is removed only after the repo is written. The copy of `lib/` is a snapshot: it does not follow later changes here.
+- It imports the built kit, so run `pnpm build` after a kit change.
+- Without `--repo`, `wb-promote` is unchanged: it moves the tool into `workbench/tools/`.
 
 ## Keeping things out of git
 

@@ -94,7 +94,7 @@ test('suite extensions: current, outdated, missing and no app', () => {
   assert.deepEqual([ext(current).version, ext(current).state], ['2.0.0', 'ok']);
   const missing = sys({ extensions: [{ package: '@pulpfixer/ext-bg-tone', version: '2.0.0', id: 'local.bg-tone', installed: null }] });
   assert.equal(ext(missing).state, 'warn');
-  assert.match(ext(missing).note, /pf sys apply suite/);
+  assert.match(ext(missing).note, /pf suite enable cursor/);
   const noApp = sys({ app: { label: 'Cursor', found: false, readable: false } });
   assert.deepEqual([ext(noApp).version, ext(noApp).state], ['2.0.0', 'ok']);
   assert.match(ext(noApp).note, /Cursor not found/);

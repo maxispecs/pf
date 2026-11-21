@@ -127,7 +127,7 @@ yourself in the workspace is never overwritten.
 ## Install and update
 
 This package is part of the pulpfixer suite and ships as `@pulpfixer/ext-bg-tone` (a `.vsix`) on the cellars registry.
-`pf sys apply suite` installs it into Cursor, `pf update` keeps it current and `pf rp` offers it for a repo. Reload
+`pf suite enable cursor` installs it into Cursor, `pf update` keeps it current and `pf rp` offers it for a repo. Reload
 the Cursor window after an install or update.
 
 ## Development

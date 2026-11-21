@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Clean dist and compile every package with tsc, in dependency order (kit, plugins, core), then bundle the
-// suite extension and package its .vsix (`pf sys apply suite` installs that file).
+// suite extension and package its .vsix (`pf suite enable cursor` installs that file).
 import { rmSync, chmodSync, existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';

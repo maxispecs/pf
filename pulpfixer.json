@@ -13,6 +13,9 @@
     },
     "publish:staging": {
       "featured": false
+    },
+    "repo:commit": {
+      "featured": true
     }
   }
 }

@@ -9,13 +9,13 @@ An IO adapter teaches pf pipes one more kind of input and / or output. pf ships 
 
 ## No package yet
 
-Ask the user for the adapter name (lowercase letter first, then letters, digits, dashes), a one-line summary, and what it talks to. Then ask them to run, in the folder that should hold the new repo:
+Ask the user for the adapter name (lowercase letter first, then letters, digits, dashes), a one-line summary, and what it talks to. Then ask them to run (from any folder; the repo goes in the suite's repos folder, `~/dev` unless `pf suite config` says otherwise, or in `--dir <path>`):
 
 ```bash
 pf template apply io-adapter <name>
 ```
 
-It creates `io-<name>/` with a working sample (JSON Lines files), tests, `AGENTS.md` and pf's repo setup. Continue inside that folder.
+It creates `<repos folder>/io-<name>/` with a working sample (JSON Lines files), tests, `AGENTS.md` and pf's repo setup. It prints the folder (`cd <path>` under "Next:"); continue inside that folder, not in the current one.
 
 ## Filling it in
 

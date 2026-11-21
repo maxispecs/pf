@@ -8,11 +8,11 @@ A pipe package is a plugin that holds scripted IO for one job (say, the monthly 
 
 ## Start from the template
 
-A pipe package lives in its own repo, like a [query package](/plugins/writing-a-query-package). `pf template apply pipe-package` creates one that builds, tests and publishes as it is (see [Templates](/templates)):
+A pipe package lives in its own repo, like a [query package](/plugins/writing-a-query-package). `pf template apply pipe-package` creates one that builds, tests and publishes as it is (see [Templates](/templates)). The repo is made in the suite's repos folder (`~/dev` by default, `pf suite config`; `--dir` picks another place) and apply prints the path to `cd` into.
 
 ```bash
 pf template apply pipe-package orders --input db --output csv --connection billing
-cd pipe-orders
+cd ~/dev/pipe-orders                       # the repos folder (pf suite config), printed by apply
 pnpm install
 pf a "write the monthly export pipe; the tables are in ../billing/migrations"
 pnpm test

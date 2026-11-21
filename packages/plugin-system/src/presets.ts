@@ -4,6 +4,7 @@ import path from 'node:path';
 import { REGISTRY_URL, pfHome } from '@pulpfixer/kit/constants';
 import { capture } from '@pulpfixer/kit/exec';
 import { readJson } from '@pulpfixer/kit/util';
+import { validateObsidianConfig, type ObsidianConfig } from './obsidian/config.js';
 
 /**
  * A preset is data, never code: the package `@pulpfixer/preset-<name>` holds one `preset.json`. pf
@@ -29,6 +30,8 @@ export interface Preset {
    * A pf that does not know the field applies the preset without the included ones.
    */
   includes?: string[];
+  /** Obsidian presets (`app: "obsidian"`): what goes into a vault's `.obsidian` folder. Nothing else uses it. */
+  obsidian?: ObsidianConfig;
 }
 
 export const PRESET_SCOPE = '@pulpfixer';
@@ -86,7 +89,22 @@ export function validatePreset(value: unknown): Preset | string {
       settings[k] = v;
     }
   }
-  return { app: o.app, summary: typeof o.summary === 'string' ? o.summary : '', extensions, settings, packages, ...(includes.length ? { includes } : {}) };
+  let obsidian: ObsidianConfig | undefined;
+  if (o.obsidian !== undefined) {
+    if (o.app !== 'obsidian') return '"obsidian" belongs to a preset with "app": "obsidian"';
+    const got = validateObsidianConfig(o.obsidian);
+    if (typeof got === 'string') return got;
+    obsidian = got;
+  } else if (o.app === 'obsidian') return 'an obsidian preset needs an "obsidian" section';
+  return {
+    app: o.app,
+    summary: typeof o.summary === 'string' ? o.summary : '',
+    extensions,
+    settings,
+    packages,
+    ...(includes.length ? { includes } : {}),
+    ...(obsidian ? { obsidian } : {}),
+  };
 }
 
 /**

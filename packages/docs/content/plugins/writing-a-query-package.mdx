@@ -8,11 +8,11 @@ A query package is a plugin that holds the SQL for one job (say, revenue recogni
 
 ## Start from the template
 
-A query package lives in its own repo. `pf template apply query-package` creates one that builds, tests and publishes as it is (see [Templates](/templates)):
+A query package lives in its own repo, created in the suite's repos folder (`~/dev` by default, change it with `pf suite config set reposDir <folder>`; `--dir` picks another place). `pf template apply query-package` creates one that builds, tests and publishes as it is (see [Templates](/templates)):
 
 ```bash
 pf template apply query-package revrec --connection billing --driver mysql
-cd query-revrec
+cd ~/dev/query-revrec                      # the repos folder (pf suite config), printed by apply
 pnpm install
 pf a "write the revrec queries; the tables are in ../billing/migrations"
 pnpm test

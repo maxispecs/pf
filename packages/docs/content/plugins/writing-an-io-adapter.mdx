@@ -8,9 +8,11 @@ An IO adapter teaches [pipes](/plugins/io) one more kind of input and output: a 
 
 ## Start from the template
 
+The repo is made in the suite's repos folder (`~/dev` by default, `pf suite config`; `--dir` picks another place) and apply prints the path to `cd` into.
+
 ```bash
 pf template apply io-adapter acme-api --summary "Acme API as rows"
-cd io-acme-api
+cd ~/dev/io-acme-api                       # printed by apply
 pnpm install
 pf a "read orders from the Acme API (paged, bearer token from ACME_TOKEN) and write them back in bulk"
 pnpm test

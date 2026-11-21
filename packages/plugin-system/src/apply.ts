@@ -51,7 +51,7 @@ export function fetchPackages(names: string[], offline: boolean, say: (title: st
 const MAX_INCLUDE_DEPTH = 4;
 
 /** Print which package a fetched preset came from. */
-function sayFetched(fetched: FetchedPreset, indent = ''): void {
+export function sayFetched(fetched: FetchedPreset, indent = ''): void {
   const c = out();
   const where = fetched.source === 'registry' ? `latest from the registry${fetched.previous ? `, was v${short(fetched.previous)}` : ''}` : 'cached copy';
   process.stdout.write(`${indent}${c.bold(`${presetPackage(fetched.name)} v${short(fetched.version)}`)} ${c.dim(`(${where})`)}\n`);
@@ -81,20 +81,31 @@ export function resolveIncludes(fetched: FetchedPreset, offline: boolean, chain:
 }
 
 /** Fetch a preset, read the app it configures and work out the plan. Prints why when it cannot. */
-export function prepare(name: string, offline: boolean): Target | null {
-  const c = out();
+export function prepare(name: string, offline: boolean, extra: { packages?: string[] } = {}): Target | null {
   const first = fetchPreset(name, { offline });
   if ('error' in first) {
     fail(first.error);
     return null;
   }
+  return prepareFetched(first, offline, extra);
+}
+
+/** The rest of `prepare` for a preset that is already fetched: includes, the app, its state and the plan. */
+export function prepareFetched(first: FetchedPreset, offline: boolean, extra: { packages?: string[] } = {}): Target | null {
+  const c = out();
+  const name = first.name;
   sayFetched(first);
   const resolved = resolveIncludes(first, offline);
   if (typeof resolved === 'string') {
     fail(resolved);
     return null;
   }
-  const fetched: FetchedPreset = { ...first, preset: resolved };
+  const packages = [...new Set([...resolved.packages, ...(extra.packages ?? [])])];
+  const fetched: FetchedPreset = { ...first, preset: { ...resolved, packages } };
+  if (fetched.preset.app === 'obsidian') {
+    fail(`${presetPackage(name)} configures Obsidian vaults: use pf suite enable obsidian`);
+    return null;
+  }
   const app = findApp(fetched.preset.app);
   if (!app) {
     fail(`this pf has no adapter for "${fetched.preset.app}" (apps: ${APPS.map((a) => a.id).join(', ')}). Run: pf update`);
@@ -110,9 +121,9 @@ export function prepare(name: string, offline: boolean): Target | null {
     return null;
   }
   for (const p of state.problems) process.stderr.write(`${badgeLabel('warning', err())} ${p}\n`);
-  const { packages, errors } = fetchPackages(fetched.preset.packages, offline, (title, how) => process.stdout.write(`${c.bold(title)} ${c.dim(`(${how})`)}\n`));
-  const plan = planPreset(fetched.preset, { extensions: state.extensions, extensionVersions: state.extensionVersions, settings: state.settings }, packages);
-  return { fetched, app, state, settings: state.settings, packages, packageErrors: errors, plan };
+  const got = fetchPackages(fetched.preset.packages, offline, (title, how) => process.stdout.write(`${c.bold(title)} ${c.dim(`(${how})`)}\n`));
+  const plan = planPreset(fetched.preset, { extensions: state.extensions, extensionVersions: state.extensionVersions, settings: state.settings }, got.packages);
+  return { fetched, app, state, settings: state.settings, packages: got.packages, packageErrors: got.errors, plan };
 }
 
 /** Write the plan's settings into the app's settings file, keeping a backup of the old one. */

@@ -4,14 +4,15 @@ title: System plugin
 
 # System plugin
 
-The built-in `system` plugin adds `pf sys`: it puts apps on this machine into a standard configuration, called a **preset**. The first app is Cursor (extensions and `settings.json`).
+The built-in `system` plugin adds `pf sys` and `pf suite`: they put apps on this machine into a standard configuration, called a **preset**. The apps are Cursor (extensions and `settings.json`) and, optionally, Obsidian (a vault's core plugins, plugin settings, theme and hotkeys). `pf sys` applies one preset by name, `pf suite` lists, enables and configures the **suite**, the set of additions that go with pf (its settings include where new repos are created).
 
-Three kinds of package are involved:
+Four kinds of package are involved:
 
 | Package | Ships | What |
 |---------|-------|------|
 | `@pulpfixer/plugin-system` | inside pf (pinned by core) | `pf sys` and the app adapters (how to read and change Cursor) |
 | `@pulpfixer/preset-<name>` | on its own, never pinned | The standard: one `preset.json`, data only |
+| `@pulpfixer/suite` | on its own, never pinned | The suite: one `suite.json` listing the features (a preset each), data only |
 | `@pulpfixer/ext-<name>` | on its own, never pinned | A suite extension: one `.vsix` that `pf sys` installs into Cursor (see [Background Tone](/plugins/bg-tone)) |
 
 A preset holds no code, so it can never run anything on your machine. pf installs the **latest** version of the preset package from the registry into `~/.pf/sys/presets` every time you apply it, so changing the standard means publishing a new preset version and needs no new pf. With no network, `pf sys apply` says so and uses the copy fetched last time (`--offline` skips the registry on purpose).
@@ -25,7 +26,7 @@ pf sys apply cursor                 # the same, then ask, then apply
 pf sys apply cursor --yes           # no question (required without a terminal)
 pf sys apply cursor --dry-run       # show the plan and the commands, change nothing
 pf sys apply cursor --offline       # use the cached preset
-pf sys apply suite                  # the whole setup: the Cursor standard plus the suite extensions (Background Tone)
+pf sys apply suite                  # same as pf suite enable: the default suite features (kept for older docs and one-liners)
 pf sys update                       # update only the suite extensions that are already installed (--check, --dry-run, --offline)
 pf sys capture cursor --setting editor.fontSize   # print a preset.json built from this machine
 ```
@@ -43,20 +44,100 @@ pf finds Cursor's `cursor` command on PATH, or inside `/Applications/Cursor.app`
 
 ## The suite
 
-`@pulpfixer/preset-suite` is the whole setup: it **includes** the `cursor` preset (so `pf sys apply suite` also installs the standard Cursor extensions and sets its settings, and there is no separate Cursor step) and lists extension **packages** instead of marketplace ids:
+`@pulpfixer/suite` is a list of **features** in one `suite.json`. A feature is a preset, and for an editor also the extension packages that go with it:
 
 ```json
 {
-  "app": "cursor",
-  "summary": "The pulpfixer suite: the standard Cursor setup plus the extensions that go with pf",
-  "includes": ["cursor"],
-  "packages": ["@pulpfixer/ext-bg-tone"]
+  "summary": "The pulpfixer suite: system additions that go with pf",
+  "features": [
+    { "id": "cursor", "summary": "...", "preset": "cursor", "packages": ["@pulpfixer/ext-bg-tone"] },
+    { "id": "obsidian", "summary": "...", "preset": "obsidian", "optional": true }
+  ]
 }
 ```
 
-`includes` names other presets for the same app. pf fetches each one (the latest, like any preset), and merges them under the including preset: extensions and packages are added together, and for a setting the including preset's value wins. An include that cannot be fetched, is for another app or loops back is an error and nothing is applied, so a half setup never passes for a complete one. A pf from before `includes` ignores the field and applies the suite without the included preset.
+```bash
+pf suite                            # list the features: on, partial, off or n/a (the app is not here), default or optional
+pf suite --json                     # the same as JSON
+pf suite enable                     # the default features only (today: cursor); optional ones are never touched
+pf suite enable obsidian            # an optional feature has to be named (or picked from the list in a terminal)
+pf suite enable cursor obsidian --vault CRI --yes
+pf suite enable --dry-run           # show the plan and the commands, change nothing
+pf suite enable --offline           # use the cached suite and presets
+```
 
-Only `@pulpfixer/ext-<name>` packages are accepted. Each ships one `.vsix` and names it in its `package.json` (`"pf": { "extension": { "id": "local.bg-tone", "vsix": "bg-tone.vsix" } }`, a plain file name inside the package). pf installs the latest version into `~/.pf/sys/presets`, and `pf sys apply suite` installs the `.vsix` with `cursor --install-extension <file> --force` when the extension is missing or older than the package. `pf sys diff suite` shows that without changing anything. An extension that is as new or newer is left alone. `pf update` runs `pf sys update`, which updates the suite extensions you already have and never installs a missing one. `pf rp` offers the install for a repo. A package that cannot be fetched is reported and the rest still applies (exit code 1).
+A bare `pf suite enable` is what the install one-liner runs, so **optional features stay off until you enable them**: Obsidian is only configured when you name it. In a terminal, bare `pf suite` lists the features and offers to enable one. `--yes` is needed without a terminal, `--dry-run` previews. pf fetches the latest `@pulpfixer/suite` and the presets it names from the registry into `~/.pf/sys/presets` (cached copy offline).
+
+**cursor** is the `cursor` preset (the standard extensions and settings) plus the extension packages the feature lists. Only `@pulpfixer/ext-<name>` packages are accepted. Each ships one `.vsix` and names it in its `package.json` (`"pf": { "extension": { "id": "local.bg-tone", "vsix": "bg-tone.vsix" } }`, a plain file name inside the package). `pf suite enable cursor` installs the `.vsix` with `cursor --install-extension <file> --force` when the extension is missing or older than the package. An extension that is as new or newer is left alone. `pf update` runs `pf sys update`, which updates the suite extensions you already have and never installs a missing one. `pf rp` offers the install for a repo. A package that cannot be fetched is reported and the rest still applies (exit code 1).
+
+`pf sys apply suite` and `pf sys diff suite` still work as aliases of `pf suite enable` (and `--dry-run`).
+
+## Suite settings
+
+`pf suite config` is where the suite's own settings live. They are user settings in `~/.pf/config.json` (`plugins.suite`), never in a repo.
+
+```bash
+pf suite config                          # every setting: value, where it comes from (default, saved, environment), what it does
+pf suite config --json
+pf suite config get reposDir             # the value in effect, resolved (/Users/me/dev), for scripts
+pf suite config set reposDir ~/code      # save; in a terminal without a value, pf asks
+pf suite config unset reposDir           # back to the default
+```
+
+| Setting | Default | Meaning |
+|---------|---------|---------|
+| `reposDir` | `~/dev` | the folder where **new repos** are created: `pf template apply` (query packages, pipe packages, IO adapters, and any template) and `pf wb-promote <name> --repo` in the workbench. `--dir` on a template still wins, relative to the folder you run pf in |
+
+`reposDir` must be an absolute path or start with `~/` (stored as typed, so a config file shared between machines stays portable). It may not exist yet: pf creates it the first time a repo is made there, and says so when you set it. A path that exists as a file is refused. `PF_REPOS_DIR` overrides the saved value for one run (tests, scripts); a saved value that has become unusable falls back to the default. An unknown setting or a bad value is exit code 2, a config file that cannot be written exit code 1. `pf suite` ends with a line saying where new repos go.
+
+## Obsidian
+
+`pf suite enable obsidian` applies `@pulpfixer/preset-obsidian` to **one vault**. Obsidian keeps its configuration inside each vault (`<vault>/.obsidian`), so you pick the vault every time:
+
+- in a terminal, a picker over the vaults in Obsidian's own `obsidian.json` (macOS `~/Library/Application Support/obsidian/`; `PF_OBSIDIAN_DIR` points pf at another folder)
+- `--vault <path>` or `--vault <name>` (the folder name of a vault Obsidian knows) anywhere else; the folder must hold a `.obsidian` folder, so open a new vault in Obsidian once first
+- with neither, pf lists the vaults and exits 2
+
+The preset is data in an `obsidian` section of `preset.json`:
+
+```json
+{
+  "app": "obsidian",
+  "summary": "Standard Obsidian setup",
+  "obsidian": {
+    "app": { "promptDelete": false, "newLinkFormat": "absolute" },
+    "appearance": { "cssTheme": "Minimal", "showRibbon": true },
+    "corePlugins": { "canvas": true, "properties": false },
+    "communityPlugins": ["table-editor-obsidian", "drawio-obsidian"],
+    "hotkeys": { "simple-code-formatter:simple_code_formatter": [{ "modifiers": ["Mod"], "key": "J" }] },
+    "pluginSettings": { "table-editor-obsidian": { "formatType": "normal", "bindTab": true } }
+  }
+}
+```
+
+| Key | Lands in |
+|-----|----------|
+| `app` | `app.json` |
+| `appearance` | `appearance.json` (`cssTheme` is a theme folder name) |
+| `corePlugins` | `core-plugins.json` (id: true or false) |
+| `communityPlugins` | `community-plugins.json`, the list of enabled plugins |
+| `hotkeys` | `hotkeys.json`, by `<plugin id>:<command id>` |
+| `pluginSettings.<id>` | `plugins/<id>/data.json`, merged key by key |
+
+**pf does not install plugins or themes.** Obsidian has no command line for it and pf downloads no third-party code. pf enables and configures a community plugin only when the vault already has it (a `manifest.json` in `.obsidian/plugins/<id>`), and sets a theme only when `.obsidian/themes/<name>/theme.css` exists. Everything else is listed as "not installed in this vault": add it in Obsidian (Settings, Community plugins or Appearance), then run `pf suite enable obsidian` again.
+
+Applying is **additive**, like any preset:
+
+- a value the preset names is set when it differs, key by key inside nested objects; every other key in the file stays
+- `community-plugins.json` only grows, nothing is disabled or removed
+- the plan is shown first and pf asks (`--yes` without a terminal); `--dry-run` writes nothing
+- the old copy of every changed file is kept in `~/.pf/sys/backups/obsidian/<vault>/<timestamp>/` (outside the vault, so it never syncs), and files are replaced through a temp file and a rename
+- a file that is not valid JSON of the expected shape stops the run before anything is written
+- pf warns when Obsidian is running, because it can rewrite its configuration when it closes: quit it first and start it again afterwards
+
+The vaults an apply went to are remembered in `~/.pf/sys/suite-state.json`, which is what `pf suite` shows as "applied to ...". `pf update` never touches a vault.
+
+The shipped preset mimics a real vault: core plugins, Importer, Iconize, Meld Encrypt, Webpage HTML Export, Advanced Tables, Diagrams, Advanced Canvas and Simple Code Formatter with the settings they were using, the Minimal theme and its settings, and two hotkeys. Per-vault values are left out (icon assignments, the export title and path, graph and workspace layout, Obsidian Sync).
 
 ## The preset format
 
@@ -71,7 +152,7 @@ Only `@pulpfixer/ext-<name>` packages are accepted. Each ships one `.vsix` and n
 }
 ```
 
-`app` picks the adapter, `extensions` are `publisher.name` ids, `settings` are top-level `settings.json` keys with the value they must have, `packages` (optional) are suite extension packages, as above, and `includes` (optional) are presets for the same app applied along with this one.
+`app` picks the adapter, `extensions` are `publisher.name` ids, `settings` are top-level `settings.json` keys with the value they must have, `packages` (optional) are suite extension packages, as above, and `includes` (optional) are presets for the same app that pf fetches and merges under this one (their extensions and packages are added together, this preset's settings win; an include that cannot be fetched, is for another app or loops back is an error and nothing is applied). An `"app": "obsidian"` preset has an `obsidian` section instead, as above.
 
 ## Changing the Cursor standard
 
@@ -84,5 +165,6 @@ The next `pf sys apply cursor` on any machine picks the new version up.
 ## Adding an app or a preset
 
 - **A preset for an app pf already knows:** a new `packages/preset-<name>` package (copy `preset-cursor`) and add it to `ORDER` in `scripts/release.mjs`.
+- **A suite feature:** a preset package as above, a feature in `packages/suite/suite.json` (`"optional": true` keeps it out of a bare `pf suite enable`), then `pnpm ver bump packages/suite minor`.
 - **A VS Code family editor:** add an `editorAdapter({...})` file under `packages/plugin-system/src/apps/` and list it in `APPS` in `apps/index.ts`.
 - **Another kind of app:** implement `AppAdapter` (`detect`, `readState`, `installArgv`) the same way; `plan.ts` compares extensions and settings only, so a different kind of state needs its own plan.

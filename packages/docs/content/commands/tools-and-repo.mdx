@@ -144,7 +144,7 @@ The menu lists it as `repo commit` in a git repo (`pf actions` id `repo:commit`,
 The Background Tone extension (`@pulpfixer/ext-bg-tone`, part of the [pulpfixer suite](/plugins/bg-tone)) tints a window and shows the repo's logo so you can tell Cursor windows apart. It keeps its settings in the `bgTone` section of `pulpfixer.json`, which is committed with the repo. `pf rp` takes care of the repo side:
 
 - the logo: if `bgTone.logo` is empty, `pf rp` finds the repo's image and writes it (`pf rp --dry-run` says what it would write). A logo you set yourself is never replaced, and one that points to a missing file is reported;
-- the extension: when Cursor does not have it, `pf rp` asks whether to run `pf sys apply suite` (default yes). Without a terminal it prints the command instead. When it is installed, `pf rp` reports its version and `pf update` keeps it current.
+- the extension: when Cursor does not have it, `pf rp` asks whether to run `pf suite enable cursor` (default yes). Without a terminal it prints the command instead. When it is installed, `pf rp` reports its version and `pf update` keeps it current.
 
 ### The link
 

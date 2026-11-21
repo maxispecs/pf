@@ -8,6 +8,7 @@ import { installVsixArgv, listExtensionsArgv, parseExtensionVersions, parseExten
 import { cachedExtension, fetchExtension, validateExtensionManifest } from '../src/extensions.js';
 import { findApp } from '../src/apps/index.js';
 import { systemVersions } from '../src/versions.js';
+import { validateSuite, type Suite } from '../src/suitefile.js';
 import { parseJsonc, sameJson, setTopLevelKeys } from '../src/jsonc.js';
 import { capturePreset, describePlan, isEmptyPlan, planPreset, settingsToWrite } from '../src/plan.js';
 import { resolveIncludes } from '../src/apply.js';
@@ -310,13 +311,12 @@ test('validatePreset accepts only @pulpfixer/ext-<name> packages', () => {
   assert.match(validatePreset({ app: 'cursor', packages: 'x' }) as string, /array/);
 });
 
-test('the suite preset ships the Background Tone extension package', () => {
-  const raw = JSON.parse(fs.readFileSync(path.join(root, '..', 'preset-suite', 'preset.json'), 'utf8'));
-  const suite = validatePreset(raw);
+test('the shipped suite lists Cursor (default, with Background Tone) and Obsidian (optional)', () => {
+  const suite = validateSuite(JSON.parse(fs.readFileSync(path.join(root, '..', 'suite', 'suite.json'), 'utf8')));
   assert.equal(typeof suite, 'object');
-  assert.deepEqual((suite as { packages: string[] }).packages, ['@pulpfixer/ext-bg-tone']);
-  // the suite is the whole setup: it pulls the standard Cursor preset in
-  assert.deepEqual((suite as { includes: string[] }).includes, ['cursor']);
+  const features = (suite as Suite).features;
+  assert.deepEqual(features.map((f) => [f.id, f.preset, f.optional]), [['cursor', 'cursor', false], ['obsidian', 'obsidian', true]]);
+  assert.deepEqual(features[0]!.packages, ['@pulpfixer/ext-bg-tone']);
 });
 
 test('--show-versions output gives ids and versions, and parseExtensions still reads it', () => {

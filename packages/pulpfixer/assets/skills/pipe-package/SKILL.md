@@ -9,13 +9,13 @@ A pipe package turns scripted IO into the command `pf <name> <pipe>`. A pipe dec
 
 ## No package yet
 
-Ask the user for the package name (lowercase, dashes), the pf db connection it uses (when a database is one end) and the kind of input and output of the first pipe (db or csv). Then ask them to run, in the folder that should hold the new repo:
+Ask the user for the package name (lowercase, dashes), the pf db connection it uses (when a database is one end) and the kind of input and output of the first pipe (db or csv). Then ask them to run (from any folder; the repo goes in the suite's repos folder, `~/dev` unless `pf suite config` says otherwise, or in `--dir <path>`):
 
 ```bash
 pf template apply pipe-package <name> --input <db|csv> --output <csv|db> --connection <connection>
 ```
 
-It creates `pipe-<name>/` with the source, tests, `AGENTS.md` and pf's repo setup (link, pnpm commands, versioning). Continue inside that folder.
+It creates `<repos folder>/pipe-<name>/` with the source, tests, `AGENTS.md` and pf's repo setup (link, pnpm commands, versioning). It prints the folder (`cd <path>` under "Next:"); continue inside that folder, not in the current one.
 
 ## Filling it in
 

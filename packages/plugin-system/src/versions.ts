@@ -2,11 +2,14 @@ import { findApp, type AppAdapter } from './apps/index.js';
 import { cachedExtensions } from './extensions.js';
 import { cachedPresets, presetPackage } from './presets.js';
 import { BG_TONE_EXTENSION } from './suite.js';
+import { SUITE_PACKAGE, cachedSuite } from './suitefile.js';
 
 /** What the system plugin has on this machine, for `pf versions`. Reads files and the app's extension list; no network. */
 export interface SystemVersions {
   /** Presets fetched into `~/.pf/sys/presets`. */
   presets: { name: string; package: string; version: string; problem?: string }[];
+  /** The suite package fetched there (`@pulpfixer/suite`); absent when it was never fetched. */
+  suite?: { package: string; version: string; features: string[]; problem?: string };
   /** Extension packages fetched there, with what the app has installed. */
   extensions: {
     package: string;
@@ -58,7 +61,11 @@ export function systemVersions(opts: { app?: AppProbe | null } = {}): SystemVers
     extensions.push({ package: '@pulpfixer/ext-bg-tone', version: '', id: BG_TONE_EXTENSION, installed: installedBgTone });
   }
 
+  const suite = cachedSuite();
   return {
+    ...(suite
+      ? { suite: { package: SUITE_PACKAGE, version: suite.version, features: suite.suite?.features.map((f) => f.id) ?? [], ...(suite.problem ? { problem: suite.problem } : {}) } }
+      : {}),
     presets: cachedPresets().map((p) => ({ name: p.name, package: presetPackage(p.name), version: p.version, ...(p.problem ? { problem: p.problem } : {}) })),
     extensions,
     app: { label: app?.label ?? 'Cursor', found, readable },

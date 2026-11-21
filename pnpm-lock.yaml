@@ -140,7 +140,7 @@ importers:
 
   packages/preset-cursor: {}
 
-  packages/preset-suite: {}
+  packages/preset-obsidian: {}
 
   packages/pulpfixer:
     dependencies:
@@ -168,6 +168,8 @@ importers:
       '@pulpfixer/plugin-yubikey':
         specifier: workspace:*
         version: link:../plugin-yubikey
+
+  packages/suite: {}
 
   packages/template-io-adapter:
     devDependencies:

@@ -9,13 +9,13 @@ A query package turns named SQL queries into the command `pf <name> <query>`. It
 
 ## No package yet
 
-Ask the user for the package name (lowercase, dashes), the pf db connection it uses and the database (postgres, mysql or sqlite). Then ask them to run, in the folder that should hold the new repo:
+Ask the user for the package name (lowercase, dashes), the pf db connection it uses and the database (postgres, mysql or sqlite). Then ask them to run (from any folder; the repo goes in the suite's repos folder, `~/dev` unless `pf suite config` says otherwise, or in `--dir <path>`):
 
 ```bash
 pf template apply query-package <name> --connection <connection> --driver <driver>
 ```
 
-It creates `query-<name>/` with the source, tests, `AGENTS.md` and pf's repo setup (link, pnpm commands, versioning). Continue inside that folder.
+It creates `<repos folder>/query-<name>/` with the source, tests, `AGENTS.md` and pf's repo setup (link, pnpm commands, versioning). It prints the folder (`cd <path>` under "Next:"); continue inside that folder, not in the current one.
 
 ## Filling it in
 
