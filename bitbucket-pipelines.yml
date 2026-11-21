@@ -24,6 +24,10 @@ definitions:
           - pnpm
         script:
           - npm install -g pnpm@12
+          # pnpm 12 ignores `${NPM_TOKEN}` in the repo .npmrc, so give it the token through the user-level
+          # .npmrc (the token never lands in the repo and the line is not echoed)
+          - test -n "$NPM_TOKEN" || { echo "NPM_TOKEN is not set (Repository settings -> Pipelines -> Repository variables)"; exit 1; }
+          - printf '//cellars.staging.pangenea.com/:_authToken=%s\n' "$NPM_TOKEN" > "$HOME/.npmrc"
           # the docs site (Amplify builds it) is not part of the checks or the release
           - pnpm install --frozen-lockfile --filter '!@pulpfixer/docs'
           - pnpm run typecheck
@@ -37,8 +41,9 @@ definitions:
           - pnpm
         script:
           - npm install -g pnpm@12
-          - pnpm install --frozen-lockfile --filter '!@pulpfixer/docs'
           - test -n "$NPM_TOKEN" || { echo "NPM_TOKEN is not set (Repository settings -> Pipelines -> Repository variables)"; exit 1; }
+          - printf '//cellars.staging.pangenea.com/:_authToken=%s\n' "$NPM_TOKEN" > "$HOME/.npmrc"
+          - pnpm install --frozen-lockfile --filter '!@pulpfixer/docs'
           # checks (typecheck, test, build), then pnpm publish of every new version
           - pnpm run publish:cellars
 
