@@ -9,6 +9,7 @@ import {
 	planBump,
 	planFeature,
 	previewBump,
+	shortLabels,
 	stackBumpedSinceHead,
 	versionsState,
 } from '../src/versions.ts';
@@ -127,7 +128,7 @@ test('previewBump says what a click does', () => {
 	assert.equal(previewBump(file, 'stack', 'minor', true), 'minor 3.23 -> 3.24');
 });
 
-test('versionsState lists the stack first and drops the shared folder from the names', () => {
+test('versionsState lists the stack first and drops the storage folder from the names', () => {
 	const state = versionsState(parseVersionsFile(FILE), { stackDone: false, canBump: true });
 	assert.deepEqual(state.rows.map(r => [r.target, r.label, r.version]), [
 		['stack', 'stack', '3.23'],
@@ -142,7 +143,7 @@ test('versionsState lists the stack first and drops the shared folder from the n
 		parseVersionsFile('{"stack":{"version":"1.0"},"packages":{"a/x":{"version":"1.0"},"b/y":{"version":"1.0"}}}'),
 		{ stackDone: false, canBump: true },
 	);
-	assert.deepEqual(mixed.rows.map(r => r.label), ['stack', 'a/x', 'b/y']);
+	assert.deepEqual(mixed.rows.map(r => r.label), ['stack', 'x', 'y']);
 	assert.deepEqual(versionsState(undefined, { stackDone: false, canBump: true }).rows, []);
 });
 
@@ -225,4 +226,15 @@ test('planFeature refuses the stack, unknown targets, odd input and a malformed 
 	assert.equal(planFeature(text, 'packages/a', 'yes').ok, false);
 	assert.equal(planFeature(null, 'packages/a', true).ok, false);
 	assert.equal(planFeature('{"stack":{"version":"1.0"},"featured":"a","packages":{"a":{"version":"1.0"}}}', 'a', true).ok, false);
+});
+
+test('shortLabels drops the storage folder and keeps segments only to tell packages apart', () => {
+	const labels = (paths: string[]) => Object.fromEntries(shortLabels(paths));
+	// A package outside packages/ (workbench) does not stop packages/ from being dropped.
+	assert.deepEqual(labels(['packages/kit', 'packages/aws', 'workbench']), { 'packages/kit': 'kit', 'packages/aws': 'aws', workbench: 'workbench' });
+	assert.deepEqual(labels(['apps/web', 'libs/ui', 'tools/cli/run']), { 'apps/web': 'web', 'libs/ui': 'ui', 'tools/cli/run': 'run' });
+	// The same name in two folders keeps its folder; the rest stay short.
+	assert.deepEqual(labels(['apps/web', 'libs/web', 'libs/ui']), { 'apps/web': 'apps/web', 'libs/web': 'libs/web', 'libs/ui': 'ui' });
+	assert.deepEqual(labels(['a/x/web', 'b/x/web', 'c/y/web']), { 'a/x/web': 'a/x/web', 'b/x/web': 'b/x/web', 'c/y/web': 'y/web' });
+	assert.deepEqual(labels(['.']), { '.': '.' });
 });

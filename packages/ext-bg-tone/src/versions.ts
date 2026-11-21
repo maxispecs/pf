@@ -244,7 +244,7 @@ export function previewBump(file: VersionsFile, target: string, part: VersionPar
 export interface VersionRow {
 	/** `stack` or the package path: what a click sends back. */
 	target: string;
-	/** Shown name: the package path without the folder every package shares (usually `packages/`). */
+	/** Shown name: the package's own folder name, without the folder it is stored in (see `shortLabels`). */
 	label: string;
 	version: string;
 	since: string;
@@ -264,13 +264,37 @@ export interface VersionsState {
 
 export const NO_VERSIONS: VersionsState = { rows: [], canBump: false, stackDone: false, hint: '' };
 
-/** The leading folder every package path shares (`packages/`), '' when they differ or there is a single level. */
-function sharedFolder(paths: string[]): string {
-	if (paths.length === 0) {
-		return '';
+/**
+ * Short names for package paths: the folder a package is stored in (`packages/`, `apps/`, ...) is redundant, so
+ * each name is its last path segment. Only when two packages would end up with the same name (`apps/web` and
+ * `libs/web`) do they keep as many trailing segments as it takes to tell them apart.
+ */
+export function shortLabels(paths: string[]): Map<string, string> {
+	const parts = new Map(paths.map(p => [p, p.split('/').filter(Boolean)] as const));
+	const take = new Map<string, number>(paths.map(p => [p, 1]));
+	const label = (p: string) => (parts.get(p) as string[]).slice(-(take.get(p) as number)).join('/') || p;
+	for (let round = 0; round < 32; round++) {
+		const byLabel = new Map<string, string[]>();
+		for (const p of paths) {
+			byLabel.set(label(p), [...(byLabel.get(label(p)) ?? []), p]);
+		}
+		let grew = false;
+		for (const group of byLabel.values()) {
+			if (group.length < 2) {
+				continue;
+			}
+			for (const p of group) {
+				if ((take.get(p) as number) < (parts.get(p) as string[]).length) {
+					take.set(p, (take.get(p) as number) + 1);
+					grew = true;
+				}
+			}
+		}
+		if (!grew) {
+			break;
+		}
 	}
-	const first = paths[0].split('/')[0];
-	return paths.every(p => p.includes('/') && p.split('/')[0] === first) ? `${first}/` : '';
+	return new Map(paths.map(p => [p, label(p)] as const));
 }
 
 export function versionsState(
@@ -295,12 +319,12 @@ export function versionsState(
 	const rest = Object.keys(file.packages)
 		.filter(p => !file.featured.includes(p))
 		.sort((a, b) => a.localeCompare(b));
-	const shared = sharedFolder([...file.featured, ...rest]);
+	const labels = shortLabels([...file.featured, ...rest]);
 	return {
 		rows: [
 			row(STACK_TARGET, STACK_TARGET, file.stack),
-			...file.featured.map(p => row(p, p.slice(shared.length), file.packages[p], true)),
-			...rest.map(p => row(p, p.slice(shared.length), file.packages[p])),
+			...file.featured.map(p => row(p, labels.get(p) ?? p, file.packages[p], true)),
+			...rest.map(p => row(p, labels.get(p) ?? p, file.packages[p])),
 		],
 		canBump: options.canBump,
 		stackDone: options.stackDone,
