@@ -1,4 +1,4 @@
-# Bitbucket Pipelines: check every push, publish to the cellars staging registry on demand.
+# Bitbucket Pipelines: check every pull request and every push to dev / main, publish to the cellars staging registry on demand.
 #
 # The publish step is the same thing `pf publish staging` / `pf ps` runs locally: `pnpm run publish:cellars`
 # (scripts/release.mjs --publish). It publishes every package whose version the registry lacks, in dependency
@@ -48,9 +48,12 @@ definitions:
           - pnpm run publish:cellars
 
 pipelines:
-  default:
-    - step: *check
+  # No `default:` rule: it runs on every branch push, so a pushed branch with a pull request got two pipelines
+  # (push + PR), and the merge a third (push to the target). A feature branch is checked by its pull request
+  # pipeline; `dev` and `main` are checked on every push to them (merges and direct pushes).
   branches:
+    dev:
+      - step: *check
     main:
       - step: *check
       - step: *publish-staging
