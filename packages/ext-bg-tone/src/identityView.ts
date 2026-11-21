@@ -8,8 +8,10 @@ import { primaryFolder, readConfig, repoName } from './settings.ts';
 import { identityVisible } from './repoConfig.ts';
 import { isPfRepo } from './store.ts';
 import { VERSIONS_FILE, parseStackVersion } from './stackVersion.ts';
+import { NO_VERSIONS, VersionsState } from './versions.ts';
+import { VersionsService, hasVersionsFile } from './versionsService.ts';
 import * as fs from 'node:fs';
-import { execFile } from 'node:child_process';
+import { runGit } from './git.ts';
 import { countChangedFiles } from './gitChanges.ts';
 import { LOG_ARGS_FORMAT, parseRecentCommits } from './gitLog.ts';
 
@@ -21,6 +23,7 @@ const TITLE_TTL_MS = 60_000;
 export const IDENTITY_CARD_VIEW = 'bgTone.identityCard';
 export const IDENTITY_SCM_CARD_VIEW = 'bgTone.identityCardScm';
 export const IDENTITY_ITEM_VIEW = 'bgTone.identityItem';
+export const VERSIONS_SCM_VIEW = 'bgTone.versionsScm';
 
 function nonce(): string {
 	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -51,6 +54,11 @@ export async function updateIdentityContext(logos: LogoService): Promise<void> {
 	);
 	await vscode.commands.executeCommand(
 		'setContext',
+		'bgTone.versionsViewVisible',
+		hasFolder && config.versions === 'view' && hasVersionsFile(),
+	);
+	await vscode.commands.executeCommand(
+		'setContext',
 		'bgTone.itemVisible',
 		hasFolder && config.logoLocations.includes('explorerItem') && hasLogo,
 	);
@@ -67,18 +75,6 @@ function stackVersion(): string {
 	} catch {
 		return '';
 	}
-}
-
-/** Runs git in the primary folder (no shell: the arguments go straight to git). */
-function runGit(cwd: string, args: string[], timeout: number): Promise<{ ok: boolean; stdout: string; stderr: string }> {
-	return new Promise(resolve => {
-		execFile(
-			'git',
-			args,
-			{ cwd, timeout, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
-			(error, stdout, stderr) => resolve({ ok: !error, stdout, stderr: stderr || (error ? error.message : '') }),
-		);
-	});
 }
 
 /** Files with uncommitted changes in the primary folder (`git status`); null without a local git repo or git. */
@@ -163,6 +159,7 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		private readonly context: vscode.ExtensionContext,
 		private readonly logos: LogoService,
 		private readonly actions: ActionsService,
+		private readonly versions: VersionsService,
 		private readonly cache: CardCache,
 		private readonly list: CardList = 'chats',
 	) {
@@ -176,15 +173,8 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 			vscode.workspace.onDidRenameFiles(soon),
 			{ dispose: () => clearTimeout(this.soonTimer) },
 		);
-		// `pnpm ver bump` rewrites versions.json: redraw the version beside the name.
-		const folder = primaryFolder();
-		if (folder) {
-			const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, VERSIONS_FILE));
-			watcher.onDidChange(() => this.refresh());
-			watcher.onDidCreate(() => this.refresh());
-			watcher.onDidDelete(() => this.refresh());
-			this.disposables.push(watcher);
-		}
+		// `pnpm ver bump` rewrites versions.json: redraw the version beside the name (and a commit resets "stack bumped").
+		this.disposables.push(watchVersions(() => this.refresh()));
 	}
 
 	resolveWebviewView(view: vscode.WebviewView): void {
@@ -216,7 +206,7 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 				this.stopPolling();
 			}
 		}, null, this.disposables);
-		view.webview.onDidReceiveMessage((m: { type?: string; id?: unknown }) => {
+		view.webview.onDidReceiveMessage((m: { type?: string; id?: unknown; target?: unknown; part?: unknown }) => {
 			if (m?.type === 'ready') {
 				this.refresh();
 				void this.actions.refresh();
@@ -226,6 +216,10 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 			} else if (m?.type === 'commit') {
 				// No payload is trusted: the count, the message prompt and the git calls are all the extension's own.
 				void commitAll().then(changed => changed && this.refresh());
+			} else if (m?.type === 'bump') {
+				// Only a target and a part come from the page; both are checked against versions.json.
+				const { target, part } = m as { target?: unknown; part?: unknown };
+				void this.versions.bump(target, part).then(() => this.refresh());
 			} else if (m?.type === 'editActions') {
 				void vscode.commands.executeCommand('bgTone.openSettings', 'actions');
 			}
@@ -256,15 +250,16 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		view.title = repoName();
 		view.description = undefined;
 		const config = readConfig();
-		const [runs, commits, changes] = await Promise.all([
+		const [runs, commits, changes, versions] = await Promise.all([
 			this.list === 'chats' && config.showLastAgent ? this.recentAgents() : Promise.resolve(undefined),
 			this.list === 'commits' && config.showLastCommits ? recentCommits() : Promise.resolve(undefined),
 			uncommittedFiles(),
+			this.showsVersions() ? this.versions.state() : Promise.resolve(undefined),
 		]);
 		if (generation !== this.generation || this.view !== view) {
 			return; // a newer refresh superseded this one, or the view went away
 		}
-		const snapshot = this.snapshot(runs?.map(({ title, status, updatedAt }) => ({ title, status, updatedAt })), commits, changes);
+		const snapshot = this.snapshot(runs?.map(({ title, status, updatedAt }) => ({ title, status, updatedAt })), commits, changes, versions);
 		if (this.logos.loaded && this.actions.status.type !== 'loading') {
 			this.cache.set(snapshot);
 		}
@@ -272,7 +267,7 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 	}
 
 	/** The card from what is known now, with the cached values for the parts that have not loaded yet. */
-	private snapshot(agents: CardAgent[] | undefined, commits?: CardCommit[], changes?: number | null): CardSnapshot {
+	private snapshot(agents: CardAgent[] | undefined, commits?: CardCommit[], changes?: number | null, versions?: VersionsState): CardSnapshot {
 		const config = readConfig();
 		const logo = this.logos.logo;
 		return composeSnapshot(
@@ -285,6 +280,7 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 				// Only this card's own list is loaded; the other one stays as cached (and is never drawn here).
 				agents: this.list === 'chats' && !config.showLastAgent ? [] : agents,
 				commits: this.list === 'commits' && !config.showLastCommits ? [] : commits,
+				versions,
 				actions: !config.showActions ? NO_ACTIONS : this.actions.status.type === 'loading' ? undefined : this.actionsState(),
 			},
 			this.cache.snapshot,
@@ -293,7 +289,14 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 
 	/** The snapshot as this card draws it: the list of the other kind is dropped. */
 	private shown(snapshot: CardSnapshot): CardSnapshot {
-		return this.list === 'chats' ? { ...snapshot, commits: [] } : { ...snapshot, agents: [] };
+		return this.list === 'chats'
+			? { ...snapshot, commits: [], versions: NO_VERSIONS }
+			: { ...snapshot, agents: [], versions: this.showsVersions() ? snapshot.versions : NO_VERSIONS };
+	}
+
+	/** Only the Source Control card has the versions list, and only when the setting puts it in the card. */
+	private showsVersions(): boolean {
+		return this.list === 'commits' && readConfig().versions === 'card';
 	}
 
 	/** What the card draws for the actions row: the featured buttons, whether to offer editing, and a hint when pf is the problem. */
@@ -346,23 +349,13 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 	}
 
 	private html(webview: vscode.Webview, initial: CardSnapshot): string {
-		const media = (file: string) =>
-			webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', file));
-		const n = nonce();
-		return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${n}';">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="${media('codicon.css')}">
-<link rel="stylesheet" href="${media('identity.css')}">
-</head>
-<body>
-<div id="card" data-state="${escapeAttribute(JSON.stringify(webviewState(webview, initial)))}"></div>
-<script nonce="${n}" src="${media('identity.js')}"></script>
-</body>
-</html>`;
+		return pageHtml(
+			webview,
+			this.context.extensionUri,
+			['codicon.css', 'identity.css', 'versions.css'],
+			['versions-list.js', 'identity.js'],
+			JSON.stringify(webviewState(webview, initial)),
+		);
 	}
 
 	dispose(): void {
@@ -377,6 +370,125 @@ function webviewState(webview: vscode.Webview, snapshot: CardSnapshot) {
 	const { logo, ...rest } = snapshot;
 	const logoSrc = logo ? webview.asWebviewUri(vscode.Uri.parse(logo.uri)).with({ query: `v=${logo.mtime}` }).toString() : '';
 	return { ...rest, logoSrc, at: Date.now() };
+}
+
+/** The page of a webview: the stylesheets and scripts come from `media/`, the first state is in a data attribute. */
+function pageHtml(webview: vscode.Webview, extensionUri: vscode.Uri, styles: string[], scripts: string[], stateJson: string): string {
+	const media = (file: string) => webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', file));
+	const n = nonce();
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${n}';">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+${styles.map(file => `<link rel="stylesheet" href="${media(file)}">`).join('\n')}
+</head>
+<body>
+<div id="card" data-state="${escapeAttribute(stateJson)}"></div>
+${scripts.map(file => `<script nonce="${n}" src="${media(file)}"></script>`).join('\n')}
+</body>
+</html>`;
+}
+
+/** Redraw triggers for the versions: `versions.json` itself and the git log of HEAD (a commit resets "stack bumped"). */
+function watchVersions(onChange: () => void): vscode.Disposable {
+	const folder = primaryFolder();
+	if (!folder) {
+		return { dispose: () => undefined };
+	}
+	const watchers = [VERSIONS_FILE, '.git/logs/HEAD'].map(pattern => {
+		const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
+		watcher.onDidChange(onChange);
+		watcher.onDidCreate(onChange);
+		watcher.onDidDelete(onChange);
+		return watcher;
+	});
+	return { dispose: () => watchers.forEach(w => w.dispose()) };
+}
+
+/** The "Versions" view of Source Control (`bgTone.versions` = `view`): the stack and package versions with `[+]` bump buttons. */
+export class VersionsViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
+	private view: vscode.WebviewView | undefined;
+	private readonly disposables: vscode.Disposable[] = [];
+	private pollTimer: ReturnType<typeof setInterval> | undefined;
+	private generation = 0;
+
+	constructor(
+		private readonly context: vscode.ExtensionContext,
+		private readonly versions: VersionsService,
+		/** Called when versions.json or the git log changes (the view exists only while versions.json does). */
+		onFilesChanged: () => void,
+	) {
+		this.disposables.push(
+			watchVersions(() => {
+				this.refresh();
+				onFilesChanged();
+			}),
+			vscode.workspace.onDidGrantWorkspaceTrust(() => this.refresh()),
+		);
+	}
+
+	resolveWebviewView(view: vscode.WebviewView): void {
+		this.view = view;
+		view.webview.options = { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'media')] };
+		view.webview.html = pageHtml(view.webview, this.context.extensionUri, ['codicon.css', 'versions.css'], ['versions-list.js', 'versions.js'], JSON.stringify({ versions: NO_VERSIONS }));
+		this.stopPolling();
+		this.pollTimer = setInterval(() => {
+			if (view.visible) {
+				this.refresh();
+			}
+		}, AGENT_POLL_MS);
+		view.onDidChangeVisibility(() => {
+			if (view.visible) {
+				this.refresh();
+			}
+		}, null, this.disposables);
+		view.onDidDispose(() => {
+			if (this.view === view) {
+				this.view = undefined;
+				this.stopPolling();
+			}
+		}, null, this.disposables);
+		view.webview.onDidReceiveMessage((m: { type?: string; target?: unknown; part?: unknown }) => {
+			if (m?.type === 'ready') {
+				this.refresh();
+			} else if (m?.type === 'bump') {
+				// Only a target and a part come from the page; both are checked against versions.json.
+				void this.versions.bump(m.target, m.part).then(() => this.refresh());
+			}
+		}, null, this.disposables);
+	}
+
+	refresh(): void {
+		void this.render();
+	}
+
+	private async render(): Promise<void> {
+		const view = this.view;
+		if (!view) {
+			return;
+		}
+		const generation = ++this.generation;
+		const state = await this.versions.state();
+		if (generation !== this.generation || this.view !== view) {
+			return;
+		}
+		void view.webview.postMessage({ type: 'state', state: { versions: state } });
+	}
+
+	private stopPolling(): void {
+		if (this.pollTimer) {
+			clearInterval(this.pollTimer);
+			this.pollTimer = undefined;
+		}
+	}
+
+	dispose(): void {
+		this.stopPolling();
+		this.disposables.forEach(d => d.dispose());
+		this.disposables.length = 0;
+	}
 }
 
 /** A one-item Explorer tree whose icon is the repo logo (small, but always in view). */

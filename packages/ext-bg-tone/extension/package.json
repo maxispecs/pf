@@ -119,6 +119,22 @@
           "scope": "window",
           "markdownDescription": "Show the repo's featured actions (run, deploy, publish, docs and your own commands) as small icon buttons on the Repo Identity card. The list comes from `pf actions --json`; choose which actions are featured with the pencil button, `pf actions feature <id>`, or `featured` / `icon` in the repo's `pulpfixer.json`. Needs `pf`; buttons run in the integrated terminal."
         },
+        "bgTone.versions": {
+          "type": "string",
+          "enum": [
+            "view",
+            "card",
+            "off"
+          ],
+          "enumDescriptions": [
+            "A separate Versions view in Source Control, under Repo Identity.",
+            "A section at the bottom of the Repo Identity card in Source Control.",
+            "Do not show the versions."
+          ],
+          "default": "view",
+          "scope": "window",
+          "markdownDescription": "Where to list the versions from the repo's `versions.json` (kept by the `ver` skill, `pf ver`), with `[+]` buttons to bump them: the left one bumps major, the right one minor. A package bump also raises the stack minor, but only once until the next commit. Nothing shows in a repo without a `versions.json`. A click edits `versions.json` and runs `pf ver sync`; trusted local workspaces only."
+        },
         "bgTone.pfPath": {
           "type": "string",
           "default": "pf",
@@ -224,6 +240,13 @@
           "when": "bgTone.scmCardVisible",
           "visibility": "collapsed",
           "contextualTitle": "Repo Identity"
+        },
+        {
+          "id": "bgTone.versionsScm",
+          "name": "Versions",
+          "type": "webview",
+          "when": "bgTone.versionsViewVisible",
+          "contextualTitle": "Versions"
         }
       ]
     }

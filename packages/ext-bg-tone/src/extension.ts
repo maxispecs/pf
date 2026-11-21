@@ -13,12 +13,15 @@ import {
 	IDENTITY_SCM_CARD_VIEW,
 	IdentityCardProvider,
 	IdentityItemProvider,
+	VERSIONS_SCM_VIEW,
+	VersionsViewProvider,
 	updateIdentityContext,
 } from './identityView.ts';
 import { applyTitle } from './title.ts';
 import { ActionsService } from './actionsService.ts';
 import { diffFeatured } from './actions.ts';
 import { CardCache } from './cardCache.ts';
+import { VersionsService } from './versionsService.ts';
 
 const NO_COLOR_LABEL = 'No color';
 const CUSTOM_LABEL = 'Custom hex color...';
@@ -28,8 +31,10 @@ export function activate(context: vscode.ExtensionContext): void {
 	const logos = new LogoService();
 	const actions = new ActionsService();
 	const cardCache = new CardCache(context.workspaceState);
-	const card = new IdentityCardProvider(context, logos, actions, cardCache, 'chats');
-	const scmCard = new IdentityCardProvider(context, logos, actions, cardCache, 'commits');
+	const versions = new VersionsService(actions);
+	const card = new IdentityCardProvider(context, logos, actions, versions, cardCache, 'chats');
+	const scmCard = new IdentityCardProvider(context, logos, actions, versions, cardCache, 'commits');
+	const versionsView = new VersionsViewProvider(context, versions, () => void updateIdentityContext(logos));
 	const item = new IdentityItemProvider(logos);
 
 	const reapply = () => {
@@ -62,6 +67,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		void updateIdentityContext(logos);
 		card.refresh();
 		scmCard.refresh();
+		versionsView.refresh();
 		item.refresh();
 	};
 	const refreshLogo = () => {
@@ -73,6 +79,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		actions,
 		card,
 		scmCard,
+		versionsView,
 		item,
 		statusItem,
 		logos.onDidChange(refreshViews),
@@ -87,14 +94,18 @@ export function activate(context: vscode.ExtensionContext): void {
 			refreshLogo();
 			// pulpfixer.json also holds the commands and `actions` the buttons come from.
 			actions.refreshSoon();
+			// `bgTone.versions` decides whether the Versions view exists and whether the card has the list.
+			void updateIdentityContext(logos);
 			card.refresh();
 			scmCard.refresh();
+			versionsView.refresh();
 		}),
 		vscode.window.onDidChangeActiveColorTheme(() => void applyTone(context)),
 
 		// Kept alive while hidden, so switching between Explorer and Source Control does not rebuild the card.
 		vscode.window.registerWebviewViewProvider(IDENTITY_CARD_VIEW, card, { webviewOptions: { retainContextWhenHidden: true } }),
 		vscode.window.registerWebviewViewProvider(IDENTITY_SCM_CARD_VIEW, scmCard, { webviewOptions: { retainContextWhenHidden: true } }),
+		vscode.window.registerWebviewViewProvider(VERSIONS_SCM_VIEW, versionsView, { webviewOptions: { retainContextWhenHidden: true } }),
 		vscode.window.registerTreeDataProvider(IDENTITY_ITEM_VIEW, item),
 		vscode.window.registerWebviewPanelSerializer(SETTINGS_PANEL_TYPE, {
 			async deserializeWebviewPanel(panel) {

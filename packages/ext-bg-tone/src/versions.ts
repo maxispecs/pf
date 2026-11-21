@@ -1,0 +1,262 @@
+/**
+ * Pure logic for the Versions section: read `versions.json` (kept by the `ver` CLI), plan a bump the way
+ * the CLI does, and decide whether the stack was already bumped since the last commit. No `vscode` import.
+ *
+ * Only `versions.json` is edited here; `pf ver sync` then rewrites the manifests and runs the hooks.
+ */
+import { parseStackVersion } from './stackVersion.ts';
+
+/** Where the Versions section shows (`bgTone.versions`): its own view in Source Control, inside the card there, or nowhere. */
+export type VersionsPlacement = 'view' | 'card' | 'off';
+
+export function normalizePlacement(value: unknown): VersionsPlacement {
+	return value === 'card' || value === 'off' ? value : 'view';
+}
+
+export type VersionPart = 'major' | 'minor';
+export const VERSION_PARTS: readonly VersionPart[] = ['major', 'minor'];
+export const STACK_TARGET = 'stack';
+
+const MAJOR_MINOR = /^(\d+)\.(\d+)$/;
+const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+interface Entry {
+	version: string;
+	since?: string;
+	type?: string;
+	[key: string]: unknown;
+}
+
+export interface VersionsFile {
+	/** The whole parsed file, so keys this code does not know (`hooks`) survive a write. */
+	data: Record<string, unknown> & { stack: Entry; packages: Record<string, Entry> };
+	stack: Entry;
+	packages: Record<string, Entry>;
+}
+
+const has = (object: object, key: string): boolean => Object.prototype.hasOwnProperty.call(object, key);
+
+function isEntry(value: unknown): value is Entry {
+	return !!value && typeof value === 'object' && !Array.isArray(value) && typeof (value as Entry).version === 'string' && MAJOR_MINOR.test((value as Entry).version);
+}
+
+/** The file as the CLI reads it: a `major.minor` stack and packages. `undefined` for anything else (nothing is guessed). */
+export function parseVersionsFile(text: string | null): VersionsFile | undefined {
+	if (text === null) {
+		return undefined;
+	}
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text);
+	} catch {
+		return undefined;
+	}
+	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+		return undefined;
+	}
+	const data = parsed as Record<string, unknown>;
+	if (!isEntry(data.stack)) {
+		return undefined;
+	}
+	const rawPackages = data.packages ?? {};
+	if (!rawPackages || typeof rawPackages !== 'object' || Array.isArray(rawPackages)) {
+		return undefined;
+	}
+	for (const entry of Object.values(rawPackages)) {
+		if (!isEntry(entry)) {
+			return undefined;
+		}
+	}
+	data.packages = rawPackages;
+	return { data: data as VersionsFile['data'], stack: data.stack, packages: data.packages as Record<string, Entry> };
+}
+
+/** `major.minor` after a bump: major gives `X+1.0`, minor gives `X.Y+1`. */
+export function bumpVersion(version: string, part: VersionPart): string {
+	const m = MAJOR_MINOR.exec(version);
+	if (!m) {
+		throw new Error(`not a major.minor version: ${version}`);
+	}
+	const major = Number(m[1]);
+	const minor = Number(m[2]);
+	return part === 'major' ? `${major + 1}.0` : `${major}.${minor + 1}`;
+}
+
+/** Local calendar date, `YYYY-MM-DD` (what the CLI stamps as `since`). */
+export function localDate(now: Date = new Date()): string {
+	const month = String(now.getMonth() + 1).padStart(2, '0');
+	const day = String(now.getDate()).padStart(2, '0');
+	return `${now.getFullYear()}-${month}-${day}`;
+}
+
+/** The CLI's `stampVersion`: `version`, `since`, `type` first, then every other key in its order. */
+function stamp(entry: Entry, version: string, since: string): Entry {
+	const next: Entry = { version, since };
+	if (entry.type) {
+		next.type = entry.type;
+	}
+	for (const [key, value] of Object.entries(entry)) {
+		if (key !== 'version' && key !== 'since' && key !== 'type') {
+			next[key] = value;
+		}
+	}
+	return next;
+}
+
+export function isVersionPart(value: unknown): value is VersionPart {
+	return value === 'major' || value === 'minor';
+}
+
+/** True for `stack` or a package path of this file (own keys only). */
+export function isTarget(file: VersionsFile, target: unknown): target is string {
+	return typeof target === 'string' && (target === STACK_TARGET || has(file.packages, target));
+}
+
+export type VersionChange = { target: string; from: string; to: string };
+
+export type BumpPlan = { ok: true; text: string; changes: VersionChange[] } | { ok: false; reason: string };
+
+/**
+ * The new file text for one click. A package bump also raises the stack minor, unless `stackDone` (the stack
+ * was already bumped since the last commit). A click on the stack itself always bumps the stack.
+ */
+export function planBump(
+	text: string | null,
+	target: unknown,
+	part: unknown,
+	options: { stackDone: boolean; today?: string },
+): BumpPlan {
+	const file = parseVersionsFile(text);
+	if (!file) {
+		return { ok: false, reason: 'versions.json is missing or not a valid ver file' };
+	}
+	if (!isVersionPart(part)) {
+		return { ok: false, reason: 'the part must be major or minor' };
+	}
+	if (!isTarget(file, target)) {
+		return { ok: false, reason: 'unknown target' };
+	}
+	const today = options.today ?? localDate();
+	if (!CALENDAR_DATE.test(today)) {
+		return { ok: false, reason: 'bad date' };
+	}
+	const changes: VersionChange[] = [];
+	const { data } = file;
+	if (target === STACK_TARGET) {
+		const to = bumpVersion(file.stack.version, part);
+		changes.push({ target, from: file.stack.version, to });
+		data.stack = stamp(file.stack, to, today);
+	} else {
+		const entry = file.packages[target];
+		const to = bumpVersion(entry.version, part);
+		changes.push({ target, from: entry.version, to });
+		data.packages[target] = stamp(entry, to, today);
+		if (!options.stackDone) {
+			const stackTo = bumpVersion(file.stack.version, 'minor');
+			changes.push({ target: STACK_TARGET, from: file.stack.version, to: stackTo });
+			data.stack = stamp(file.stack, stackTo, today);
+		}
+	}
+	const packages = Object.fromEntries(Object.entries(data.packages).sort(([a], [b]) => a.localeCompare(b)));
+	return { ok: true, text: `${JSON.stringify({ ...data, packages }, null, 2)}\n`, changes };
+}
+
+/**
+ * Whether the stack was already bumped since the last commit: `HEAD` has no valid `versions.json`, or its
+ * stack version differs from the working copy's. That also counts a bump made from a terminal.
+ */
+export function stackBumpedSinceHead(headText: string | null | undefined, currentText: string | null): boolean {
+	const head = parseStackVersion(headText ?? null);
+	const current = parseStackVersion(currentText);
+	return head === undefined || current === undefined || head !== current;
+}
+
+/** What a click would do, e.g. `minor 1.2 -> 1.3, stack 3.23 -> 3.24`; the stack part is left out when it will not change. */
+export function previewBump(file: VersionsFile, target: string, part: VersionPart, stackDone: boolean): string {
+	const plan = planBump(JSON.stringify(file.data), target, part, { stackDone, today: '2000-01-01' });
+	if (!plan.ok) {
+		return '';
+	}
+	const [first, stack] = plan.changes;
+	let out = `${part} ${first.from} -> ${first.to}`;
+	if (stack) {
+		out += `, stack ${stack.from} -> ${stack.to}`;
+	} else if (target !== STACK_TARGET) {
+		out += ' (stack already bumped since the last commit)';
+	}
+	return out;
+}
+
+export interface VersionRow {
+	/** `stack` or the package path: what a click sends back. */
+	target: string;
+	/** Shown name: the package path without the folder every package shares (usually `packages/`). */
+	label: string;
+	version: string;
+	since: string;
+	tips: { major: string; minor: string };
+}
+
+/** What the page draws. */
+export interface VersionsState {
+	rows: VersionRow[];
+	/** False when clicking is refused (untrusted workspace, not a local folder). */
+	canBump: boolean;
+	stackDone: boolean;
+	hint: string;
+}
+
+export const NO_VERSIONS: VersionsState = { rows: [], canBump: false, stackDone: false, hint: '' };
+
+/** The leading folder every package path shares (`packages/`), '' when they differ or there is a single level. */
+function sharedFolder(paths: string[]): string {
+	if (paths.length === 0) {
+		return '';
+	}
+	const first = paths[0].split('/')[0];
+	return paths.every(p => p.includes('/') && p.split('/')[0] === first) ? `${first}/` : '';
+}
+
+export function versionsState(
+	file: VersionsFile | undefined,
+	options: { stackDone: boolean; canBump: boolean; hint?: string },
+): VersionsState {
+	if (!file) {
+		return NO_VERSIONS;
+	}
+	const row = (target: string, label: string, entry: Entry): VersionRow => ({
+		target,
+		label,
+		version: entry.version,
+		since: typeof entry.since === 'string' ? entry.since : '',
+		tips: {
+			major: previewBump(file, target, 'major', options.stackDone),
+			minor: previewBump(file, target, 'minor', options.stackDone),
+		},
+	});
+	const paths = Object.keys(file.packages).sort((a, b) => a.localeCompare(b));
+	const shared = sharedFolder(paths);
+	return {
+		rows: [row(STACK_TARGET, STACK_TARGET, file.stack), ...paths.map(p => row(p, p.slice(shared.length), file.packages[p]))],
+		canBump: options.canBump,
+		stackDone: options.stackDone,
+		hint: options.hint ?? '',
+	};
+}
+
+/** Accepts only a well-formed state (workspaceState may hold one written by an older version). */
+export function parseVersionsState(raw: unknown): VersionsState {
+	if (!raw || typeof raw !== 'object') {
+		return NO_VERSIONS;
+	}
+	const s = raw as Partial<VersionsState>;
+	if (!Array.isArray(s.rows)) {
+		return NO_VERSIONS;
+	}
+	const rows = s.rows.filter(
+		(r): r is VersionRow =>
+			!!r && typeof r.target === 'string' && typeof r.label === 'string' && typeof r.version === 'string' && typeof r.since === 'string' &&
+			!!r.tips && typeof r.tips.major === 'string' && typeof r.tips.minor === 'string',
+	);
+	return { rows, canBump: s.canBump === true, stackDone: s.stackDone === true, hint: typeof s.hint === 'string' ? s.hint : '' };
+}

@@ -39,6 +39,12 @@ customization keys are left alone.
   `pnpm ver`) on the line below the name; a repo without that file shows none. Beside it the card shows how many files
   have uncommitted changes (`git status`, untracked files included), hidden at zero or outside a git repo. The number is a link: it asks for a commit message, then
   stages everything (`git add -A`) and commits (hooks run; nothing is pushed). Only in a trusted workspace.
+- **Versions**: in a repo with a `versions.json`, Source Control lists the stack and every package with its version and
+  two `[+]` buttons, like `pf v` (the one before the version bumps major, the one after it minor; hover shows the
+  result). A package bump also raises the stack minor, but only once until the next commit (the stack counts as
+  already bumped when its version differs from `HEAD:versions.json`, so a bump made in a terminal counts too; a click
+  on the stack itself always bumps it). A click edits `versions.json` (same format as the `ver` CLI) and runs
+  `pf ver sync` for the manifests and hooks; trusted local workspaces only. `bgTone.versions` chooses where it shows.
 
 ## Settings
 
@@ -57,6 +63,7 @@ customization keys are left alone.
 | `bgTone.showLastAgent` | `true` | Show the last 3 Cursor agent chats (title, status, time since) on the Repo Identity card. |
 | `bgTone.showLastCommits` | `true` | Show the last 3 commits (message, time since) on the Repo Identity card in Source Control, in place of the agent chats. |
 | `bgTone.showActions` | `true` | Show the repo's featured actions as icon buttons on the Repo Identity card (personal setting). |
+| `bgTone.versions` | `view` | Where to list the versions with `[+]` bump buttons: `view` (a Versions view in Source Control), `card` (a section of the Repo Identity card there) or `off`. |
 | `bgTone.pfPath` | `pf` | The `pf` command the buttons run. Machine scope: a repo's workspace settings cannot change it. |
 
 Commands: **Set Tone Color**, **Open Repo Settings**, **Choose Repo Logo...**, **Clear Repo Logo**,

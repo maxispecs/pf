@@ -166,6 +166,11 @@
 			}
 			children.push(list);
 		}
+		// The Source Control card can carry the versions list (the `bgTone.versions` = `card` setting).
+		const versions = window.bgToneVersions ? window.bgToneVersions.render(state.versions, message => vscode.postMessage(message), true) : null;
+		if (versions) {
+			children.push(versions);
+		}
 		updateAgentTime();
 		root.replaceChildren(...children);
 	}

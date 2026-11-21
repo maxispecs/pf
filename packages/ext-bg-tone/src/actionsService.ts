@@ -192,7 +192,7 @@ export class ActionsService implements vscode.Disposable {
 		const args = ['actions', '--all', '--json'];
 		const cwd = folder.uri.fsPath;
 		try {
-			const { stdout } = await this.exec(args, cwd);
+			const { stdout } = await this.runPf(args, cwd);
 			const parsed = parseActions(stdout);
 			return parsed.ok
 				? { status: { type: 'ready' }, actions: parsed.actions }
@@ -211,7 +211,7 @@ export class ActionsService implements vscode.Disposable {
 	}
 
 	/** Runs pf; when the configured `pf` is not on this process's PATH, tries the usual install places and a login shell once. */
-	private async exec(args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
+	async runPf(args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
 		try {
 			return await this.execPf(args, cwd);
 		} catch (e) {
@@ -272,7 +272,7 @@ export class ActionsService implements vscode.Disposable {
 			return 'the workspace is not trusted';
 		}
 		try {
-			await this.exec(['actions', featured ? 'feature' : 'unfeature', ...ids], folder.uri.fsPath);
+			await this.runPf(['actions', featured ? 'feature' : 'unfeature', ...ids], folder.uri.fsPath);
 		} catch (e) {
 			const err = e as Error & { stderr?: string };
 			return (err.stderr ?? '').trim().split('\n').pop() || err.message;

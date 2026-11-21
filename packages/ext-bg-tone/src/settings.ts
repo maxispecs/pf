@@ -3,6 +3,7 @@ import { ALL_SURFACES, Surface, normalizeStrength, normalizeSurfaces, parseHex }
 import { LogoLocation, normalizeLogoLocations, normalizeTitlePrefix } from './logo.ts';
 import { normalizeHex } from './presets.ts';
 import { applyTone } from './apply.ts';
+import { VersionsPlacement, normalizePlacement } from './versions.ts';
 import { REPO_KEYS, clearLegacyValues, getValue, hasLegacyValues, primaryFolder, writeRepoValues } from './store.ts';
 
 export { primaryFolder };
@@ -21,6 +22,7 @@ export interface BgToneConfig {
 	showLastAgent: boolean;
 	showLastCommits: boolean;
 	showActions: boolean;
+	versions: VersionsPlacement;
 	palette: unknown;
 }
 
@@ -51,6 +53,7 @@ export function readConfig(): BgToneConfig {
 		showLastAgent: vscode.workspace.getConfiguration('bgTone').get<boolean>('showLastAgent', true) !== false,
 		showLastCommits: vscode.workspace.getConfiguration('bgTone').get<boolean>('showLastCommits', true) !== false,
 		showActions: vscode.workspace.getConfiguration('bgTone').get<boolean>('showActions', true) !== false,
+		versions: normalizePlacement(vscode.workspace.getConfiguration('bgTone').get<unknown>('versions', 'view')),
 		palette: getValue<unknown>('palette', undefined),
 	};
 }

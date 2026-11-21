@@ -1,3 +1,5 @@
+import { NO_VERSIONS, VersionsState, parseVersionsState } from './versions.ts';
+
 /** workspaceState key of the last Repo Identity card the extension drew in this workspace. */
 export const CARD_SNAPSHOT_KEY = 'bgTone.cardSnapshot';
 
@@ -38,6 +40,8 @@ export interface CardSnapshot {
 	/** The last commits (`git log`); only the Source Control card draws them, the Explorer card draws `agents`. */
 	commits: CardCommit[];
 	actions: CardActions;
+	/** The versions list; only the Source Control card draws it, and only when `bgTone.versions` is `card`. */
+	versions: VersionsState;
 }
 
 /** The parts known right now; `undefined` means "not loaded yet", so the cached value stands in. */
@@ -50,6 +54,7 @@ export interface FreshCard {
 	agents: CardAgent[] | undefined;
 	commits: CardCommit[] | undefined;
 	actions: CardActions | undefined;
+	versions: VersionsState | undefined;
 }
 
 export const NO_ACTIONS: CardActions = { buttons: [], canEdit: false, hint: '' };
@@ -64,6 +69,7 @@ export function composeSnapshot(fresh: FreshCard, cached: CardSnapshot | undefin
 		agents: fresh.agents ?? cached?.agents ?? [],
 		commits: fresh.commits ?? cached?.commits ?? [],
 		actions: fresh.actions ?? cached?.actions ?? NO_ACTIONS,
+		versions: fresh.versions ?? cached?.versions ?? NO_VERSIONS,
 	};
 }
 
@@ -80,7 +86,7 @@ export function parseSnapshot(raw: unknown): CardSnapshot | undefined {
 	const version = typeof s.version === 'string' ? s.version : '';
 	const changes = typeof s.changes === 'number' && Number.isInteger(s.changes) && s.changes >= 0 ? s.changes : null;
 	const commits = Array.isArray(s.commits) ? s.commits : [];
-	return { name: s.name, version, changes, color: s.color, logo, agents: s.agents, commits, actions: s.actions };
+	return { name: s.name, version, changes, color: s.color, logo, agents: s.agents, commits, actions: s.actions, versions: parseVersionsState(s.versions) };
 }
 
 /** Escapes a value for a double-quoted HTML attribute. */

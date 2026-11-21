@@ -1,0 +1,67 @@
+/* The Versions view has no card around it; in the card the list is a section below the commits. */
+* { box-sizing: border-box; }
+body:has(.versions:not(.versions-card)) {
+	margin: 0;
+	padding: 4px 8px 6px;
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	color: var(--vscode-foreground);
+}
+
+.versions-card {
+	margin-top: 6px;
+	padding-top: 4px;
+	border-top: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+}
+.versions-title {
+	margin-bottom: 2px;
+	font-size: 0.8em;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--vscode-descriptionForeground);
+}
+/* A repo with many packages: the card section scrolls instead of growing without end. */
+.versions-card .versions-list { max-height: 260px; overflow-y: auto; }
+
+.ver-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 22px;
+	padding: 0 2px;
+	border-radius: 3px;
+}
+.ver-row:hover { background: var(--vscode-list-hoverBackground); }
+.ver-name {
+	min-width: 0;
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--vscode-descriptionForeground);
+}
+.ver-stack .ver-name { color: var(--vscode-foreground); font-weight: 600; }
+.ver-control { flex: none; display: inline-flex; align-items: center; gap: 2px; font-variant-numeric: tabular-nums; }
+.ver-version { min-width: 3.5em; text-align: center; font-weight: 600; }
+
+/* [+] before the version bumps major, after it minor (as in `pf v`). */
+.ver-plus {
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	cursor: pointer;
+}
+.ver-plus .codicon { font-size: 14px; }
+.ver-major { color: var(--vscode-charts-yellow, #cca700); }
+.ver-minor { color: var(--vscode-charts-green, #388a34); }
+.ver-plus:hover:not(:disabled) { background: var(--vscode-toolbar-hoverBackground); }
+.ver-plus:active:not(:disabled) { background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground)); }
+.ver-plus:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.ver-plus:disabled { opacity: 0.4; cursor: default; }
+.versions-hint { margin-top: 4px; font-size: 0.9em; color: var(--vscode-descriptionForeground); }

@@ -51,6 +51,18 @@ A repo that still keeps `bgTone.*` values in `.vscode/settings.json` keeps worki
 
 The colors the extension derives from these values (`workbench.colorCustomizations`, an optional `window.title`) are written to the workspace's `.vscode/settings.json`, as before. They are recomputed from `pulpfixer.json` on every machine, so there is nothing to commit there.
 
+## Versions
+
+In a repo with a `versions.json` (kept by the `ver` skill, `pf ver`), Source Control gets a **Versions** view under Repo Identity. It lists the stack and every package with its version and two `[+]` buttons, like `pf v`: the one before the version bumps **major**, the one after it bumps **minor**. Hover a button to see the result (for example `minor 1.2 -> 1.3, stack 3.23 -> 3.24`).
+
+A package bump also raises the stack minor, but only **once until the next commit**. The stack counts as already bumped when its version differs from the one in `HEAD:versions.json` (or `HEAD` has no `versions.json`), so a bump made in a terminal counts too, and any commit starts over. A click on the stack's own `[+]` always bumps the stack. Without git the stack is raised on every package bump.
+
+A click edits `versions.json` the way the `ver` CLI does (`since` becomes today, other keys such as `hooks` are kept), then runs `pf ver sync`, which rewrites the package manifests and runs the `postSync` hooks. If pf is missing or the sync fails, a message says so and you run `pf ver sync` yourself. It never commits. Only trusted local workspaces can bump; the page sends just a target and a part, both checked against the file.
+
+| Setting | Default | |
+|---------|---------|---|
+| `bgTone.versions` | `view` | `view`: the Versions view. `card`: a section at the bottom of the Repo Identity card in Source Control. `off`: hidden (a personal setting) |
+
 ## Action buttons
 
 Beside the repo name (right of it, the name shortens to make room), the Repo Identity card shows a row of small icon buttons for the repo's **featured actions**: push (`pf gp`), deploy, publish, docs and your own commands (and commit with a message from the last chat, `pf g`, once you run `pf actions feature repo:commit`). Hover a button for its name; a click runs `pf <action>` in the integrated terminal (a terminal named `pf: <action>`, reused when it is idle, shown instead of typed into when the action is still running).
