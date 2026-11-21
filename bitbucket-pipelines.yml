@@ -20,6 +20,8 @@ definitions:
   steps:
     - step: &check
         name: Typecheck, test, build
+        # installing needs the cellars token, which lives in the Staging deployment environment
+        deployment: staging
         caches:
           - pnpm
         script:
@@ -60,6 +62,9 @@ pipelines:
     '**':
       - step:
           name: Pull request (publish to staging when it targets dev)
+          # NPM_TOKEN is a variable of the Staging deployment environment (Repository settings -> Pipelines
+          # -> Deployments), so a step only sees it when it names that environment
+          deployment: staging
           caches:
             - pnpm
           script:
