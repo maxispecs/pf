@@ -61,7 +61,7 @@ customization keys are left alone.
 | `bgTone.logoLocations` | `["identityCard", "explorerItem", "scmCard"]` | Where to show the identity: `identityCard`, `explorerItem`, `scmCard` (the Repo Identity card in Source Control), `windowTitle`. |
 | `bgTone.titleEmoji` | `""` | Emoji or short text (max 8 characters) used as the window title prefix. |
 | `bgTone.showLastAgent` | `true` | Show the last 3 Cursor agent chats (title, status, time since) on the Repo Identity card. |
-| `bgTone.showLastCommits` | `true` | Show the last 3 commits (message, time since) on the Repo Identity card in Source Control, in place of the agent chats. |
+| `bgTone.showLastCommits` | `true` | Show the last 3 commits (message, time since) on the Repo Identity card in Source Control, in place of the agent chats. The commit icon is colored like the Commit Graph: blue for a commit only this clone has, purple once a remote has it. |
 | `bgTone.showActions` | `true` | Show the repo's featured actions as icon buttons on the Repo Identity card (personal setting). |
 | `bgTone.versions` | `view` | Where to list the versions with `[+]` bump buttons: `view` (a Versions view in Source Control), `card` (a section of the Repo Identity card there) or `off`. |
 | `bgTone.pfPath` | `pf` | The `pf` command the buttons run. Machine scope: a repo's workspace settings cannot change it. |

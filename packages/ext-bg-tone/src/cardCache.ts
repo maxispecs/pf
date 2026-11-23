@@ -19,6 +19,8 @@ export interface CardCommit {
 	hash: string;
 	title: string;
 	updatedAt: number;
+	/** True when a remote has it (purple, like the graph's remote lane), false when local only (blue); absent when unknown. */
+	pushed?: boolean;
 }
 
 export interface CardActions {

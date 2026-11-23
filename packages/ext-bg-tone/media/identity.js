@@ -158,9 +158,11 @@
 			const list = h('div', 'agents');
 			for (const commit of commits) {
 				const row = h('div', 'agent');
-				row.title = commit.hash + ' ' + commit.title;
+				const state = commit.pushed === true ? 'Pushed' : commit.pushed === false ? 'Not pushed' : '';
+				row.title = String(commit.hash).slice(0, 7) + ' ' + commit.title + (state ? ' (' + state.toLowerCase() + ')' : '');
 				const time = h('span', 'agent-time');
-				row.append(h('span', 'codicon codicon-git-commit commit-icon'), h('span', 'agent-title', commit.title), time);
+				const icon = h('span', 'codicon codicon-git-commit commit-icon' + (commit.pushed === true ? ' commit-pushed' : commit.pushed === false ? ' commit-local' : ''));
+				row.append(icon, h('span', 'agent-title', commit.title), time);
 				agentTimes.push({ el: time, run: { status: 'success', updatedAt: commit.updatedAt }, commit: true });
 				list.append(row);
 			}

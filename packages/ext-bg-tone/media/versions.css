@@ -32,8 +32,9 @@ body:has(.versions:not(.versions-card)) {
 	border-radius: 3px;
 }
 .ver-row:hover { background: var(--vscode-list-hoverBackground); }
-/* Names sit against the buttons and, when too long, lose their left part (the folder), not the name itself.
-   rtl makes the ellipsis come first; the <bdi> inside keeps the text reading left to right. */
+/* Names are left-aligned and, when too long, lose their left part (the folder), not the name itself.
+   rtl makes the ellipsis come first; text-align: left keeps a short name at the left edge; the <bdi>
+   inside keeps the text reading left to right. */
 .ver-name {
 	min-width: 0;
 	flex: 1;
@@ -41,7 +42,7 @@ body:has(.versions:not(.versions-card)) {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	direction: rtl;
-	text-align: right;
+	text-align: left;
 	color: var(--vscode-descriptionForeground);
 }
 /* The stack and the featured packages (listed right after it) have bold names. */

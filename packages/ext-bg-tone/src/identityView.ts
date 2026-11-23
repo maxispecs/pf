@@ -13,7 +13,7 @@ import { VersionsService, hasVersionsFile } from './versionsService.ts';
 import * as fs from 'node:fs';
 import { runGit } from './git.ts';
 import { countChangedFiles } from './gitChanges.ts';
-import { LOG_ARGS_FORMAT, parseRecentCommits } from './gitLog.ts';
+import { LOG_ARGS_FORMAT, parseHashSet, parseRecentCommits } from './gitLog.ts';
 
 /** How often the card re-reads the agent transcripts (cheap: one directory scan, two small reads). */
 const AGENT_POLL_MS = 10_000;
@@ -93,8 +93,18 @@ async function recentCommits(): Promise<CardCommit[]> {
 	if (folder?.uri.scheme !== 'file') {
 		return [];
 	}
-	const result = await runGit(folder.uri.fsPath, ['log', '-n', '3', LOG_ARGS_FORMAT], 5000);
-	return result.ok ? parseRecentCommits(result.stdout, 3) : [];
+	const cwd = folder.uri.fsPath;
+	const [log, upstream] = await Promise.all([
+		runGit(cwd, ['log', '-n', '3', LOG_ARGS_FORMAT], 5000),
+		runGit(cwd, ['rev-list', '@{upstream}..HEAD'], 5000),
+	]);
+	if (!log.ok) {
+		return [];
+	}
+	// Local-only commits: those past the upstream branch, else those no remote branch has (no remote at all: all
+	// of them). `pushed` is left out only when git could not answer.
+	const local = upstream.ok ? upstream : await runGit(cwd, ['rev-list', 'HEAD', '--not', '--remotes'], 5000);
+	return parseRecentCommits(log.stdout, 3, local.ok ? parseHashSet(local.stdout) : undefined);
 }
 
 /**
