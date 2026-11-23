@@ -70,6 +70,27 @@ body:has(.versions:not(.versions-card)) {
 .ver-plus:active:not(:disabled) { background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground)); }
 .ver-plus:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
 .ver-plus:disabled { opacity: 0.4; cursor: default; }
+/* Commit button: appears under the list once a bump waits for a commit. */
+.ver-commit {
+	margin-top: 6px;
+	width: 100%;
+	min-height: 24px;
+	padding: 2px 8px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	border: 1px solid var(--vscode-button-border, transparent);
+	border-radius: 2px;
+	font: inherit;
+	color: var(--vscode-button-foreground);
+	background: var(--vscode-button-background);
+	cursor: pointer;
+}
+.ver-commit .codicon { font-size: 14px; }
+.ver-commit:hover:not(:disabled) { background: var(--vscode-button-hoverBackground); }
+.ver-commit:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+.ver-commit:disabled { opacity: 0.4; cursor: default; }
 .versions-hint { margin-top: 4px; font-size: 0.9em; color: var(--vscode-descriptionForeground); }
 
 /* Featured: the star is always filled; an unfeatured package shows a faint star that fills in on row hover. */

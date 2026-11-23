@@ -2,15 +2,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
 	bumpVersion,
+	commitMessage,
+	hookCommands,
 	isTarget,
 	localDate,
 	parseVersionsFile,
 	parseVersionsState,
+	pendingChanges,
 	planBump,
 	planFeature,
 	previewBump,
 	shortLabels,
 	stackBumpedSinceHead,
+	versionFileCandidates,
 	versionsState,
 } from '../src/versions.ts';
 
@@ -180,6 +184,53 @@ test('parseVersionsState keeps only well-formed rows', () => {
 	assert.deepEqual(parseVersionsState(JSON.parse(JSON.stringify(state))), state);
 	assert.deepEqual(parseVersionsState(undefined).rows, []);
 	assert.deepEqual(parseVersionsState({ rows: [{ target: 1 }, state.rows[0]] }).rows, [state.rows[0]]);
+});
+
+test('pendingChanges compares the working versions.json with HEAD', () => {
+	const bumped = plan('packages/kit', 'minor', false);
+	assert.deepEqual(pendingChanges(FILE, bumped.text), [
+		{ target: 'stack', from: '3.23', to: '3.24' },
+		{ target: 'packages/kit', from: '1.4', to: '1.5' },
+	]);
+	assert.equal(commitMessage(pendingChanges(FILE, bumped.text)), 'Bump versions: stack 3.23 -> 3.24, packages/kit 1.4 -> 1.5');
+	// Nothing changed, no HEAD copy, or an unreadable file: nothing waits.
+	assert.deepEqual(pendingChanges(FILE, FILE), []);
+	assert.deepEqual(pendingChanges(null, FILE), []);
+	assert.deepEqual(pendingChanges(undefined, FILE), []);
+	assert.deepEqual(pendingChanges(FILE, 'nope'), []);
+	// A package HEAD lacks is new, not bumped.
+	const added = JSON.stringify({ stack: { version: '3.23' }, packages: { 'packages/new': { version: '1.0' }, 'packages/kit': { version: '1.4' } } });
+	assert.deepEqual(pendingChanges(FILE, added), []);
+});
+
+test('versionFileCandidates lists versions.json and the manifests of the bumped targets only', () => {
+	const files = versionFileCandidates(
+		[{ target: 'stack', from: '1.0', to: '1.1' }, { target: 'packages/kit', from: '1.0', to: '1.1' }, { target: '../outside', from: '1.0', to: '1.1' }, { target: '/abs', from: '1.0', to: '1.1' }],
+		'versions.json',
+	);
+	assert.ok(files.includes('versions.json') && files.includes('package.json') && files.includes('VERSION'));
+	assert.ok(files.includes('packages/kit/package.json') && files.includes('packages/kit/pyproject.toml'));
+	assert.equal(files.some(f => f.includes('..') || f.startsWith('/')), false);
+	assert.equal(files.some(f => f.startsWith('packages/aws')), false);
+});
+
+test('hookCommands reads a string or an array and refuses a malformed hooks key', () => {
+	const hooks = (value: unknown) => hookCommands(parseVersionsFile(JSON.stringify({ stack: { version: '1.0' }, hooks: value }))!, 'preCommit');
+	assert.deepEqual(hooks({ preCommit: 'fmt {files}' }), { ok: true, commands: ['fmt {files}'] });
+	assert.deepEqual(hooks({ preCommit: ['a', 'b'], postSync: 'x' }), { ok: true, commands: ['a', 'b'] });
+	assert.deepEqual(hooks({ postSync: 'x' }), { ok: true, commands: [] });
+	assert.deepEqual(hooks(undefined), { ok: true, commands: [] });
+	assert.equal(hooks({ preCommit: 3 }).ok, false);
+	assert.equal(hooks({ preCommit: [' '] }).ok, false);
+	assert.equal(hooks({ other: 'x' }).ok, false);
+	assert.equal(hooks([]).ok, false);
+});
+
+test('the pending commit survives the state round trip and is dropped when malformed', () => {
+	const state = versionsState(parseVersionsFile(FILE), { stackDone: false, canBump: true, pending: { message: 'Bump versions: stack 3.23 -> 3.24' } });
+	assert.deepEqual(parseVersionsState(JSON.parse(JSON.stringify(state))).pending, { message: 'Bump versions: stack 3.23 -> 3.24' });
+	assert.equal(parseVersionsState({ ...state, pending: { message: 4 } }).pending, null);
+	assert.equal(versionsState(parseVersionsFile(FILE), { stackDone: false, canBump: true }).pending, null);
 });
 
 test('localDate is the local calendar day', () => {

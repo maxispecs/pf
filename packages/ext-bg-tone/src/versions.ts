@@ -225,6 +225,87 @@ export function stackBumpedSinceHead(headText: string | null | undefined, curren
 	return head === undefined || current === undefined || head !== current;
 }
 
+/**
+ * The version changes not committed yet: every target (stack first, then packages by path) whose version in the
+ * working `versions.json` differs from `HEAD`'s. A package `HEAD` does not have is a new package, not a bump.
+ * Empty without a `HEAD` copy (no commits, or a new file): there is nothing to compare with.
+ */
+export function pendingChanges(headText: string | null | undefined, currentText: string | null): VersionChange[] {
+	const head = parseVersionsFile(headText ?? null);
+	const current = parseVersionsFile(currentText);
+	if (!head || !current) {
+		return [];
+	}
+	const changes: VersionChange[] = [];
+	if (head.stack.version !== current.stack.version) {
+		changes.push({ target: STACK_TARGET, from: head.stack.version, to: current.stack.version });
+	}
+	for (const target of Object.keys(current.packages).sort((a, b) => a.localeCompare(b))) {
+		const before = has(head.packages, target) ? head.packages[target].version : undefined;
+		if (before !== undefined && before !== current.packages[target].version) {
+			changes.push({ target, from: before, to: current.packages[target].version });
+		}
+	}
+	return changes;
+}
+
+/** The ver CLI's commit message: `Bump versions: stack 3.23 -> 3.24, packages/kit 1.4 -> 1.5`. */
+export function commitMessage(changes: VersionChange[]): string {
+	return `Bump versions: ${changes.map(c => `${c.target} ${c.from} -> ${c.to}`).join(', ')}`;
+}
+
+/** Native files `pf ver sync` writes a version into (the stack's are in the repo root). */
+const NATIVE_MANIFESTS = ['package.json', 'pyproject.toml', 'composer.json', 'VERSION', 'SKILL.md'];
+
+/**
+ * Where a bump of these targets may have written: `versions.json` and the native manifests of each target
+ * (repo-relative, `/` separated). Only the ones git sees as changed are committed, so a name a target has no
+ * file for costs nothing.
+ */
+export function versionFileCandidates(changes: VersionChange[], versionsFile: string): string[] {
+	const files = new Set<string>([versionsFile]);
+	for (const { target } of changes) {
+		const dir = target === STACK_TARGET ? '' : target.replace(/\\/g, '/').replace(/^\.\/+/, '').replace(/\/+$/, '');
+		if (dir.startsWith('/') || dir.split('/').includes('..')) {
+			continue; // never a path outside the repo
+		}
+		for (const name of NATIVE_MANIFESTS) {
+			files.add(dir && dir !== '.' ? `${dir}/${name}` : name);
+		}
+	}
+	return [...files];
+}
+
+export type HookEvent = 'postSync' | 'preCommit';
+
+/**
+ * The commands `versions.json` configures for a hook event (a string or an array of strings, like the CLI
+ * reads them). A malformed `hooks` is refused, as the CLI does.
+ */
+export function hookCommands(file: VersionsFile, event: HookEvent): { ok: true; commands: string[] } | { ok: false; reason: string } {
+	const raw = file.data.hooks;
+	if (raw === undefined || raw === null) {
+		return { ok: true, commands: [] };
+	}
+	if (typeof raw !== 'object' || Array.isArray(raw)) {
+		return { ok: false, reason: 'the "hooks" key of versions.json must be an object keyed by postSync or preCommit' };
+	}
+	for (const key of Object.keys(raw)) {
+		if (key !== 'postSync' && key !== 'preCommit') {
+			return { ok: false, reason: `unknown hook "${key}" in versions.json` };
+		}
+	}
+	const value = (raw as Record<string, unknown>)[event];
+	if (value === undefined) {
+		return { ok: true, commands: [] };
+	}
+	const list = typeof value === 'string' ? [value] : value;
+	if (!Array.isArray(list) || list.some(x => typeof x !== 'string' || !x.trim())) {
+		return { ok: false, reason: `hooks.${event} in versions.json must be a command string or an array of command strings` };
+	}
+	return { ok: true, commands: list as string[] };
+}
+
 /** What a click would do, e.g. `minor 1.2 -> 1.3, stack 3.23 -> 3.24`; the stack part is left out when it will not change. */
 export function previewBump(file: VersionsFile, target: string, part: VersionPart, stackDone: boolean): string {
 	const plan = planBump(JSON.stringify(file.data), target, part, { stackDone, today: '2000-01-01' });
@@ -253,16 +334,23 @@ export interface VersionRow {
 	tips: { major: string; minor: string };
 }
 
+/** Bumps not committed yet: the commit button's tooltip and the message the commit starts from. */
+export interface PendingCommit {
+	message: string;
+}
+
 /** What the page draws. */
 export interface VersionsState {
 	rows: VersionRow[];
+	/** Set while a bump waits for a commit (the button shows then); null otherwise. */
+	pending: PendingCommit | null;
 	/** False when clicking is refused (untrusted workspace, not a local folder). */
 	canBump: boolean;
 	stackDone: boolean;
 	hint: string;
 }
 
-export const NO_VERSIONS: VersionsState = { rows: [], canBump: false, stackDone: false, hint: '' };
+export const NO_VERSIONS: VersionsState = { rows: [], pending: null, canBump: false, stackDone: false, hint: '' };
 
 /**
  * Short names for package paths: the folder a package is stored in (`packages/`, `apps/`, ...) is redundant, so
@@ -299,7 +387,7 @@ export function shortLabels(paths: string[]): Map<string, string> {
 
 export function versionsState(
 	file: VersionsFile | undefined,
-	options: { stackDone: boolean; canBump: boolean; hint?: string },
+	options: { stackDone: boolean; canBump: boolean; hint?: string; pending?: PendingCommit | null },
 ): VersionsState {
 	if (!file) {
 		return NO_VERSIONS;
@@ -326,6 +414,7 @@ export function versionsState(
 			...file.featured.map(p => row(p, labels.get(p) ?? p, file.packages[p], true)),
 			...rest.map(p => row(p, labels.get(p) ?? p, file.packages[p])),
 		],
+		pending: options.pending ?? null,
 		canBump: options.canBump,
 		stackDone: options.stackDone,
 		hint: options.hint ?? '',
@@ -348,5 +437,6 @@ export function parseVersionsState(raw: unknown): VersionsState {
 				!!r.tips && typeof r.tips.major === 'string' && typeof r.tips.minor === 'string',
 		)
 		.map(r => ({ ...r, featured: r.featured === true }));
-	return { rows, canBump: s.canBump === true, stackDone: s.stackDone === true, hint: typeof s.hint === 'string' ? s.hint : '' };
+	const pending = s.pending && typeof s.pending === 'object' && typeof s.pending.message === 'string' ? { message: s.pending.message } : null;
+	return { rows, pending, canBump: s.canBump === true, stackDone: s.stackDone === true, hint: typeof s.hint === 'string' ? s.hint : '' };
 }

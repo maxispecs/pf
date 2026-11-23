@@ -1,6 +1,6 @@
 {
   "name": "@pulpfixer/docs",
-  "version": "2.17.0",
+  "version": "2.18.0",
   "private": true,
   "description": "pf documentation site (Nextra). Private: never published.",
   "license": "MIT",

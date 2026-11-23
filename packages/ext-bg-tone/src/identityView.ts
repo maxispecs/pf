@@ -233,6 +233,9 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 			} else if (m?.type === 'feature') {
 				// A package path and a yes or no; both are checked against versions.json.
 				void this.versions.setFeatured(m.target, m.on).then(() => this.refresh());
+			} else if (m?.type === 'commitVersions') {
+				// No payload: the files, the message and the git calls are all the extension's own.
+				void this.versions.commit().then(() => this.refresh());
 			} else if (m?.type === 'editActions') {
 				void vscode.commands.executeCommand('bgTone.openSettings', 'actions');
 			}
@@ -471,6 +474,8 @@ export class VersionsViewProvider implements vscode.WebviewViewProvider, vscode.
 				void this.versions.bump(m.target, m.part).then(() => this.refresh());
 			} else if (m?.type === 'feature') {
 				void this.versions.setFeatured(m.target, m.on).then(() => this.refresh());
+			} else if (m?.type === 'commitVersions') {
+				void this.versions.commit().then(() => this.refresh());
 			}
 		}, null, this.disposables);
 	}

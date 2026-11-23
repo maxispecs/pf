@@ -14,6 +14,7 @@ const cached: CardSnapshot = {
 	actions: { buttons: [{ id: 'dev', label: 'Run', icon: 'play' }], canEdit: true, hint: '' },
 	versions: {
 		rows: [{ target: 'stack', label: 'stack', version: '3.5', since: '2026-11-17', featured: false, tips: { major: 'major 3.5 -> 4.0', minor: 'minor 3.5 -> 3.6' } }],
+		pending: null,
 		canBump: true,
 		stackDone: false,
 		hint: '',

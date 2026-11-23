@@ -1,3 +1,5 @@
+import { exec } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
@@ -5,7 +7,65 @@ import type { ActionsService } from './actionsService.ts';
 import { runGit } from './git.ts';
 import { VERSIONS_FILE } from './stackVersion.ts';
 import { primaryFolder } from './store.ts';
-import { NO_VERSIONS, VersionsState, planBump, planFeature, parseVersionsFile, stackBumpedSinceHead, versionsState } from './versions.ts';
+import {
+	NO_VERSIONS,
+	PendingCommit,
+	VersionsState,
+	commitMessage,
+	hookCommands,
+	pendingChanges,
+	planBump,
+	planFeature,
+	parseVersionsFile,
+	stackBumpedSinceHead,
+	versionFileCandidates,
+	versionsState,
+} from './versions.ts';
+
+/** `git` with literal pathspecs: a package path is a file name here, never a glob. */
+const GIT = '--literal-pathspecs';
+
+/** The last lines of command output, where a failing hook or git hook says why. */
+function tail(text: string, lines = 4): string {
+	return text.trim().split('\n').filter(Boolean).slice(-lines).join(' ');
+}
+
+const shellQuote = (s: string): string => (process.platform === 'win32' ? `"${s}"` : `'${s.replace(/'/g, `'\\''`)}'`);
+
+function runShell(cwd: string, command: string, env: NodeJS.ProcessEnv): Promise<{ ok: boolean; output: string }> {
+	return new Promise(resolve => {
+		exec(command, { cwd, env, timeout: 120_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }, (error, stdout, stderr) =>
+			resolve({ ok: !error, output: `${stdout}${stderr}` || (error ? error.message : '') }),
+		);
+	});
+}
+
+/**
+ * Tracked files that differ from HEAD (paths relative to `cwd`), each with a hash of its content, so two
+ * snapshots tell which files a command touched even when they were already modified. Empty without a HEAD.
+ */
+async function changedFiles(cwd: string, only?: string[]): Promise<Map<string, string>> {
+	const result = await runGit(cwd, [GIT, 'diff', '--name-only', '-z', '--relative', 'HEAD', ...(only ? ['--', ...only] : [])], 10_000);
+	const files = new Map<string, string>();
+	if (!result.ok) {
+		return files;
+	}
+	for (const name of result.stdout.split('\0').filter(Boolean)) {
+		let hash = 'missing';
+		try {
+			hash = createHash('sha1').update(fs.readFileSync(path.join(cwd, name))).digest('hex');
+		} catch {
+			// deleted or unreadable
+		}
+		files.set(name, hash);
+	}
+	return files;
+}
+
+/** Names whose hash differs between two snapshots (new ones included). */
+function touchedBetween(before: Map<string, string>, after: Map<string, string>): string[] {
+	return [...after].filter(([name, hash]) => before.get(name) !== hash).map(([name]) => name);
+}
 
 function localFolder(): vscode.WorkspaceFolder | undefined {
 	const folder = primaryFolder();
@@ -29,18 +89,30 @@ export function hasVersionsFile(): boolean {
 	return parseVersionsFile(readVersionsText()) !== undefined;
 }
 
+/** `versions.json` as HEAD has it: undefined outside a git work tree, null when HEAD has no such file (no commits, new file). */
+async function headVersionsText(cwd: string): Promise<string | null | undefined> {
+	const inside = await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], 5000);
+	if (!inside.ok) {
+		return undefined;
+	}
+	const head = await runGit(cwd, ['show', `HEAD:./${VERSIONS_FILE}`], 5000);
+	return head.ok ? head.stdout : null;
+}
+
 /**
  * Whether the stack was already bumped since the last commit (see `stackBumpedSinceHead`). Without git there
  * is no "next commit", so it is never considered bumped; inside git, a `versions.json` that HEAD does not
  * have (no commits yet, or a new file) counts as bumped.
  */
 async function stackDone(cwd: string, currentText: string | null): Promise<boolean> {
-	const inside = await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], 5000);
-	if (!inside.ok) {
-		return false;
-	}
-	const head = await runGit(cwd, ['show', `HEAD:${VERSIONS_FILE}`], 5000);
-	return stackBumpedSinceHead(head.ok ? head.stdout : null, currentText);
+	const head = await headVersionsText(cwd);
+	return head !== undefined && stackBumpedSinceHead(head, currentText);
+}
+
+/** The bumps waiting for a commit: `versions.json` has version changes HEAD does not. */
+function pendingCommit(head: string | null | undefined, currentText: string | null): PendingCommit | null {
+	const changes = pendingChanges(head, currentText);
+	return changes.length ? { message: commitMessage(changes) } : null;
 }
 
 function writeAtomic(file: string, text: string): void {
@@ -56,6 +128,8 @@ function writeAtomic(file: string, text: string): void {
  */
 export class VersionsService {
 	private queue: Promise<void> = Promise.resolve();
+	/** Files a bump of this session changed beyond the manifests we can guess (what `postSync` hooks wrote); cleared by a commit. */
+	private readonly touched = new Set<string>();
 
 	constructor(private readonly actions: ActionsService) {}
 
@@ -68,8 +142,10 @@ export class VersionsService {
 			return NO_VERSIONS;
 		}
 		const trusted = vscode.workspace.isTrusted;
+		const head = await headVersionsText(folder.uri.fsPath);
 		return versionsState(file, {
-			stackDone: await stackDone(folder.uri.fsPath, text),
+			stackDone: head !== undefined && stackBumpedSinceHead(head, text),
+			pending: pendingCommit(head, text),
 			canBump: trusted,
 			hint: trusted ? '' : 'Trust this workspace to bump versions.',
 		});
@@ -131,6 +207,8 @@ export class VersionsService {
 			void vscode.window.showErrorMessage(`Background Tone: cannot bump: ${plan.reason}.`);
 			return false;
 		}
+		// What the bump and its sync (hooks included) change is what the commit button commits.
+		const before = await changedFiles(cwd);
 		try {
 			writeAtomic(path.join(cwd, VERSIONS_FILE), plan.text);
 		} catch (e) {
@@ -141,6 +219,7 @@ export class VersionsService {
 		try {
 			await this.actions.runPf(['ver', 'sync'], cwd);
 		} catch (e) {
+			this.remember(before, await changedFiles(cwd));
 			const err = e as NodeJS.ErrnoException & { stderr?: string };
 			const detail = err.code === 'ENOENT' ? 'pf was not found' : ((err.stderr ?? '').trim().split('\n').pop() || err.message);
 			void vscode.window.showWarningMessage(
@@ -148,7 +227,113 @@ export class VersionsService {
 			);
 			return true;
 		}
+		this.remember(before, await changedFiles(cwd));
 		void vscode.window.showInformationMessage(`Background Tone: bumped ${summary}.`);
 		return true;
+	}
+
+	private remember(before: Map<string, string>, after: Map<string, string>): void {
+		for (const name of touchedBetween(before, after)) {
+			this.touched.add(name);
+		}
+	}
+
+	/**
+	 * Commits the bumps (the commit button, like the ver CLI's "Commit changed files"): only the files the bumps
+	 * changed (`versions.json`, the synced manifests, what `postSync` hooks wrote), never other work. The message
+	 * is asked for first (the dialog is the confirmation). `preCommit` hooks of `versions.json` run first and the
+	 * files they change join the commit; if git's own hooks reformat the files the commit is retried once.
+	 * Resolves true when something changed (redraw).
+	 */
+	commit(): Promise<boolean> {
+		const result = this.queue.then(() => this.runCommit());
+		this.queue = result.then(() => undefined, () => undefined);
+		return result;
+	}
+
+	private async runCommit(): Promise<boolean> {
+		const folder = localFolder();
+		if (!folder) {
+			return false;
+		}
+		if (!vscode.workspace.isTrusted) {
+			void vscode.window.showWarningMessage('Background Tone: trust this workspace to commit versions.');
+			return false;
+		}
+		const cwd = folder.uri.fsPath;
+		const text = readVersionsText();
+		const file = parseVersionsFile(text);
+		const changes = pendingChanges(await headVersionsText(cwd), text);
+		if (!file || !changes.length) {
+			void vscode.window.showInformationMessage('Background Tone: no version bump is waiting for a commit.');
+			return true;
+		}
+		const hooks = hookCommands(file, 'preCommit');
+		if (!hooks.ok) {
+			void vscode.window.showErrorMessage(`Background Tone: cannot commit: ${hooks.reason}.`);
+			return false;
+		}
+		const candidates = [...versionFileCandidates(changes, VERSIONS_FILE), ...this.touched];
+		const files = new Set((await changedFiles(cwd, candidates)).keys());
+		if (!files.size) {
+			void vscode.window.showInformationMessage('Background Tone: the version files have no changes to commit.');
+			return true;
+		}
+		const list = [...files];
+		const noun = list.length === 1 ? '1 file' : `${list.length} files`;
+		const shown = list.length > 4 ? `${list.slice(0, 4).join(', ')}, ...` : list.join(', ');
+		const message = await vscode.window.showInputBox({
+			title: `Commit ${noun} of the version bump`,
+			prompt: `Commits only ${shown}. Commit message:`,
+			value: commitMessage(changes),
+			validateInput: value => (value.trim() === '' ? 'A commit message is required.' : undefined),
+		});
+		if (message === undefined) {
+			return false;
+		}
+		return vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Committing ${noun}...` }, async () => {
+			const env = {
+				...process.env,
+				VER_ROOT: cwd,
+				VER_EVENT: 'preCommit',
+				VER_STACK: file.stack.version,
+				VER_CHANGES: JSON.stringify(changes.map(c => [c.target, c.from, c.to])),
+			};
+			for (const command of hooks.commands) {
+				const current = [...files];
+				const before = await changedFiles(cwd);
+				const run = await runShell(cwd, command.split('{files}').join(current.map(shellQuote).join(' ')), { ...env, VER_FILES: current.join('\n') });
+				if (!run.ok) {
+					void vscode.window.showErrorMessage(`Background Tone: preCommit hook failed: ${command}: ${tail(run.output)}`.slice(0, 300));
+					return true;
+				}
+				for (const name of touchedBetween(before, await changedFiles(cwd))) {
+					files.add(name);
+				}
+			}
+			const paths = [...files];
+			const attempt = async () => {
+				const add = await runGit(cwd, [GIT, 'add', '--', ...paths], 30_000);
+				if (!add.ok) {
+					return add;
+				}
+				return runGit(cwd, [GIT, 'commit', '-m', message.trim(), '--', ...paths], 120_000);
+			};
+			const before = await changedFiles(cwd, paths);
+			let commit = await attempt();
+			if (!commit.ok) {
+				// The repo's own git hooks (formatters) may have rewritten the files: stage them again, once.
+				if (touchedBetween(before, await changedFiles(cwd, paths)).length) {
+					commit = await attempt();
+				}
+				if (!commit.ok) {
+					void vscode.window.showErrorMessage(`Background Tone: git commit failed: ${tail(`${commit.stdout}\n${commit.stderr}`, 3)}`.slice(0, 300));
+					return true; // files may be staged now: redraw
+				}
+			}
+			this.touched.clear();
+			void vscode.window.showInformationMessage(`Background Tone: committed ${noun}.`);
+			return true;
+		});
 	}
 }
