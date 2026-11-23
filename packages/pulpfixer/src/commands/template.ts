@@ -111,7 +111,7 @@ async function promptParams(template: Template, given: Values): Promise<Values |
 }
 
 /** Whether `dir` (or, when it does not exist yet, its nearest existing parent) is in a git work tree. */
-function insideGitRepo(dir: string): boolean {
+export function insideGitRepo(dir: string): boolean {
   let probe = dir;
   while (!fs.existsSync(probe) && path.dirname(probe) !== probe) probe = path.dirname(probe);
   return capture(['git', 'rev-parse', '--is-inside-work-tree'], { cwd: probe }).stdout.trim() === 'true';
@@ -129,7 +129,7 @@ export function shellPath(abs: string): string {
   return `'${abs.replaceAll("'", "'\\''")}'`;
 }
 
-async function applyTemplate(cwd: string, args: string[]): Promise<number> {
+export async function applyTemplate(cwd: string, args: string[]): Promise<number> {
   const c = err();
   const rest = [...args];
   const dryRun = takeFlag(rest, '--dry-run', '-n');

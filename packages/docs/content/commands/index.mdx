@@ -24,6 +24,7 @@ Run `pf list` for the list that applies in the current directory, and `pf help` 
 | `pf repo` | Hook pf's tools into this repo (link, pnpm commands, versioning, background tone logo and extension, `.pf/` in `.gitignore`, deploy), or update them |
 | `pf repo commit` (`pf g`) | Commit everything uncommitted with a message the agent writes from the last Cursor chat; shows the files and message and asks first. See [Tools and repo setup](/commands/tools-and-repo#pf-repo-commit) |
 | `pf template [list \| apply <template> ...]` | Create a new repo from a template fetched from cellars, for example a query package, a pipe package or an IO adapter. It goes in the suite's repos folder (`~/dev` by default, `pf suite config`) unless `--dir` says otherwise. See [Templates](/templates) |
+| `pf new [query \| pipe \| scratch] [<name>]` | A menu to start something new: a query package or a pipe package (`pf template apply query-package` / `pipe-package`), or an empty scratch repo (a folder, `git init` and `pf repo --no-deploy`). All go in the suite's repos folder unless `--dir` says otherwise. See [Templates](/templates#pf-new) |
 | `pf agent [prompt]` | Open the coding agent (Claude Code, Codex or Cursor). See [Agent](/agent) |
 | `pf troubleshoot [prompt]` (`pf t`) | Find out what is wrong with this repo's deployment on AWS: pf reads how it deploys, links the AWS profile, then starts the agent with scoped AWS access. See [Troubleshoot](/agent/troubleshoot) |
 | `pf profile [...]` | Project profiles: which AWS account a repo uses and what the agent may read there |

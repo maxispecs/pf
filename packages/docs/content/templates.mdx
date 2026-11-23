@@ -18,6 +18,20 @@ pf template apply io-adapter acme-api
 
 In a terminal, pf asks for each value you did not pass, with its default filled in. Without one, it uses the defaults and stops with the usage line when a required value is missing, so scripts and agents pass flags.
 
+## pf new
+
+`pf new` is the shortcut for the three things you start most often. In a terminal it shows a menu (query package, pipe package, empty scratch); it prints the matching command so you can skip the menu next time.
+
+```bash
+pf new                      # the menu
+pf new query revrec --driver mysql     # = pf template apply query-package revrec --driver mysql
+pf new pipe orders --input db --output csv
+pf new scratch try-1        # an empty repo ~/dev/try-1 (the repos folder, or --dir)
+pf new scratch              # asks for a name, `scratch-<date>` by default
+```
+
+`query` and `pipe` hand every other argument to `pf template apply`, so they take the same flags. `scratch` creates the folder (it must not exist, or must be empty), runs `git init` unless it is already inside a git repo, runs `pf repo --no-deploy`, and prints `cd <the folder>`. It takes `--dir <path>`, `--dry-run`, `--no-git` and `--no-repo`. A scratch name is lowercase letters, digits and dashes. Without a terminal `pf new` prints its usage (exit 2) and `pf new scratch` needs a name.
+
 ## What apply does
 
 1. Installs `@pulpfixer/template-<name>@latest` into `~/.pf/templates`. With `--offline`, or when the registry cannot be reached, it uses the copy fetched last time.

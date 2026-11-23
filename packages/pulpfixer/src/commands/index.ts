@@ -27,6 +27,7 @@ import { pluginCommand } from './plugin.js';
 import { profileCommand } from './profile.js';
 import { publishCommand } from './publish.js';
 import { repoCommand } from './repo.js';
+import { newCommand } from './new.js';
 import { templateCommand } from './template.js';
 import { pluginCommands } from '../plugins/index.js';
 
@@ -51,6 +52,7 @@ export function allCommands(): Command[] {
     initCommand,
     repoCommand,
     templateCommand,
+    newCommand,
     profileCommand,
     doctorCommand,
     setupCommand,

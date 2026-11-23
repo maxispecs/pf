@@ -22,6 +22,7 @@ import { updateCommand } from './commands/update.js';
 import { pluginCommand } from './commands/plugin.js';
 import { profileCommand } from './commands/profile.js';
 import { repoCommand } from './commands/repo.js';
+import { newCommand } from './commands/new.js';
 import { templateCommand } from './commands/template.js';
 import { verCommand } from './commands/ver.js';
 import { versionsCommand } from './commands/versions.js';
@@ -241,6 +242,7 @@ export function entriesFor(ctx: Context): Entry[] {
     const localCli = localCliFor(ctx);
     if (localCli) fromRepo.push({ ...tool(toolsCommand, 'Tools', `${localCli.commands.length} in ${localCli.entry}`), ...action('tools', ['tools']) });
     entries.push(tool(skillCommand, 'Tools'));
+    entries.push(tool(newCommand, 'Tools'));
     entries.push(tool(pluginCommand, 'Tools'));
     entries.push(tool(versionsCommand, 'Tools'));
     entries.push(tool(repoCommand, 'Tools'));
@@ -253,6 +255,7 @@ export function entriesFor(ctx: Context): Entry[] {
     entries.push(agentEntry(ctx));
     entries.push({ ...tool(skillCommand, 'Tools'), name: 'skill', summary: 'Run a skill' });
     entries.push(tool(pluginCommand, 'Tools'));
+    entries.push(tool(newCommand, 'Tools'));
     entries.push(tool(templateCommand, 'Tools'));
     entries.push(tool(versionsCommand, 'Tools'));
     entries.push(tool(profileCommand, 'Tools', profileDetail(ctx)));
