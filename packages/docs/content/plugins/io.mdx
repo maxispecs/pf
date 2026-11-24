@@ -11,6 +11,7 @@ The built-in `io` plugin (`@pulpfixer/plugin-io`) is the base of pf's data plumb
 | `db` | [database plugin](/plugins/db) | a pf db connection: a query in, a table (or your own write) out | yes | yes |
 | `csv` | [CSV plugin](/plugins/csv) | a CSV file, or standard input / output | yes | yes |
 | `pdf` | [PDF plugin](/plugins/pdf) | a PDF file: lines, pages, positioned text, metadata or form fields in; rows through a layout template out | yes | yes |
+| `eventbridge` | [AWS plugin](/plugins/aws) | Amazon EventBridge: one event per row | - | yes |
 | `memory` | `io` | rows in an array (tests, small glue code) | yes | yes |
 | `stdout` | `io` | the terminal: `ndjson`, `csv` or `table` | - | yes |
 | `<name>` | `@pulpfixer/io-<name>` | whatever the add-on brings, see [Writing an IO adapter](/plugins/writing-an-io-adapter) | | |
@@ -55,6 +56,7 @@ The outputs are closed after the body ran, and each is told whether the pipe wor
 
 - a **database** output is one transaction: committed when the pipe worked, rolled back when it did not;
 - a **CSV** output writes a temporary file next to the target and moves it into place at the end, so a failed pipe leaves the old file (or none) untouched;
+- an **EventBridge** output holds its events until the pipe has worked and sends them then, so a failed pipe sends nothing (EventBridge cannot take an event back, so a call that fails part-way leaves the earlier events sent, and the error says how many);
 - if one output fails to commit, the outputs after it are told to discard.
 
 ## Writing pipes in code

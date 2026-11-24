@@ -4,7 +4,7 @@ title: AWS plugin
 
 # AWS plugin
 
-The built-in `aws` plugin wraps the aws CLI (it must be on PATH). It starts with a shared **exchange bucket** for passing files between people, and it provides the agent's read-only AWS tools.
+The built-in `aws` plugin wraps the aws CLI (it must be on PATH). It starts with a shared **exchange bucket** for passing files between people, sends **EventBridge events**, and provides the agent's read-only AWS tools.
 
 ## Exchange bucket
 
@@ -30,6 +30,52 @@ Settings live in `plugins.aws.exchange` of `~/.pf/config.json`. These variables 
 | `PF_EXCHANGE_REGION` | region |
 
 pf never reads credentials: the aws CLI resolves them from the profile. All commands support `--dry-run`, and `pf dl` is also in the menu.
+
+## Sending events (EventBridge)
+
+`pf events put` sends one event to Amazon EventBridge with `aws events put-events`. The target comes from flags only: nothing is saved and there are no settings or variables.
+
+```bash
+pf events put --source acme.orders --type OrderPlaced --detail '{"id": 42}'
+pf events put --source acme.orders --type OrderPlaced --detail-file order.json --bus orders
+cat order.json | pf events put --source acme.orders --type OrderPlaced --detail-file - --yes
+pf events put --source acme.orders --type OrderPlaced --resource arn:aws:s3:::my-bucket --time 2026-11-24T15:00:00Z \
+  --profile prod --region eu-west-1
+pf events put ... --dry-run  # check and show the event, call nothing
+```
+
+| Flag | Meaning |
+|------|---------|
+| `--source <s>` | who sent it, for example `acme.orders`. Required. A source starting with `aws.` is refused: AWS reserves it |
+| `--type <t>` | the detail-type. Required |
+| `--detail <json>` / `--detail-file <path\|->` | the detail, a JSON object (`-` is standard input). Default `{}`. Give one of them |
+| `--bus <name\|arn>` | the event bus. Without it the account's default bus gets the event |
+| `--resource <arn>` | a resource the event is about. Repeat for several |
+| `--time <iso>` | when it happened. Without it EventBridge uses the time it received the event |
+| `--profile <p>` / `--region <r>` | the AWS profile and region (otherwise the aws CLI's own defaults) |
+| `--dry-run` | validate and show the event without sending it |
+| `--yes` | send without asking. Without a terminal it is required (exit 2 otherwise) |
+
+pf shows the event and asks before it sends, because an event reaches other systems. It prints the event id on stdout. EventBridge answers a call with failed entries as a success, so pf reads the per-entry result and exits 1 when an event was not accepted. An event is at most 256 KB and the caller needs the `events:PutEvents` permission.
+
+### In pipes
+
+The `eventbridge` IO adapter turns each row into one event, for pipe packages (`eventbridgeSink` from `@pulpfixer/plugin-aws/api`):
+
+```ts
+import { eventbridgeSink } from '@pulpfixer/plugin-aws/api';
+
+eventbridgeSink({
+  source: 'acme.orders',
+  detailType: 'OrderPlaced',   // or detailTypeField: 'kind' to read it from a column
+  detail: ['id', 'total'],     // columns for the detail; default is the whole row
+  bus: 'orders',               // optional; also resources, profile, region
+});
+```
+
+Events are checked as rows arrive and sent, ten per call, when the pipe has worked; a failed pipe and `--dry-run` send nothing. More than 100,000 events in one pipe are refused: split the pipe. `pf io` lists the adapter as `built in`.
+
+There are no agent or MCP tools for events: they write, and their details can hold user data.
 
 ## Agent access
 

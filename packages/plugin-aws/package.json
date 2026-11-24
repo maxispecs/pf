@@ -1,7 +1,7 @@
 {
   "name": "@pulpfixer/plugin-aws",
-  "version": "5.2.0",
-  "description": "pf AWS plugin: exchange bucket (pf s3, pf dl)",
+  "version": "6.0.0",
+  "description": "pf AWS plugin: exchange bucket (pf s3, pf dl), EventBridge events (pf events)",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -9,6 +9,11 @@
       "source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./api": {
+      "source": "./src/api.ts",
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
     }
   },
   "files": [
