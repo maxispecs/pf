@@ -4,7 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { changesSinceBump, findCheckout, planBumps, publishable, shipsChange, suggestCommitMessage, type CyclePackage } from '../src/devcycle.js';
+import { buildContext } from '@pulpfixer/kit/context';
 import { localEntries } from '../src/local.js';
+import { entriesFor } from '../src/menu.js';
 import { json, mkRepo } from './helpers.js';
 
 const pkg = (name: string, over: Partial<CyclePackage> = {}): CyclePackage => ({
@@ -122,6 +124,24 @@ test('the local menu offers the dev cycle', () => {
   const cycle = localEntries(root).find((e) => e.name === 'cycle');
   assert.ok(cycle);
   assert.equal(cycle.cli, './pf cycle');
+});
+
+test('the menu in the checkout root lists the workbench tools in the Agent group', () => {
+  const files = {
+    'package.json': json({ name: 'pf-checkout' }),
+    pf: '#!/bin/sh\n',
+    'scripts/release.mjs': '',
+    'packages/pulpfixer/package.json': json({ name: 'pulpfixer' }),
+    'workbench/pulpfixer.json': json({ commands: { 'wb-new': { run: 'node tools/wb-new/index.mjs', description: 'Start a tool', group: 'Workbench' } } }),
+  };
+  const root = mkRepo(files);
+  const agent = entriesFor(buildContext(root)).find((e) => e.name === 'wb-new');
+  assert.ok(agent);
+  assert.equal(agent.group, 'Agent');
+  assert.equal(agent.summary, 'Start a tool');
+  // Elsewhere in the checkout, and in another repo, there is no such entry.
+  assert.equal(entriesFor(buildContext(path.join(root, 'workbench'))).some((e) => e.group === 'Agent' && e.name === 'wb-new'), false);
+  assert.equal(entriesFor(buildContext(mkRepo({ 'package.json': json({ name: 'other' }) }))).some((e) => e.name === 'wb-new'), false);
 });
 
 test('findCheckout finds the pulpfixer checkout from inside it, and nothing elsewhere', () => {

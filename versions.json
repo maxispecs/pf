@@ -1,6 +1,6 @@
 {
   "stack": {
-    "version": "3.39",
+    "version": "3.41",
     "since": "2026-11-23"
   },
   "featured": [
@@ -26,7 +26,7 @@
       "type": "node"
     },
     "packages/docs": {
-      "version": "2.19",
+      "version": "2.20",
       "since": "2026-11-23",
       "type": "node"
     },
@@ -86,7 +86,7 @@
       "type": "node"
     },
     "packages/pulpfixer": {
-      "version": "7.10",
+      "version": "7.11",
       "since": "2026-11-23",
       "type": "node"
     },

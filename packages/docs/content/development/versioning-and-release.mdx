@@ -44,3 +44,5 @@ Never publish unless you were asked to.
 ## The dev cycle
 
 `./pf cycle [--message m] [--no-push] [--yes] [--dry-run]` in the checkout bumps changed packages (core goes along), commits, runs `pnpm run publish:cellars`, pushes with `pf git push` (the primary remote, then the backup remotes; `--no-push` skips it, and a failed push does not stop the update but makes the cycle exit 1), then runs `pf u --yes` so the global pf updates itself.
+
+In the checkout's root, the `pf` menu also lists the tools registered in `workbench/pulpfixer.json` (`wb-new`, `wb-promote`, ...) in the **Agent** group, next to `agent` and `troubleshoot`. Choosing one runs it from `workbench/`.

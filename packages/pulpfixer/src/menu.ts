@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { defaultMeta } from './actionmeta.js';
 import { findCheckout, runDevCycle } from './devcycle.js';
@@ -35,7 +36,7 @@ import { candidates } from '@pulpfixer/kit/detect/resolve';
 import type { Task } from '@pulpfixer/kit/detect/stacks';
 import { formatCmd, runCmd, shellCmd, withArgs } from '@pulpfixer/kit/exec';
 import { findVersionsRoot } from './commands/ver.js';
-import { lastMenuChoice, rememberMenuChoice } from '@pulpfixer/kit/config';
+import { lastMenuChoice, loadRepoConfig, rememberMenuChoice } from '@pulpfixer/kit/config';
 import { err, out } from '@pulpfixer/kit/ui/palette';
 import { pick } from '@pulpfixer/kit/ui/picker';
 import { h2, termLine } from '@pulpfixer/kit/ui/text';
@@ -70,6 +71,33 @@ export function runCustom(ctx: Context, name: string, args: string[]): Promise<n
   return runCmd(withArgs(shellCmd(cfg.run, path.resolve(root, cfg.cwd ?? '.')), args), { base: root });
 }
 
+/**
+ * In the pulpfixer checkout's root: the tools registered in `workbench/pulpfixer.json`, shown in the
+ * Agent group next to `agent` and `troubleshoot`. They run from `workbench/` (the folder pf would
+ * read them from), so `cli` says how to run the same thing from a shell.
+ */
+export function workbenchEntries(ctx: Context): Entry[] {
+  if (!ctx.repo) return [];
+  const checkout = findCheckout(ctx.repo.root);
+  if (!checkout || checkout !== path.resolve(ctx.repo.root)) return [];
+  const dir = path.join(checkout, 'workbench');
+  if (!fs.existsSync(dir)) return [];
+  const own = new Set(Object.keys(ctx.config.commands));
+  const entries: Entry[] = [];
+  for (const [name, cfg] of Object.entries(loadRepoConfig(dir).commands)) {
+    if (own.has(name)) continue;
+    entries.push({
+      name,
+      summary: cfg.description ?? cfg.run,
+      group: 'Agent',
+      detail: 'workbench',
+      cli: `(cd workbench && pf ${name})`,
+      run: () => runCmd(shellCmd(cfg.run, path.resolve(dir, cfg.cwd ?? '.')), { base: dir }),
+    });
+  }
+  return entries;
+}
+
 function groupRank(g: string): number {
   const i = (GROUPS as readonly string[]).indexOf(g);
   return i === -1 ? GROUPS.indexOf('Tools') - 0.5 : i; // custom groups sit between Docs & deploy and Tools
@@ -99,6 +127,7 @@ export function entriesFor(ctx: Context): Entry[] {
   if (ctx.repo) {
     entries.push(agentEntry(ctx));
     entries.push(tool(troubleshootCommand, 'Agent', profileDetail(ctx)));
+    entries.push(...workbenchEntries(ctx));
     for (const t of TASK_COMMANDS) {
       const list = candidates(t.name as Task, ctx);
       if (list.length === 0) continue;
