@@ -65,6 +65,18 @@
 		if (inCard) {
 			section.append(h('div', 'versions-title', 'Versions'));
 		}
+		// Shown at the top while a bump waits for a commit (versions.json differs from HEAD). No payload leaves
+		// the page: the extension works out the files and the message itself and commits without asking.
+		if (v.pending && typeof v.pending.message === 'string') {
+			const commit = h('button', 'ver-commit');
+			commit.type = 'button';
+			commit.title = v.canBump ? v.pending.message : v.pending.message + ' (trust this workspace to commit versions)';
+			commit.setAttribute('aria-label', 'Commit versions: ' + v.pending.message);
+			commit.disabled = !v.canBump;
+			commit.append(h('span', 'codicon codicon-git-commit'), h('span', undefined, 'Commit versions'));
+			commit.addEventListener('click', () => post({ type: 'commitVersions' }));
+			section.append(commit);
+		}
 		const list = h('div', 'versions-list');
 		list.setAttribute('role', 'list');
 		for (const row of v.rows) {
@@ -81,18 +93,6 @@
 			list.append(el);
 		}
 		section.append(list);
-		// Shown while a bump waits for a commit (versions.json differs from HEAD). No payload leaves the page:
-		// the extension works out the files and the message itself.
-		if (v.pending && typeof v.pending.message === 'string') {
-			const commit = h('button', 'ver-commit');
-			commit.type = 'button';
-			commit.title = v.canBump ? v.pending.message : v.pending.message + ' (trust this workspace to commit versions)';
-			commit.setAttribute('aria-label', 'Commit versions: ' + v.pending.message);
-			commit.disabled = !v.canBump;
-			commit.append(h('span', 'codicon codicon-git-commit'), h('span', undefined, 'Commit versions'));
-			commit.addEventListener('click', () => post({ type: 'commitVersions' }));
-			section.append(commit);
-		}
 		if (v.hint) {
 			section.append(h('div', 'versions-hint', v.hint));
 		}

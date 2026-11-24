@@ -47,6 +47,9 @@ body:has(.versions:not(.versions-card)) {
 }
 /* The stack and the featured packages (listed right after it) have bold names. */
 .ver-stack .ver-name, .ver-featured .ver-name { color: var(--vscode-foreground); font-weight: 600; }
+/* A little air around them, so the stack and the featured packages stand apart from the plain rows. */
+.ver-stack, .ver-featured { padding-top: 2px; padding-bottom: 2px; }
+.ver-stack { margin-bottom: 2px; }
 .ver-control { flex: none; display: inline-flex; align-items: center; gap: 2px; font-variant-numeric: tabular-nums; }
 .ver-version { min-width: 3.5em; text-align: center; font-weight: 600; }
 
@@ -70,9 +73,9 @@ body:has(.versions:not(.versions-card)) {
 .ver-plus:active:not(:disabled) { background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground)); }
 .ver-plus:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
 .ver-plus:disabled { opacity: 0.4; cursor: default; }
-/* Commit button: appears under the list once a bump waits for a commit. */
+/* Commit button: appears above the list once a bump waits for a commit. */
 .ver-commit {
-	margin-top: 6px;
+	margin: 2px 0 6px;
 	width: 100%;
 	min-height: 24px;
 	padding: 2px 8px;

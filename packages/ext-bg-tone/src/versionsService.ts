@@ -240,8 +240,8 @@ export class VersionsService {
 
 	/**
 	 * Commits the bumps (the commit button, like the ver CLI's "Commit changed files"): only the files the bumps
-	 * changed (`versions.json`, the synced manifests, what `postSync` hooks wrote), never other work. The message
-	 * is asked for first (the dialog is the confirmation). `preCommit` hooks of `versions.json` run first and the
+	 * changed (`versions.json`, the synced manifests, what `postSync` hooks wrote), never other work. It commits
+	 * at once with the generated message (`Bump versions: ...`), no dialog. `preCommit` hooks of `versions.json` run first and the
 	 * files they change join the commit; if git's own hooks reformat the files the commit is retried once.
 	 * Resolves true when something changed (redraw).
 	 */
@@ -279,18 +279,9 @@ export class VersionsService {
 			void vscode.window.showInformationMessage('Background Tone: the version files have no changes to commit.');
 			return true;
 		}
-		const list = [...files];
-		const noun = list.length === 1 ? '1 file' : `${list.length} files`;
-		const shown = list.length > 4 ? `${list.slice(0, 4).join(', ')}, ...` : list.join(', ');
-		const message = await vscode.window.showInputBox({
-			title: `Commit ${noun} of the version bump`,
-			prompt: `Commits only ${shown}. Commit message:`,
-			value: commitMessage(changes),
-			validateInput: value => (value.trim() === '' ? 'A commit message is required.' : undefined),
-		});
-		if (message === undefined) {
-			return false;
-		}
+		const noun = files.size === 1 ? '1 file' : `${files.size} files`;
+		// No dialog: the button commits with the generated message (the same one its tooltip shows).
+		const message = commitMessage(changes);
 		return vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Committing ${noun}...` }, async () => {
 			const env = {
 				...process.env,

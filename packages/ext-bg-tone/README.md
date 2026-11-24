@@ -45,7 +45,7 @@ customization keys are left alone.
   already bumped when its version differs from `HEAD:versions.json`, so a bump made in a terminal counts too; a click
   on the stack itself always bumps it). A click edits `versions.json` (same format as the `ver` CLI) and runs
   `pf ver sync` for the manifests and hooks; trusted local workspaces only. While a bump waits for a commit
-  (`versions.json` differs from `HEAD`), a **Commit versions** button asks for a message (`Bump versions: ...`) and commits
+  (`versions.json` differs from `HEAD`), a **Commit versions** button at the top of the list commits at once with the message `Bump versions: ...` (no dialog) and commits
   only the files the bump changed (`versions.json`, the synced manifests, what `postSync` hooks wrote), after the
   `preCommit` hooks of `versions.json`; nothing is pushed. `bgTone.versions` chooses where it shows.
 
