@@ -1,4 +1,5 @@
 // Make a scratch tool permanent.
+// With nothing given and a terminal (the menu), it asks which tool, where it goes and what it does.
 //   pf wb-promote <name> "<description>" [--dry-run]         move it to tools/ and register it with pf
 //   pf wb-promote <name> --repo ["<description>"] [--dry-run] [--no-git] [--no-repo]
 //                                                            make it a repo of its own in the suite's repos folder
@@ -6,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { checkName, ROOT } from '../../lib/paths.mjs';
+import { ask, canAsk, choose } from '../../lib/prompt.mjs';
 import { monorepoVersions, planRepo, writeRepo } from '../../lib/promote.mjs';
 
 const USAGE = 'usage: pf wb-promote <name> "<what it does>" [--dry-run]\n       pf wb-promote <name> --repo ["<what it does>"] [--dry-run] [--no-git] [--no-repo]';
@@ -14,11 +16,32 @@ const argv = process.argv.slice(2);
 const args = argv.filter((a) => !a.startsWith('--'));
 const flag = (f) => argv.includes(f);
 const dry = flag('--dry-run');
-const repoMode = flag('--repo');
+let repoMode = flag('--repo');
 const unknown = argv.filter((a) => a.startsWith('--') && !['--dry-run', '--repo', '--no-git', '--no-repo'].includes(a));
-const [name, ...rest] = args;
-const description = rest.join(' ').trim();
+let [name, ...rest] = args;
+let description = rest.join(' ').trim();
 if (unknown.length) (console.error(`unknown option ${unknown[0]}\n${USAGE}`), process.exit(2));
+
+// From the menu (a terminal, nothing given): pick the scratch tool, where it goes and what it does.
+if (!name && canAsk()) {
+  const scratch = path.join(ROOT, 'scratch');
+  const tools = fs.existsSync(scratch)
+    ? fs.readdirSync(scratch, { withFileTypes: true }).filter((d) => d.isDirectory() && fs.existsSync(path.join(scratch, d.name, 'index.mjs'))).map((d) => d.name).sort()
+    : [];
+  if (!tools.length) (console.error('no tool in scratch/ to promote (pf wb-new <name> starts one)'), process.exit(1));
+  name = tools.length === 1 ? tools[0] : await choose('Which scratch tool?', tools);
+  if (name === null) process.exit(130);
+  const where = await choose(`Where does "${name}" go?`, [
+    { value: 'tools', label: 'tools/ here, registered as a pf command' },
+    { value: 'repo', label: 'a repo of its own in the repos folder' },
+  ]);
+  if (where === null) process.exit(130);
+  repoMode = where === 'repo';
+  description =
+    (await ask(repoMode ? 'What it does (optional)' : 'What it does', { validate: (v) => (!v && !repoMode ? 'a description is needed' : undefined) })) ?? null;
+  if (description === null) process.exit(130);
+}
+
 if (!name || (!repoMode && !description)) (console.error(USAGE), process.exit(2));
 if (!repoMode && (flag('--no-git') || flag('--no-repo'))) (console.error(`--no-git and --no-repo only go with --repo\n${USAGE}`), process.exit(2));
 

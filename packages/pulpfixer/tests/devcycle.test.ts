@@ -126,7 +126,7 @@ test('the local menu offers the dev cycle', () => {
   assert.equal(cycle.cli, './pf cycle');
 });
 
-test('the menu in the checkout root lists the workbench tools in the Agent group', () => {
+test('the menu in the checkout root has one workbench entry in the Agent group, which opens a submenu', () => {
   const files = {
     'package.json': json({ name: 'pf-checkout' }),
     pf: '#!/bin/sh\n',
@@ -135,13 +135,16 @@ test('the menu in the checkout root lists the workbench tools in the Agent group
     'workbench/pulpfixer.json': json({ commands: { 'wb-new': { run: 'node tools/wb-new/index.mjs', description: 'Start a tool', group: 'Workbench' } } }),
   };
   const root = mkRepo(files);
-  const agent = entriesFor(buildContext(root)).find((e) => e.name === 'wb-new');
-  assert.ok(agent);
-  assert.equal(agent.group, 'Agent');
-  assert.equal(agent.summary, 'Start a tool');
+  const list = entriesFor(buildContext(root));
+  const parent = list.find((e) => e.name === 'workbench');
+  assert.ok(parent);
+  assert.equal(parent.group, 'Agent');
+  assert.equal(parent.detail, '1 tool');
+  // The tools are in the submenu, not the main menu.
+  assert.equal(list.some((e) => e.group === 'Agent' && e.name === 'wb-new'), false);
   // Elsewhere in the checkout, and in another repo, there is no such entry.
-  assert.equal(entriesFor(buildContext(path.join(root, 'workbench'))).some((e) => e.group === 'Agent' && e.name === 'wb-new'), false);
-  assert.equal(entriesFor(buildContext(mkRepo({ 'package.json': json({ name: 'other' }) }))).some((e) => e.name === 'wb-new'), false);
+  assert.equal(entriesFor(buildContext(path.join(root, 'workbench'))).some((e) => e.group === 'Agent' && e.name === 'workbench'), false);
+  assert.equal(entriesFor(buildContext(mkRepo({ 'package.json': json({ name: 'other' }) }))).some((e) => e.name === 'workbench'), false);
 });
 
 test('findCheckout finds the pulpfixer checkout from inside it, and nothing elsewhere', () => {

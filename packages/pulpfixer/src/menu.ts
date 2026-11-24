@@ -71,10 +71,14 @@ export function runCustom(ctx: Context, name: string, args: string[]): Promise<n
   return runCmd(withArgs(shellCmd(cfg.run, path.resolve(root, cfg.cwd ?? '.')), args), { base: root });
 }
 
+/** The workbench tools shown first in its submenu; the others follow in file order. */
+const WORKBENCH_ORDER = ['wb-new', 'wb-promote', 'ddb-check'];
+
 /**
- * In the pulpfixer checkout's root: the tools registered in `workbench/pulpfixer.json`, shown in the
- * Agent group next to `agent` and `troubleshoot`. They run from `workbench/` (the folder pf would
- * read them from), so `cli` says how to run the same thing from a shell.
+ * In the pulpfixer checkout's root: one `workbench` entry (Agent group, next to `agent` and
+ * `troubleshoot`) that opens a submenu of the tools registered in `workbench/pulpfixer.json`.
+ * They run from `workbench/` (the folder pf would read them from), so `cli` says how to run the
+ * same thing from a shell. The tools ask for missing inputs themselves when there is a terminal.
  */
 export function workbenchEntries(ctx: Context): Entry[] {
   if (!ctx.repo) return [];
@@ -82,20 +86,37 @@ export function workbenchEntries(ctx: Context): Entry[] {
   if (!checkout || checkout !== path.resolve(ctx.repo.root)) return [];
   const dir = path.join(checkout, 'workbench');
   if (!fs.existsSync(dir)) return [];
-  const own = new Set(Object.keys(ctx.config.commands));
-  const entries: Entry[] = [];
-  for (const [name, cfg] of Object.entries(loadRepoConfig(dir).commands)) {
-    if (own.has(name)) continue;
-    entries.push({
-      name,
-      summary: cfg.description ?? cfg.run,
+  const rank = (n: string) => {
+    const i = WORKBENCH_ORDER.indexOf(n);
+    return i === -1 ? WORKBENCH_ORDER.length : i;
+  };
+  const tools = Object.entries(loadRepoConfig(dir).commands)
+    .map(([name, cfg], i) => ({ name, cfg, i }))
+    .sort((a, b) => rank(a.name) - rank(b.name) || a.i - b.i);
+  if (!tools.length) return [];
+  const sub: Entry[] = tools.map(({ name, cfg }) => ({
+    name,
+    summary: cfg.description ?? cfg.run,
+    group: 'Workbench',
+    cli: `(cd workbench && pf ${name})`,
+    run: () => runCmd(shellCmd(cfg.run, path.resolve(dir, cfg.cwd ?? '.')), { base: dir }),
+  }));
+  return [
+    {
+      name: 'workbench',
+      summary: 'Ad-hoc and repeatable tools (new, promote, ddb-check)',
       group: 'Agent',
-      detail: 'workbench',
-      cli: `(cd workbench && pf ${name})`,
-      run: () => runCmd(shellCmd(cfg.run, path.resolve(dir, cfg.cwd ?? '.')), { base: dir }),
-    });
-  }
-  return entries;
+      detail: `${sub.length} tool${sub.length === 1 ? '' : 's'}`,
+      cli: '(cd workbench && pf)',
+      run: () =>
+        runMenu(ctx, {
+          entries: sub,
+          title: 'Workbench. What do you want to do?',
+          heading: 'workbench',
+          historyKey: `workbench:${checkout}`,
+        }),
+    },
+  ];
 }
 
 function groupRank(g: string): number {
