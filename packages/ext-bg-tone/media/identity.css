@@ -78,7 +78,8 @@ body {
 @media (prefers-reduced-motion: reduce) { .agent-dot-running { animation: none; } }
 .commit-icon { flex: none; font-size: 12px; opacity: 0.7; }
 /* Like the Commit Graph: blue for a commit only this clone has, purple once a remote has it. */
-.commit-local { color: var(--vscode-charts-blue, #3794ff); opacity: 1; }
+/* A codicon has one weight, so "bold" for the unpushed icon is a stroke in its own color. */
+.commit-local { color: var(--vscode-charts-blue, #3794ff); opacity: 1; font-weight: bold; -webkit-text-stroke: 0.7px currentColor; }
 .commit-pushed { color: var(--vscode-charts-purple, #b180d7); opacity: 1; }
 .agent-title { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-time { flex: none; font-size: 0.8em; opacity: 0.8; }

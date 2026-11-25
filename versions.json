@@ -1,6 +1,6 @@
 {
   "stack": {
-    "version": "3.44",
+    "version": "3.45",
     "since": "2026-11-24"
   },
   "featured": [
@@ -31,8 +31,8 @@
       "type": "node"
     },
     "packages/ext-bg-tone": {
-      "version": "2.6",
-      "since": "2026-11-23",
+      "version": "2.7",
+      "since": "2026-11-24",
       "type": "node"
     },
     "packages/kit": {
