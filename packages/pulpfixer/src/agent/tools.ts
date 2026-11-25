@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { findVersionsRoot, resolveVerCli } from '../commands/ver.js';
+import { SKILL_ALIASES } from '../skills/packages.js';
 import type { Context } from '@pulpfixer/kit/context';
 import { detectDocs } from '@pulpfixer/kit/detect/docs';
 import { detectDeploy, detectStaging } from '@pulpfixer/kit/detect/deploy';
@@ -44,7 +45,9 @@ export function loadAgentSkills(ctx: Context): Skill[] {
 
 export function findSkill(ctx: Context, name: string): Skill | undefined {
   const n = name.replace(/^\//, '');
-  return loadAgentSkills(ctx).find((s) => s.name === n);
+  const skills = loadAgentSkills(ctx);
+  // `ver` was the name of the version skill before it shipped with pf; an exact match still wins.
+  return skills.find((s) => s.name === n) ?? skills.find((s) => s.name === SKILL_ALIASES[n]);
 }
 
 /** Text of a skill for the agent: where it lives (to read its scripts) and its SKILL.md. */

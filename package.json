@@ -1,7 +1,7 @@
 {
   "name": "pulpfixer-monorepo",
   "private": true,
-  "version": "3.45.0",
+  "version": "3.46.0",
   "type": "module",
   "description": "pf: unified developer CLI for any repo, any language (monorepo root)",
   "license": "MIT",
@@ -48,7 +48,7 @@
     },
     "Tools": {
       "ver": "List versions and bump commands",
-      "skills:sync": "Refresh the bundled /ver and /pnpm helpers from the skills checkout",
+      "skills:sync": "Refresh this repo's scripts/version.mjs and scripts/tasks.mjs from the skill packages",
       "logo": "Regenerate the header art from packages/pulpfixer/assets/pulpfixer.png (--preview to see it)"
     },
     "Help": {

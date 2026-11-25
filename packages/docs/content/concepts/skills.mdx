@@ -23,9 +23,9 @@ In this order. A skill in an earlier directory wins over a later one with the sa
 4. `~/.claude/skills`
 5. the repo's `.cursor/skills`, `.agents/skills` and `.claude/skills`
 6. pf's own folder, `~/.pf/skills`
-7. the skills bundled with pf
+7. the skills bundled with pf (the skill packages below, then `assets/skills`)
 
-Skills in `~/.pf/skills` and the bundled ones run through `pf agent`, which reads them with the `pf_skill` tool, so they work with any agent CLI. `ver` and `pnpm` run their scripts directly. Others run through the agent CLI.
+Skills in `~/.pf/skills` and the bundled ones run through `pf agent`, which reads them with the `pf_skill` tool, so they work with any agent CLI. `version` (also called `ver`) and `pnpm` run their scripts directly. Others run through the agent CLI.
 
 ## Skills from the registry
 
@@ -33,10 +33,10 @@ The skills repo publishes each skill to cellars as `@pf-skills/<name>`, or `@pf-
 
 ```bash
 pf skill available                  # registry skills, their versions and where they are installed
-pf skill install ver bp             # latest version into pf's own folder, ~/.pf/skills
+pf skill install version bp         # into pf's own folder, ~/.pf/skills (version comes from pf, bp from the registry)
 pf skill install --all --to claude  # every skill, into ~/.claude/skills instead
 pf skill update [name...]           # bring registry installs to the latest (--check only reports)
-pf skill remove ver                 # delete a registry install
+pf skill remove version             # delete an install
 ```
 
 `--to` takes `pf` (the default), `cursor`, `claude`, `agents` or `all` (comma-separated). Use an agent folder when that agent should see the skill outside `pf agent`.
@@ -45,12 +45,20 @@ An install keeps the package's `package.json` in the skill folder, which marks i
 
 A skill named `available`, `install`, `update`, `remove` or `run` runs as `pf skill run <name>`.
 
-## Stack skills (ver, pnpm)
+## Skills that ship with pf
 
-The `ver` and `pnpm` skills change often and pf runs their helper files itself (`pf ver`, `pf repo`, the agent's version tools). So `pf update`:
+Four skills are packages that pf depends on, so they always match the pf you run and need no registry:
 
-- installs them into `~/.pf/skills` when missing, and updates them there (a symlinked checkout or a hand-made folder is left alone);
-- uses the newest of that copy and the one bundled in the pf package, which stays as the offline fallback;
-- inside a repo, refreshes the repo's own copies: `scripts/version.mjs` (when its revision is older; a newer one is kept) and `scripts/tasks.mjs` (only a copy that is already the pnpm helper).
+| Package | Skills |
+|---|---|
+| `@pulpfixer/skill-version` | `version` (`ver` still works as its name): major.minor versioning and its CLI, `scripts/version.mjs` |
+| `@pulpfixer/skill-repo` | `pnpm` (the helper behind `pnpm ask`, `pnpm doc`, `pnpm deploy:staging`), `pf-repo` and `deploy-setup` (what `pf rp` hands to the agent) |
+
+pf runs their helper files itself (`pf ver`, `pf repo`, the agent's version tools), straight from its own install, and `pf skill` and `pf_skill` find them like any bundled skill. There is nothing to install for pf to use them. `pf skill install version pnpm --to claude` (or `--all`) copies them out of pf into an agent's folder, so that agent has `/version` and `/pnpm` too. The copy carries a `package.json` naming its package, and `pf update` refreshes it from the pf that ships it.
+
+`pf update` also:
+
+- removes an old registry install of `ver` or `pnpm` from `~/.pf/skills` (they used to come from `@pf-skills/ver` and `@pf-skills/pnpm`; a symlinked checkout or a hand-made folder is left alone and reported, because it would win over the skill pf ships);
+- inside a repo, refreshes the repo's own copies from the pf that is running: `scripts/version.mjs` (when its revision is older; a newer one is kept) and `scripts/tasks.mjs` (only a copy that is already the pnpm helper).
 
 It never installs a helper into a repo (that is `pf repo`), never commits, and `--check` and `--dry-run` only report.

@@ -6,7 +6,7 @@ title: Versioning
 
 To see what is installed on this machine instead (pf, plugins, skills, extensions), use [`pf versions`](/commands/index#versions) (`pf vs`).
 
-`pf ver` is major.minor versioning for a repo, including monorepos where every package has its own version and the whole stack has one too. It runs the bundled `/ver` CLI, and uses the newest copy of it that pf can find (see [Skills](/concepts/skills#stack-skills-ver-pnpm)).
+`pf ver` is major.minor versioning for a repo, including monorepos where every package has its own version and the whole stack has one too. It runs the CLI of the `version` skill, which ships with pf in `@pulpfixer/skill-version` (see [Skills](/concepts/skills#skills-that-ship-with-pf)).
 
 ```bash
 pf ver                         # list versions, with ready-to-run bump commands

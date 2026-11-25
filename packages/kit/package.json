@@ -1,6 +1,6 @@
 {
   "name": "@pulpfixer/kit",
-  "version": "6.14.0",
+  "version": "6.15.0",
   "description": "pf shared kit: detection, exec, ui, config and the plugin API",
   "license": "MIT",
   "type": "module",

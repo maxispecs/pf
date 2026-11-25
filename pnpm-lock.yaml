@@ -180,6 +180,16 @@ importers:
       '@pulpfixer/plugin-yubikey':
         specifier: workspace:*
         version: link:../plugin-yubikey
+      '@pulpfixer/skill-repo':
+        specifier: workspace:*
+        version: link:../skill-repo
+      '@pulpfixer/skill-version':
+        specifier: workspace:*
+        version: link:../skill-version
+
+  packages/skill-repo: {}
+
+  packages/skill-version: {}
 
   packages/suite: {}
 

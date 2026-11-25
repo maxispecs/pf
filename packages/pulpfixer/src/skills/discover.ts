@@ -5,6 +5,7 @@ import type { UserConfig } from '@pulpfixer/kit/config';
 import { exists } from '@pulpfixer/kit/util';
 import { pfHome } from '@pulpfixer/kit/constants';
 import { packageRoot } from '@pulpfixer/kit/version';
+import { packagedSkillsDirs } from './packages.js';
 
 export interface Skill {
   name: string;
@@ -91,8 +92,9 @@ export function isPfSkill(skill: Skill): boolean {
 }
 
 /**
- * Directories scanned for skills, in priority order. pf's folder and its bundled skills come last
- * so a repo or agent copy wins; a registry install in pf's folder wins over the bundled copy.
+ * Directories scanned for skills, in priority order. pf's folder and its bundled skills (the `assets/skills`
+ * folder and the skill packages) come last so a repo or agent copy wins; a registry install in pf's folder
+ * wins over the bundled copy.
  */
 export function skillDirs(
   repoRoot: string | null,
@@ -100,6 +102,8 @@ export function skillDirs(
   home = os.homedir(),
   bundled: string | null = bundledSkillsDir(),
   own: string | null = pfSkillsDir(),
+  /** The `skills/` folders of the skill packages pf depends on; only with pf's own bundled folder. */
+  packaged: string[] = bundled === bundledSkillsDir() ? packagedSkillsDirs() : [],
 ): { dir: string; label: string }[] {
   const dirs: { dir: string; label: string }[] = [];
   if (repoRoot) {
@@ -111,6 +115,7 @@ export function skillDirs(
   for (const d of user.skillDirs ?? []) dirs.push({ dir: d.replace(/^~(?=\/)/, home), label: d });
   if (own) dirs.push({ dir: own, label: PF_SKILLS_LABEL });
   if (bundled) dirs.push({ dir: bundled, label: BUNDLED_LABEL });
+  for (const dir of packaged) dirs.push({ dir, label: BUNDLED_LABEL });
   return dirs;
 }
 

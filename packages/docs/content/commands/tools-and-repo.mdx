@@ -98,7 +98,7 @@ See [pulpfixer.json](/concepts/pulpfixer-json) for the format.
 - **config**: renames an older `pf.json` to `pulpfixer.json` (the format is the same). A `pf.json` identical to an existing `pulpfixer.json` is deleted; one that differs is left alone with a warning, since pf reads only `pulpfixer.json` then;
 - **link**: gives `pulpfixer.json` an `id` and remembers the repo in pf's state folder (below);
 - the `/pnpm` root commands: `pnpm ask` (every root script, grouped), `pnpm doc` (the docs site) and `pnpm deploy:staging`, adding the last two only where a docs site or a staging target exists;
-- `/ver` versioning: `versions.json` and `pnpm ver`;
+- `/version` versioning: `versions.json` and `pnpm ver`;
 - **background tone**: sets `bgTone.logo` in `pulpfixer.json` from an image in the repo (`logo.svg`, `assets/logo.png`, `public/icon.svg`, else the first local image in the README) when it has none, never replacing one that is set, and offers to install the Background Tone extension into Cursor when it is missing (below);
 - **local settings**: adds `.pf/` (machine-local pf settings, see [Local settings](/concepts/local-settings)) to the repo's `.gitignore`, once;
 - **deploy**: tells you what `pf d` runs, or, when the repo has none, wires one (below).
@@ -166,12 +166,24 @@ The link is still under development. Its format and rules change between pf rele
 
 ### Deploy setup
 
-Some repos deploy through their own helper, not a script pf can read: triton's `./tl d`, arbiter's `./al d`. Those scripts have no `# usage:` headers, so pf cannot parse them. When `pf d` resolves to nothing, `pf rp` looks for helpers at the repo root (an executable script with a `"$1" = "d"` or `"deploy"` branch, ranked with the local `GWLOCAL` ones first and server-only ones such as arbiter's `a.sh` last) and offers to start the coding agent with the bundled `deploy-setup` skill. pf asks which key to write, then starts Claude (or Cursor) in print mode so it exits when it is done and pf can show the result. Print mode streams its events (`--output-format stream-json`), and pf shows each step as it happens: what the agent says (`│`), each tool it runs with its main argument (`▸ Read tl`), any tool that fails (`✗`), and a closing line with the time, turns and cost. The agent:
+Some repos deploy through their own helper, not a script pf can read: triton's `./tl d`, arbiter's `./al d`. Those scripts have no `# usage:` headers, so pf cannot parse them. When `pf d` resolves to nothing, `pf rp` looks for helpers at the repo root and offers to start the coding agent with the `deploy-setup` skill (it ships with pf in `@pulpfixer/skill-repo`).
 
-1. reads the repo's own deploy notes (`AGENTS.md`, README, docs) and the helper;
-2. picks the dev-machine command and never a server-only one;
-3. writes the key you picked (`deploy`, `deploy:staging` or `deploy:production`; no terminal means `deploy`), with `"message": true` when the command commits and takes a commit message;
-4. never runs the deploy. It exits, and pf previews `pf d`.
+**What pf offers.** Only a whole deploy that runs from this checkout. A script is a candidate when it has a deploy entry point: a `"$1" = "d"` or `"deploy"` branch (or a `case "$1"` label) on a live line, or a file name that says deploy (`deploy.sh`, `deploy-staging.sh`). The word "deploy" in the text, or in a comment, is not enough. A candidate is offered only when it is none of these:
+
+| Ruled out | Example | How pf sees it |
+|---|---|---|
+| One step of a deploy | `deploy_migrations.sh`, `deploy_clear_cache.sh`, `deploy-api.sh` | a qualifier next to `deploy` that is not an environment word (`staging`, `prod`, `live`, ...) |
+| A hook the platform runs on the server | a script under `appspec.yml` `hooks` (AWS CodeDeploy) | its name is a `location:` there |
+| A stub | a script whose commands are all commented out or only `echo` | no live command |
+| Server only | needs `$GWHOME`, `systemctl`, `sudo`, or a live `/var/www`, `/srv`, `/opt`, `/etc` path (arbiter's `a.sh`) | unless it is marked local (`GWLOCAL`) |
+
+`pf rp` lists the ones it ruled out, for example `deploy: not wired: deploy_migrations.sh (one step of a deploy (migrations), not a whole deploy; a hook the platform runs on the server (appspec.yml AfterInstall); does nothing: every command is commented out or only prints)`, and does not ask. With nothing offered, `pf rp --deploy` still starts the agent for the cases pf cannot see, and its prompt names the ruled-out scripts so the agent does not wire them. pf asks which key to write, then starts Claude (or Cursor) in print mode so it exits when it is done and pf can show the result. Print mode streams its events (`--output-format stream-json`), and pf shows each step as it happens: what the agent says (`│`), each tool it runs with its main argument (`▸ Read tl`), any tool that fails (`✗`), and a closing line with the time, turns and cost. The agent:
+
+1. reads the repo's own deploy notes (`AGENTS.md`, README, docs), the helper, and what deploys outside the checkout (`appspec.yml`, CI pipelines, `Procfile`);
+2. decides whether anything is a whole deploy: a step, a platform hook, a CI-only step, a stub or a server-only helper is not, and it never wires a bare `git push` unless the repo's notes say a push deploys;
+3. checks, without running anything, that the command can work here (its programs exist, the files it uses are in the checkout, the remote it pushes to exists, the variables it needs are named);
+4. writes the key you picked (`deploy`, `deploy:staging` or `deploy:production`; no terminal means `deploy`), with `"message": true` when the command commits and takes a commit message;
+5. never runs the deploy. It exits, and pf previews `pf d`. When nothing qualified it writes nothing and says why, and `pf rp` reports that nothing was wired (exit 0).
 
 ```json
 { "commands": { "deploy": { "run": "./al d", "message": true, "description": "Bump version, compile prefect.yaml, commit, push" } } }

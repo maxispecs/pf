@@ -7,7 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { buildContext } from '@pulpfixer/kit/context';
 import { detectDeploy } from '@pulpfixer/kit/detect/deploy';
 import { applyMessage, parseDeployArgs } from '../src/commands/deploy.js';
+import type { DeployHelper } from '@pulpfixer/kit/detect/helpers';
 import { deploySetupPrompt } from '../src/commands/repo.js';
+import { packagedSkill } from '../src/skills/packages.js';
 import { json, lines, mkRepo } from './helpers.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -180,12 +182,54 @@ test('the menu list shows the bare deploy and does not run it as a custom comman
 });
 
 test('the deploy-setup skill ships with pf, and the setup prompt names the ranked helpers', () => {
-  const skill = fs.readFileSync(path.join(root, 'assets', 'skills', 'deploy-setup', 'SKILL.md'), 'utf8');
+  const skill = fs.readFileSync(path.join(packagedSkill('deploy-setup')!.dir, 'SKILL.md'), 'utf8');
   assert.match(skill, /^---\nname: deploy-setup\n/);
-  const prompt = deploySetupPrompt([{ file: 'al', local: true, serverOnly: false, branch: true, score: 14, reasons: ['marked local (GWLOCAL)'] }]);
+  const al: DeployHelper = { file: 'al', local: true, serverOnly: false, branch: true, role: 'deploy', stub: false, eligible: true, score: 14, reasons: ['marked local (GWLOCAL)'] };
+  const prompt = deploySetupPrompt([al]);
   assert.match(prompt, /pf_skill with name "deploy-setup"/);
   assert.match(prompt, /al \(marked local/);
   assert.match(prompt, /key "deploy"/);
+  assert.doesNotMatch(prompt, /ruled these out/);
   assert.match(deploySetupPrompt([], 'deploy:staging'), /key "deploy:staging"/);
   assert.match(deploySetupPrompt([]), /no helper script/);
+});
+
+test('the setup prompt lists a script pf ruled out as not to be wired, and offers none of it as a candidate', () => {
+  const step: DeployHelper = {
+    file: 'deploy_migrations.sh', local: false, serverOnly: false, branch: false, role: 'step', hook: 'appspec.yml AfterInstall', stub: true, eligible: false,
+    rejected: 'one step of a deploy (migrations), not a whole deploy', score: -8, reasons: ['named like a deploy script'],
+  };
+  const prompt = deploySetupPrompt([step]);
+  assert.match(prompt, /no helper script at the repo root that is a whole deploy/);
+  assert.match(prompt, /ruled these out, do not wire them: deploy_migrations\.sh \(one step of a deploy \(migrations\)/);
+  assert.doesNotMatch(prompt, /best guess first/);
+});
+
+const GENETICS = {
+  ...git,
+  'deploy_migrations.sh': '#!/usr/bin/env bash\n# /usr/local/bin/knex migrate:latest\necho "deploy migrations legacy script"\n',
+  'appspec.yml': 'version: 0.0\nhooks:\n  AfterInstall:\n    - location: deploy_migrations.sh\n',
+};
+
+test('pf rp --dry-run reports a deploy step as not wired and does not offer the agent', () => {
+  const dir = mkRepo(GENETICS);
+  fs.chmodSync(path.join(dir, 'deploy_migrations.sh'), 0o755);
+  const r = pf(dir, 'rp', '--dry-run');
+  const text = r.out + r.err;
+  assert.equal(r.code, 0, text);
+  assert.match(text, /deploy: not wired: deploy_migrations\.sh \(one step of a deploy \(migrations\)/);
+  assert.match(text, /appspec\.yml AfterInstall/);
+  assert.match(text, /deploy: nothing found for pf d/);
+  assert.doesNotMatch(text, /would start the agent/);
+});
+
+test('pf rp --dry-run offers the agent for a real local deploy helper, next to a ruled-out step', () => {
+  const dir = mkRepo({ ...GENETICS, tl: '#!/usr/bin/env bash\nGWLOCAL=True\nif [ "$1" = "d" ]; then git push; fi\n' });
+  for (const f of ['deploy_migrations.sh', 'tl']) fs.chmodSync(path.join(dir, f), 0o755);
+  const text = (() => {
+    const r = pf(dir, 'rp', '--dry-run');
+    return r.out + r.err;
+  })();
+  assert.match(text, /deploy: not wired: deploy_migrations\.sh/);
+  assert.match(text, /would start the agent to wire pf d \(candidates: tl\)/);
 });

@@ -205,7 +205,7 @@ if [ "$FROM_SOURCE" = 1 ]; then
   run pnpm --dir "$ROOT" build
   # pnpm pack turns the workspace:* dependencies into real versions; npm installs the tarballs together.
   PACKS="$(mktemp -d)"
-  for pkg in kit plugin-aws plugin-cri plugin-csv plugin-db plugin-io plugin-pdf plugin-system plugin-yubikey core; do run pnpm --dir "$ROOT/packages/$pkg" pack --pack-destination "$PACKS"; done
+  for pkg in kit plugin-aws plugin-cri plugin-csv plugin-db plugin-io plugin-pdf plugin-system plugin-yubikey skill-version skill-repo pulpfixer; do run pnpm --dir "$ROOT/packages/$pkg" pack --pack-destination "$PACKS"; done
   run npm install -g "$PACKS"/*.tgz
   rm -rf "$PACKS"
 else

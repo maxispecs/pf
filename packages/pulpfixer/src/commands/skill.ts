@@ -1,6 +1,7 @@
 import type { Context } from '@pulpfixer/kit/context';
 import { discoverSkills, shortDescription, type Skill } from '../skills/discover.js';
 import { defaultTargets, installSkills, listAvailable, removeSkills, targetsHelp, updateSkills } from '../skills/manage.js';
+import { SKILL_ALIASES, packagedSkill, packagedSkills } from '../skills/packages.js';
 import { searchRemote } from '../skills/registry.js';
 import { runSkill } from '../skills/run.js';
 import { err, out } from '@pulpfixer/kit/ui/palette';
@@ -62,19 +63,24 @@ async function registryCommand(ctx: Context, sub: string, rest: string[], dryRun
     return removeSkills(names, targets, { dryRun });
   }
   let wanted = names;
+  let searchFailed = false;
   if (all) {
+    // The skills that ship with pf come first and need no registry; the registry's ver and pnpm were replaced by them.
+    const shipped = packagedSkills().map((s) => s.name);
     const found = searchRemote();
     if (!found.skills) {
       process.stderr.write(`${badgeLabel('error', c)} could not search the registry: ${found.error}\n`);
-      return 1;
+      if (!shipped.length) return 1;
+      searchFailed = true;
     }
-    wanted = found.skills.map((s) => s.name);
+    wanted = [...shipped, ...(found.skills ?? []).map((s) => s.name).filter((n) => !packagedSkill(n))];
   }
   if (!wanted.length) {
     process.stderr.write(`${badgeLabel('error', c)} name the skills to install, or pass --all. ${termLine('pf skill available', c)} lists them.\n`);
     return 1;
   }
-  return installSkills(wanted, targets!, { dryRun, force });
+  const code = installSkills(wanted, targets!, { dryRun, force });
+  return searchFailed ? 1 : code;
 }
 
 export const skillCommand: Command = {
@@ -106,7 +112,7 @@ export const skillCommand: Command = {
       process.stderr.write(`${c.dim('next time:')} ${termLine(`pf skill ${skill.name}`, c)}\n`);
     } else {
       const name = rest.shift()!.replace(/^\//, '');
-      skill = skills.find((s) => s.name === name);
+      skill = skills.find((s) => s.name === name) ?? skills.find((s) => s.name === SKILL_ALIASES[name]);
       if (!skill) {
         const near = skills.filter((s) => s.name.includes(name)).map((s) => s.name);
         process.stderr.write(`${badgeLabel('error', c)} no skill named "${name}".${near.length ? ` Did you mean: ${near.join(', ')}?` : ''}\n`);

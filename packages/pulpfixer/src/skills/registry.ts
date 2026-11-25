@@ -22,6 +22,13 @@ export function isSkillPackage(name: string): boolean {
   return PACKAGE_RE.test(name);
 }
 
+/** The marker name of a skill copied out of one of pf's own skill packages (`@pulpfixer/skill-repo`). */
+const PACKAGED_RE = new RegExp(`^@pulpfixer/skill-${NAME}$`);
+
+export function isPackagedSkillPackage(name: string): boolean {
+  return PACKAGED_RE.test(name);
+}
+
 /** `@pf-skills-ver/ver` -> `ver`. */
 export function skillOfPackage(name: string): string | null {
   return PACKAGE_RE.exec(name)?.[1] ?? null;
@@ -153,7 +160,7 @@ export function inspectPath(dir: string): { kind: 'missing' | 'registry' | 'link
   }
   if (st.isSymbolicLink()) return { kind: 'link' };
   const pkg = readJson<{ name?: string; version?: string }>(dir, 'package.json');
-  if (st.isDirectory() && pkg?.name && isSkillPackage(pkg.name)) return { kind: 'registry', package: pkg.name, version: pkg.version ?? '0.0.0' };
+  if (st.isDirectory() && pkg?.name && (isSkillPackage(pkg.name) || isPackagedSkillPackage(pkg.name))) return { kind: 'registry', package: pkg.name, version: pkg.version ?? '0.0.0' };
   return { kind: 'other' };
 }
 
@@ -210,6 +217,26 @@ export function installTarball(tarball: string, dest: string, force = false): vo
     const extracted = path.join(work, 'package');
     const name = parseSkillFile(fs.readFileSync(path.join(extracted, 'SKILL.md'), 'utf8'), path.basename(dest)).name;
     if (name !== path.basename(dest)) throw new Error(`the package's SKILL.md is named "${name}", expected "${path.basename(dest)}"`);
+    placeSkill(extracted, dest, force);
+  } finally {
+    fs.rmSync(work, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Copy a skill that ships with pf (a folder in one of its skill packages) to `dest`, with a `package.json`
+ * naming the package and version, which marks the copy as ours so updates can replace it.
+ */
+export function installPackaged(skill: { dir: string; package: string; version: string; name: string }, dest: string, force = false): void {
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  const work = fs.mkdtempSync(path.join(path.dirname(dest), `.${path.basename(dest)}.pf-new-`));
+  try {
+    const extracted = path.join(work, 'package');
+    fs.cpSync(skill.dir, extracted, { recursive: true, dereference: true });
+    fs.writeFileSync(
+      path.join(extracted, 'package.json'),
+      JSON.stringify({ name: skill.package, version: skill.version, description: `${skill.name} skill, copied from ${skill.package}` }, null, 2) + '\n',
+    );
     placeSkill(extracted, dest, force);
   } finally {
     fs.rmSync(work, { recursive: true, force: true });

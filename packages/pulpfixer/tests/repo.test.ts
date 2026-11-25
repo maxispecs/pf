@@ -6,13 +6,13 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { isRepoSetUp, resolveTasksHelper, wireVerScript } from '../src/commands/repo.js';
 import { resolveVerCli } from '../src/commands/ver.js';
-import { homeSkillFile } from '../src/skills/stack.js';
+import { packagedSkill, packagedSkillFile, packagedSkills } from '../src/skills/packages.js';
 import { json, mkRepo } from './helpers.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const entry = path.join(root, 'src', 'bin', 'pf.ts');
 const loader = path.join(root, '..', '..', 'node_modules', 'tsx', 'dist', 'loader.mjs');
-const bundledVer = fs.readFileSync(path.join(root, 'assets', 'version.mjs'), 'utf8');
+const bundledVer = fs.readFileSync(resolveVerCli(), 'utf8');
 
 function pf(cwd: string, ...args: string[]) {
   return pfHome(mkRepo({}), cwd, ...args);
@@ -151,54 +151,33 @@ test('wireVerScript keeps a foreign ver script and uses versions instead', () =>
   assert.ok('versions' in pkg.scriptsInfo.Tools);
 });
 
-const bundledTasks = fs.readFileSync(path.join(root, 'assets', 'tasks.mjs'), 'utf8');
-
-/** A skills folder holding `ver` (and `pnpm`) the way `pf update` installs them. */
-function skillsHome(opts: { ver?: string; tasks?: string; link?: boolean } = {}): string {
-  const dir = mkRepo({});
-  const add = (name: string, rel: string, text: string) => {
-    fs.mkdirSync(path.join(dir, name, 'scripts'), { recursive: true });
-    fs.writeFileSync(path.join(dir, name, 'SKILL.md'), `---\nname: ${name}\n---\n`);
-    fs.writeFileSync(path.join(dir, name, 'package.json'), json({ name: `@pf-skills/${name}`, version: '9.0.0' }));
-    fs.writeFileSync(path.join(dir, name, rel), text);
-  };
-  if (opts.ver !== undefined) add('ver', 'scripts/version.mjs', opts.ver);
-  if (opts.tasks !== undefined) add('pnpm', 'scripts/tasks.mjs', opts.tasks);
-  return dir;
-}
+const bundledTasks = fs.readFileSync(resolveTasksHelper(), 'utf8');
 
 const withRevision = (n: number) => bundledVer.replace(/const CLI_VERSION = \d+;/, `const CLI_VERSION = ${n};`);
 
-test('resolveVerCli takes the newest of the ~/.pf/skills copy and the bundled one; a tie goes to the skill', () => {
-  const bundledRev = Number(/const CLI_VERSION = (\d+);/.exec(bundledVer)![1]);
-  const newer = skillsHome({ ver: withRevision(bundledRev + 1) });
-  assert.equal(resolveVerCli(newer), path.join(newer, 'ver', 'scripts', 'version.mjs'));
-  const tie = skillsHome({ ver: withRevision(bundledRev) });
-  assert.equal(resolveVerCli(tie), path.join(tie, 'ver', 'scripts', 'version.mjs'));
-  const older = skillsHome({ ver: withRevision(Math.max(0, bundledRev - 1)) });
-  assert.equal(resolveVerCli(older), path.join(root, 'assets', 'version.mjs'));
-  assert.equal(resolveVerCli(skillsHome()), path.join(root, 'assets', 'version.mjs'));
+test('the version CLI and the pnpm helper come from the skill packages that ship with pf', () => {
+  const ver = resolveVerCli();
+  const tasks = resolveTasksHelper();
+  assert.match(ver.split(path.sep).join('/'), /skill-version\/skills\/version\/scripts\/version\.mjs$/);
+  assert.match(tasks.split(path.sep).join('/'), /skill-repo\/skills\/pnpm\/scripts\/tasks\.mjs$/);
+  assert.ok(fs.existsSync(ver) && fs.existsSync(tasks));
+  assert.equal(ver, packagedSkillFile('ver', 'scripts/version.mjs'), 'ver is an alias of version');
 });
 
-test('resolveTasksHelper prefers the pnpm skill in ~/.pf/skills, else the bundled helper', () => {
-  const home = skillsHome({ tasks: '// @skill pnpm\n' });
-  assert.equal(resolveTasksHelper(home), path.join(home, 'pnpm', 'scripts', 'tasks.mjs'));
-  assert.equal(resolveTasksHelper(skillsHome()), path.join(root, 'assets', 'tasks.mjs'));
+test('pf ships the version, pf-repo, deploy-setup and pnpm skills, and ver names version', () => {
+  const names = packagedSkills().map((s) => s.name);
+  assert.deepEqual(names, ['deploy-setup', 'pf-repo', 'pnpm', 'version']);
+  assert.equal(packagedSkill('ver')?.name, 'version');
+  assert.equal(packagedSkill('version')?.package, '@pulpfixer/skill-version');
+  assert.equal(packagedSkill('deploy-setup')?.package, '@pulpfixer/skill-repo');
+  assert.equal(packagedSkill('nope'), null);
+  for (const s of packagedSkills()) assert.match(fs.readFileSync(path.join(s.dir, 'SKILL.md'), 'utf8'), new RegExp(`^---\\nname: ${s.name}\\n`));
 });
 
-test('homeSkillFile accepts a registry install and a symlink, not a hand-made folder or a missing file', () => {
-  const home = skillsHome({ ver: 'x' });
-  assert.equal(homeSkillFile('ver', 'scripts/version.mjs', home), path.join(home, 'ver', 'scripts', 'version.mjs'));
-  assert.equal(homeSkillFile('ver', 'scripts/nope.mjs', home), null);
-  assert.equal(homeSkillFile('pnpm', 'scripts/tasks.mjs', home), null);
-
-  const checkout = skillsHome({ ver: 'x' });
-  const linked = mkRepo({});
-  fs.symlinkSync(path.join(checkout, 'ver'), path.join(linked, 'ver'));
-  assert.equal(homeSkillFile('ver', 'scripts/version.mjs', linked), path.join(linked, 'ver', 'scripts', 'version.mjs'));
-
-  const handMade = mkRepo({ 'ver/SKILL.md': '---\nname: ver\n---\n', 'ver/scripts/version.mjs': 'x' });
-  assert.equal(homeSkillFile('ver', 'scripts/version.mjs', handMade), null);
+test('this repo\'s own scripts/version.mjs and scripts/tasks.mjs are copies of the skill packages (pnpm skills:sync)', () => {
+  const repoRoot = path.resolve(root, '..', '..');
+  assert.equal(fs.readFileSync(path.join(repoRoot, 'scripts', 'version.mjs'), 'utf8'), bundledVer);
+  assert.equal(fs.readFileSync(path.join(repoRoot, 'scripts', 'tasks.mjs'), 'utf8'), bundledTasks);
 });
 
 test('pf update --repo-only refreshes the ver CLI and the pnpm helper copies, and leaves unrelated or newer files', () => {

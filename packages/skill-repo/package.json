@@ -1,0 +1,19 @@
+{
+  "name": "@pulpfixer/skill-repo",
+  "version": "1.0.0",
+  "description": "pf skills for working in a repo: pf-repo, deploy-setup and pnpm (the pnpm root commands helper), bundled with pf and used by pf repo",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "skills"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://cellars.staging.pangenea.com/"
+  }
+}

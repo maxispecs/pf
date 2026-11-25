@@ -5,7 +5,7 @@ One command line for every repo, in any language. Run `pf` in a repo to get its 
 ```
 pf              menu for this repo
 pf dev          run the app locally (any language)
-pf ver          versions and bumps (the /ver skill)
+pf ver          versions and bumps (the /version skill)
 ```
 
 Every invocation prints its version (`pf v2.0`) on stderr.
@@ -50,15 +50,15 @@ scripts/install.sh --dry-run      # show what would happen
 | `pf aws [grants\|revoke]` | AWS access the agent was granted: list it, end it |
 | `pf list` | The same list, static (for scripts and agents) |
 | `pf dev`, `build`, `test`, `lint`, `install` | Resolved per repo, see below. `--dry-run` prints, `--pick` chooses when several exist, `-- <args>` passes args on |
-| `pf ver [list\|bump\|init\|sync]` | Major.minor versioning with the bundled `/ver` CLI |
+| `pf ver [list\|bump\|init\|sync]` | Major.minor versioning with the `/version` skill's CLI |
 | `pf doc` (`pf docs`) | Run the docs site (Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo) |
 | `pf deploy` (`pf d`) | Deploy: staging if configured, else production, else the repo's own `deploy` (`pulpfixer.json`, a `deploy` script or `./a deploy`; production-like, always asks). `pf d "message"` passes a commit message to a target marked `"message": true`. `--dry-run`, `--yes`, `-m` |
 | `pf deploy staging` | Deploy to staging. `--dry-run`, `--yes`. Never production |
 | `pf skill [name]` | Pick and run an agent skill. `available`, `install`, `update`, `remove` manage skills from the registry |
 | `pf plugin [list\|available\|install\|update\|remove]` | Administer plugins from the registry. Without a command it opens an interactive menu. See [Plugins](#plugins) |
-| `pf update` (`pf u`) | Update pf, installed plugins, the `ver` and `pnpm` skills and registry skills, then this repo's copies of their helpers. `--check`, `--yes`, `--dry-run` |
+| `pf update` (`pf u`) | Update pf, installed plugins, registry skills and your copies of pf's own skills, then this repo's copies of the `version` and `pnpm` helpers. `--check`, `--yes`, `--dry-run` |
 | `pf init` | Write `pulpfixer.json` for this repo from what was detected |
-| `pf repo` (`pf rp`) | Hook pf's tools into this repo, or update them: the `/pnpm` root commands (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`) and `/ver` versioning (`versions.json`, `pnpm ver`). Updates every older ver CLI copy, prints what it did. Also reports what `pf d` runs, or, when the repo deploys through its own helper (`./tl d`, `./al d`), offers to start the agent with the bundled `deploy-setup` skill, which writes the `pulpfixer.json` entry (never runs the deploy). `--dry-run`, `--no-pnpm`, `--no-ver`, `--no-deploy`, `--deploy`. Never commits |
+| `pf repo` (`pf rp`) | Hook pf's tools into this repo, or update them: the `/pnpm` root commands (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`) and `/version` versioning (`versions.json`, `pnpm ver`). Updates every older ver CLI copy, prints what it did. Also reports what `pf d` runs, or, when the repo deploys through its own helper (`./tl d`, `./al d`), offers to start the agent with the `deploy-setup` skill, which writes the `pulpfixer.json` entry (never runs the deploy), but only for a whole deploy that works from the checkout: a step such as `deploy_migrations.sh`, a platform hook, a stub or a server-only helper is listed as not wired. `--dry-run`, `--no-pnpm`, `--no-ver`, `--no-deploy`, `--deploy`. Never commits |
 | `pf repo commit` (`pf g`) | Commit everything uncommitted (`git add -A`) with a message the agent writes from the last Cursor chat of the repo (`~/.cursor/projects/<repo>/agent-transcripts/`), or made from the chat's first request and last answer without an agent. Shows the files and message and asks first (`--yes` without a TTY). `-m <message>`, `--chat <id>`, `--agent <name>`, `--no-agent`, `--dry-run`. Never pushes (`pf gp`). Also the `repo:commit` action (`pf actions feature repo:commit` makes it a Repo Identity button) |
 | `pf host ...` | pf on EC2 instances: install, login, update, security patching and the fix agent. See [Hosts](#hosts-ec2) |
 | `pf s3 <file...>`, `pf dl [name]` | AWS plugin: upload to and download from a shared exchange bucket. See [AWS plugin](#aws-plugin) |
@@ -89,7 +89,7 @@ Built-in names (`dev`, `build`, ...) override detection. Other names show up in 
 
 ### Skills
 
-`pf skill` finds skills in `~/.cursor/skills`, `~/.cursor/skills-cursor`, `~/.agents/skills`, `~/.claude/skills`, the repo's `.cursor/skills`, `.agents/skills`, `.claude/skills`, pf's own folder `~/.pf/skills`, and the skills bundled with pf, in that order: a skill in an earlier directory wins over a later one with the same name. Skills in `~/.pf/skills` and the bundled ones run through `pf agent`, which reads them with the `pf_skill` tool, so they work with any agent CLI. `ver` and `pnpm` run their scripts directly. Others run through the agent CLI.
+`pf skill` finds skills in `~/.cursor/skills`, `~/.cursor/skills-cursor`, `~/.agents/skills`, `~/.claude/skills`, the repo's `.cursor/skills`, `.agents/skills`, `.claude/skills`, pf's own folder `~/.pf/skills`, and the skills bundled with pf, in that order: a skill in an earlier directory wins over a later one with the same name. Skills in `~/.pf/skills` and the bundled ones run through `pf agent`, which reads them with the `pf_skill` tool, so they work with any agent CLI. `version` (`ver`) and `pnpm` run their scripts directly. Others run through the agent CLI.
 
 #### Skills from the registry
 
@@ -97,17 +97,17 @@ The skills repo publishes each skill to cellars as `@pf-skills/<name>`, or `@pf-
 
 ```bash
 pf skill available                  # registry skills, their versions and where they are installed
-pf skill install ver bp             # latest version into pf's own folder, ~/.pf/skills
+pf skill install version bp         # into pf's own folder, ~/.pf/skills (version comes from pf, bp from the registry)
 pf skill install --all --to claude  # every skill, into ~/.claude/skills instead
 pf skill update [name...]           # bring registry installs to the latest (--check only reports)
-pf skill remove ver                 # delete a registry install
+pf skill remove version             # delete an install
 ```
 
 `--to` takes `pf` (the default), `cursor`, `claude`, `agents` or `all` (comma-separated); use an agent folder when that agent should see the skill outside `pf agent`. An install keeps the package's `package.json` in the skill folder; that marks it as a registry install. pf never replaces a symlink (a skills repo checkout) or a folder it did not install unless you pass `--force`. `pf update` also updates every registry install. A skill named `available`, `install`, `update`, `remove` or `run` runs as `pf skill run <name>`.
 
-#### Stack skills (ver, pnpm)
+#### Skills that ship with pf
 
-The `ver` and `pnpm` skills change often and pf runs their helper files itself (`pf ver`, `pf repo`, the agent's version tools). `pf update` therefore installs them into `~/.pf/skills` when missing and updates them there (a symlinked checkout or a hand-made folder is left alone). pf uses the newest of that copy and the one bundled in the pf package, which stays as the offline fallback (`pnpm skills:sync` refreshes it). Inside a repo, `pf update` then refreshes the repo's own copies from there: `scripts/version.mjs` (when its revision is older; a newer one is kept) and `scripts/tasks.mjs` (only a copy that is already the pnpm helper). It never installs a helper (that is `pf repo`), never commits, and `--check` / `--dry-run` only report.
+`version`, `pnpm`, `pf-repo` and `deploy-setup` are packages that pf depends on (`@pulpfixer/skill-version`, `@pulpfixer/skill-repo`), so they match the pf you run and pf reads their helper files (`pf ver`, `pf repo`) straight from its install. `pf skill install version pnpm --to claude` (or `--all`) copies them into an agent's folder, and `pf update` refreshes such copies. `pf update` also removes an old registry install of `ver` or `pnpm` from `~/.pf/skills` (a symlinked checkout is left alone and reported), and inside a repo refreshes the repo's own copies: `scripts/version.mjs` (when its revision is older; a newer one is kept) and `scripts/tasks.mjs` (only a copy that is already the pnpm helper). It never installs a helper (that is `pf repo`), never commits, and `--check` / `--dry-run` only report.
 
 ### Agent
 

@@ -1,7 +1,7 @@
 {
   "stack": {
-    "version": "3.45",
-    "since": "2026-11-24"
+    "version": "3.46",
+    "since": "2026-11-25"
   },
   "featured": [
     "packages/pulpfixer",
@@ -26,8 +26,8 @@
       "type": "node"
     },
     "packages/docs": {
-      "version": "2.22",
-      "since": "2026-11-24",
+      "version": "2.23",
+      "since": "2026-11-25",
       "type": "node"
     },
     "packages/ext-bg-tone": {
@@ -36,8 +36,8 @@
       "type": "node"
     },
     "packages/kit": {
-      "version": "6.14",
-      "since": "2026-11-20",
+      "version": "6.15",
+      "since": "2026-11-25",
       "type": "node"
     },
     "packages/plugin-aws": {
@@ -91,8 +91,18 @@
       "type": "node"
     },
     "packages/pulpfixer": {
-      "version": "7.15",
-      "since": "2026-11-24",
+      "version": "7.16",
+      "since": "2026-11-25",
+      "type": "node"
+    },
+    "packages/skill-repo": {
+      "version": "1.0",
+      "since": "2026-11-25",
+      "type": "node"
+    },
+    "packages/skill-version": {
+      "version": "1.0",
+      "since": "2026-11-25",
       "type": "node"
     },
     "packages/suite": {

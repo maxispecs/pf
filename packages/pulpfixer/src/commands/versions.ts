@@ -12,6 +12,7 @@ import { pfOnPath } from '../install/env.js';
 import { BUILTIN_PLUGINS } from '../plugins/index.js';
 import { loadFailures } from '../plugins/loader.js';
 import { bundledVersion, installedPlugins, pluginsDir } from '../plugins/registry.js';
+import { SKILL_PACKAGES, packagedSkills, skillPackageRoot, type PackagedSkill } from '../skills/packages.js';
 import { BUNDLED_LABEL, PF_SKILLS_LABEL, bundledSkillsDir, pfSkillsDir, shortDescription, skillsIn } from '../skills/discover.js';
 import { inspectPath, installedSkills, targetLabel } from '../skills/registry.js';
 import { cachedTemplates, templatePackage, type CachedTemplate } from '../templates/templates.js';
@@ -79,7 +80,7 @@ export function pathSection(installs = pfOnPath()): VersionSection {
   };
 }
 
-/** The packages that ship inside pf: the kit and the built-in plugins. */
+/** The packages that ship inside pf: the kit, the built-in plugins and the skill packages. */
 export function bundledSection(): VersionSection {
   return {
     id: 'bundled',
@@ -91,6 +92,12 @@ export function bundledSection(): VersionSection {
       ...BUILTIN_PLUGINS.map((p) => {
         const v = bundledVersion(p.name);
         return row(`@pulpfixer/plugin-${p.name}`, v, v ? shortDescription(p.summary, 60) : 'version not found', v ? 'ok' : 'warn');
+      }),
+      ...SKILL_PACKAGES.map((pkg) => {
+        const root = skillPackageRoot(pkg);
+        const v = root ? (readJson<{ version?: string }>(root, 'package.json')?.version ?? '') : '';
+        const skills = packagedSkills().filter((s) => s.package === pkg).map((s) => s.name);
+        return row(pkg, v, v ? `skills: ${skills.join(', ')}` : 'version not found', v ? 'ok' : 'warn');
       }),
     ],
   };
@@ -116,7 +123,12 @@ export function pluginsSection(): VersionSection {
  * (links to a checkout, hand-made folders) and the ones bundled with pf. Version comes from the package, or
  * from `metadata.version` in SKILL.md.
  */
-export function skillsSection(home = os.homedir(), bundled: string | null = bundledSkillsDir(), own: string | null = pfSkillsDir()): VersionSection {
+export function skillsSection(
+  home = os.homedir(),
+  bundled: string | null = bundledSkillsDir(),
+  own: string | null = pfSkillsDir(),
+  packaged: PackagedSkill[] = bundled === bundledSkillsDir() ? packagedSkills() : [],
+): VersionSection {
   const rows: VersionRow[] = [];
   const registry = installedSkills(home);
   for (const s of registry) rows.push(row(s.name, s.version, `${targetLabel(s.target)}, registry`));
@@ -134,6 +146,10 @@ export function skillsSection(home = os.homedir(), bundled: string | null = bund
       const overridden = registryHere.has(path.basename(s.dir)) || rows.some((r) => r.name === s.name && r.note.startsWith(PF_SKILLS_LABEL));
       rows.push(row(s.name, s.version ?? '', overridden ? `bundled with pf (${PF_SKILLS_LABEL} copy is used)` : 'bundled with pf'));
     }
+  }
+  for (const s of packaged) {
+    const overridden = registryHere.has(s.name) || rows.some((r) => r.name === s.name && r.note.startsWith(PF_SKILLS_LABEL));
+    rows.push(row(s.name, s.version, `bundled with pf (${s.package})${overridden ? `, ${PF_SKILLS_LABEL} copy is used` : ''}`));
   }
   return {
     id: 'skills',

@@ -12,7 +12,7 @@ Run `pf list` for the list that applies in the current directory, and `pf help` 
 | `pf list` | The same list, static (for scripts and agents) |
 | `pf dev`, `build`, `test`, `lint`, `install` | Resolved per repo. `--dry-run` prints, `--pick` chooses when several exist, `-- <args>` passes args on. See [Run, build and docs](/commands/run-and-build). `pf install [local\|<to>]` (`pf i`, `pf il`) runs the repo's `install:local` / `install:<to>` target, else installs dependencies |
 | `pf doc` (`pf docs`) | Run the docs site (Nextra, Docusaurus, VitePress, Starlight, mkdocs, Sphinx, mdBook, Hugo) |
-| `pf ver [list\|bump\|init\|sync]` | Major.minor versioning with the bundled `/ver` CLI. See [Versioning](/commands/ver) |
+| `pf ver [list\|bump\|init\|sync]` | Major.minor versioning with the `version` skill's CLI. See [Versioning](/commands/ver) |
 | `pf deploy` (`pf d`) | Deploy: staging if configured, else production, else the repo's own deploy, else the publish of a repo that only publishes. Optional commit message. See [Deploy and publish](/commands/deploy) |
 | `pf deploy staging` | Deploy to staging. `--dry-run`, `--yes`. See [Deploy and publish](/commands/deploy) |
 | `pf deploy production` | Only a `deploy:production` script or `pulpfixer.json` entry; always confirms |
@@ -49,7 +49,7 @@ Commands that run something support `--dry-run`. Short names such as `pf r` and 
 | Command | Notes |
 |---------|-------|
 | `pf setup` | Registry, completions and legacy cleanup. `--dry-run`, `--yes`, `--no-completions` |
-| `pf update` (`pf u`) | Update pf, installed plugins, the suite extensions installed in Cursor (Background Tone), the `ver` and `pnpm` skills and registry skills, then this repo's copies of their helpers. `--check`, `--yes`, `--dry-run` |
+| `pf update` (`pf u`) | Update pf, installed plugins, the suite extensions installed in Cursor (Background Tone), registry skills and your copies of pf's own skills, then this repo's copies of the `version` and `pnpm` helpers. `--check`, `--yes`, `--dry-run` |
 | `pf uninstall` | Remove pf. `--purge`, `--no-package`, `--no-shell`, `--yes`, `--dry-run` |
 | `pf doctor` | Check this machine and repo for problems. `--offline` |
 | `pf versions` (`pf vs`) | List the versions of everything pulpfixer-related installed here: pf, the bundled kit and plugins, registry plugins, skills, presets, the suite extensions in Cursor and templates. `--json`. No network. See [Versions](#versions) |
@@ -64,7 +64,7 @@ Commands that run something support `--dry-run`. Short names such as `pf r` and 
 | pf on PATH | Every `pf` on `PATH`, in order. A legacy (1.x) one or a shadowed one is flagged |
 | Bundled with pf | `@pulpfixer/kit` and the built-in plugins, at the versions this pf ships |
 | Plugins | Plugins installed from the registry (`~/.pf/plugins`), and whether each loaded |
-| Skills | Registry skills in `~/.pf/skills` and the agent folders (`~/.cursor`, `~/.claude`, `~/.agents`), what else sits in `~/.pf/skills`, and the skills bundled with pf, with the version from the package or from `metadata.version` in `SKILL.md` |
+| Skills | Registry skills in `~/.pf/skills` and the agent folders (`~/.cursor`, `~/.claude`, `~/.agents`), what else sits in `~/.pf/skills`, and the skills bundled with pf (the `@pulpfixer/skill-*` packages and `assets/skills`), with the version from the package or from `metadata.version` in `SKILL.md` |
 | Presets | The suite and the presets that `pf suite enable` and `pf sys apply` fetched into `~/.pf/sys/presets` |
 | Cursor extensions | The suite extensions (Background Tone), at the version Cursor has installed, with a hint when a newer one was fetched |
 | Templates | The templates `pf template apply` fetched into `~/.pf/templates` |

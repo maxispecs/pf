@@ -12,26 +12,20 @@ import { pick } from '@pulpfixer/kit/ui/picker';
 import { confirm } from '@pulpfixer/kit/ui/prompt';
 import { badgeLabel, h2, termLine, ul } from '@pulpfixer/kit/ui/text';
 import { exists, interactive, readText, takeFlag } from '@pulpfixer/kit/util';
-import { packageRoot } from '@pulpfixer/kit/version';
 import type { Command } from '@pulpfixer/kit/types';
 import { startAgent } from '../agent/launch.js';
-import { homeSkillFile } from '../skills/stack.js';
+import { packagedSkillFile } from '../skills/packages.js';
 import { pickDeploy, runDeployAuto } from './deploy.js';
 import { REPO_COMMIT_USAGE, runRepoCommit } from './repocommit.js';
 import { setupTone } from './tone.js';
 import { cliRevision, resolveVerCli } from './ver.js';
 
-/** Path of the /pnpm skill helper bundled with pf (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`); the offline fallback. */
-export function bundledTasksHelper(): string {
-  return path.join(packageRoot(), 'assets', 'tasks.mjs');
-}
-
 /**
- * The /pnpm helper pf copies into repos: the `pnpm` skill in pf's own folder (kept current by
- * `pf update`), else the bundled copy. The helper has no revision, so the registry copy counts as latest.
+ * The /pnpm helper pf copies into repos (`pnpm ask`, `pnpm doc`, `pnpm deploy:staging`): `scripts/tasks.mjs` of the
+ * `pnpm` skill, shipped in the pinned `@pulpfixer/skill-repo` package.
  */
-export function resolveTasksHelper(skillsDir?: string): string {
-  return homeSkillFile('pnpm', path.join('scripts', 'tasks.mjs'), skillsDir) ?? bundledTasksHelper();
+export function resolveTasksHelper(): string {
+  return packagedSkillFile('pnpm', path.join('scripts', 'tasks.mjs'));
 }
 
 /** Repo-relative paths where a repo may keep its copy of the pnpm helper. */
@@ -189,12 +183,20 @@ async function setupVer(root: string, dryRun: boolean, done: string[]): Promise<
 
 export type DeployKey = 'deploy' | 'deploy:staging' | 'deploy:production';
 
-/** What the agent is asked first. The skill carries the method; the ranked helpers are only hints. */
+/**
+ * What the agent is asked first. The skill carries the method; the helpers pf found are only hints: the ones that
+ * are a whole deploy from this checkout (`eligible`) as candidates, the rest as scripts pf already ruled out.
+ */
 export function deploySetupPrompt(helpers: DeployHelper[], key: DeployKey = 'deploy'): string {
-  const hints = helpers.length
-    ? `pf found these scripts at the repo root, best guess first: ${helpers.map((h) => `${h.file} (${h.reasons.join(', ')})`).join('; ')}. Check them yourself.`
-    : 'pf found no helper script at the repo root; look in the docs, a Makefile, a justfile or cli/.';
-  return `Set up pf deploy for this repo: call pf_skill with name "deploy-setup" and follow it. ${hints} The user chose the ${REPO_CONFIG} key "${key}". Use that key and do not ask. This session exits when you finish. Write ${REPO_CONFIG} only, then stop. pf will preview the deploy after you exit. Do not run the deploy.`;
+  const offered = helpers.filter((h) => h.eligible);
+  const ruledOut = helpers.filter((h) => !h.eligible);
+  const hints = offered.length
+    ? `pf found these scripts at the repo root, best guess first: ${offered.map((h) => `${h.file} (${h.reasons.join(', ')})`).join('; ')}. Check them yourself.`
+    : 'pf found no helper script at the repo root that is a whole deploy; look in the docs, a Makefile, a justfile or cli/. If nothing there is a whole deploy that runs from this checkout, write nothing.';
+  const ruled = ruledOut.length
+    ? ` pf already ruled these out, do not wire them: ${ruledOut.map((h) => `${h.file} (${h.rejected})`).join('; ')}.`
+    : '';
+  return `Set up pf deploy for this repo: call pf_skill with name "deploy-setup" and follow it. ${hints}${ruled} The user chose the ${REPO_CONFIG} key "${key}". Use that key and do not ask. This session exits when you finish. Write ${REPO_CONFIG} only, then stop. pf will preview the deploy after you exit. Do not run the deploy.`;
 }
 
 /** The environment question, asked here so the agent can run once and exit. No terminal means the plain `deploy` key. */
@@ -231,12 +233,15 @@ async function planDeploy(ctx: Context, opts: { force: boolean; dryRun: boolean 
     return { resolved, helpers: [], agent: false };
   }
   const helpers = findDeployHelpers(root);
-  const names = helpers.map((h) => `${h.file}${h.serverOnly ? ' (server only)' : ''}`).join(', ');
+  const offered = helpers.filter((h) => h.eligible);
+  // A script that only looks like a deploy (a step, a server hook, a stub) is reported, never offered.
+  for (const h of helpers.filter((x) => !x.eligible)) done.push(`deploy: not wired: ${h.file} (${h.rejected})`);
+  const names = offered.map((h) => h.file).join(', ');
   if (opts.dryRun) {
-    done.push(helpers.length || opts.force ? `deploy: would start the agent to wire pf d${names ? ` (candidates: ${names})` : ''}` : resolved ? `deploy: ${resolved}` : 'deploy: nothing found for pf d');
+    done.push(offered.length || opts.force ? `deploy: would start the agent to wire pf d${names ? ` (candidates: ${names})` : ''}` : resolved ? `deploy: ${resolved}` : 'deploy: nothing found for pf d');
     return { resolved, helpers, agent: false };
   }
-  if (helpers.length === 0 && !opts.force) {
+  if (offered.length === 0 && !opts.force) {
     done.push(resolved ? `deploy: ${resolved}` : 'deploy: nothing found for pf d, run pf rp --deploy to let the agent look');
     return { resolved, helpers, agent: false };
   }
@@ -403,10 +408,17 @@ export const repoCommand: Command = {
       const code = await startAgent(ctx, { prompt: deploySetupPrompt(deploy.helpers, key), once: true });
       if (code !== 0) return code;
       // The agent was told to exit when the file was written. Show what pf d resolves to now.
-      process.stderr.write(`\n${c.dim('pf d now:')}\n`);
-      const check = await runDeployAuto(buildContext(ctx.cwd), { dryRun: true });
-      if (check !== 0) return check;
-      details.unshift('pf d is wired: it asks before it runs, nothing was deployed');
+      const after = buildContext(ctx.cwd);
+      if (!pickDeploy(after)) {
+        // Nothing in the repo is a whole deploy that runs from here: the agent was right to write nothing.
+        process.stderr.write(`\n${badgeLabel('warning', c)} the agent wired nothing: no whole deploy that runs from this checkout. ${c.dim('pf d stays unset.')}\n`);
+        details.unshift('pf d is not wired: nothing in this repo is a whole deploy that runs from here');
+      } else {
+        process.stderr.write(`\n${c.dim('pf d now:')}\n`);
+        const check = await runDeployAuto(after, { dryRun: true });
+        if (check !== 0) return check;
+        details.unshift('pf d is wired: it asks before it runs, nothing was deployed');
+      }
     }
     if (!dryRun) printSuccessLogo({ version: ctx.version, repo: ctx.repo.name }, `${ctx.repo.name} is set up for pulpfixer`, details);
     return 0;

@@ -25,7 +25,8 @@ export function agentCommand(agent: string, skill: string, args: string[], cwd: 
  */
 export async function runDirect(ctx: Context, skill: Skill, args: string[], dryRun: boolean): Promise<number | null> {
   const c = err();
-  if (skill.name === 'ver') {
+  // `ver` is the old name of the version skill (a copy of it in an agent folder may still be called that).
+  if (skill.name === 'version' || skill.name === 'ver') {
     return dryRun ? (process.stderr.write(`${c.dim('would run')} ${termLine('pf ver ' + args.join(' '), c)}\n`), 0) : verCommand.run(ctx, args);
   }
   if (skill.name === 'pnpm') {

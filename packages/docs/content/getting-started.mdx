@@ -50,12 +50,12 @@ The full one-liner already ran the first two steps below (after the only-pf one,
 | Step | Command | What it does |
 |------|---------|--------------|
 | The pulpfixer suite | `pf suite enable` (list it with `pf suite`) | Applies the standard Cursor setup (extensions and `settings.json` values) and installs the suite extensions, today [Background Tone](/plugins/bg-tone) (a per-repo color tint and logo, plus action buttons for the repo). Additive: nothing is uninstalled, your other settings stay, and the old file is backed up first. Shows the plan and asks (`--yes` skips the question and is needed without a terminal, `--dry-run` previews). Reload the Cursor window afterwards. Optional features are named: `pf suite enable obsidian` applies the standard Obsidian settings to one vault (`--vault`), configuring the plugins the vault already has and never installing any |
-| Skills | `pf skill install --all` | Installs the registry skills into `~/.pf/skills` (`pf skill available` lists them; `--to claude`, `--to cursor` or `--to agents` puts them where that agent looks). pf also ships a few skills of its own (`pf-repo`, `ship-staging`, `fix-failing`, `deploy-setup`, `troubleshoot`, `query-package`, `pipe-package`, `io-adapter`), and `pf update` keeps the `ver` and `pnpm` skills current on its own |
+| Skills | `pf skill install --all` | Installs the registry skills into `~/.pf/skills` (`pf skill available` lists them; `--to claude`, `--to cursor` or `--to agents` puts them where that agent looks). pf also ships skills of its own (`version`, `pnpm`, `pf-repo`, `deploy-setup`, `ship-staging`, `fix-failing`, `troubleshoot`, `query-package`, `pipe-package`, `io-adapter`; `--all` copies the first four out of pf too), and they are always the ones that match your pf |
 | Check the machine | `pf doctor` | Checks the install, the registry, skills and agents, your config and the repo you are in |
 | Plugins | `pf plugin available`, then `pf plugin install <name>` | Optional registry plugins (`@pf-plugins/<name>`) that add commands. The AWS, YubiKey and system plugins are built in |
 | Your repos | `pf rp` (in each repo) | Links the repo to this machine, wires pf's versioning and pnpm helpers into it, sets the Background Tone logo and offers the suite install if Cursor lacks it |
 
-The suite and the skills are fetched at their latest version, so these commands also work as the way to bring a machine back to the standard. The Cursor standard on its own (without Background Tone) is `pf sys apply cursor`. Afterwards `pf update` (`pf u`) keeps pf, its plugins, the skills and the suite extensions you have installed current. It updates the `ver` and `pnpm` skills (installing them when missing) and registry skills you already have, but never installs a missing suite extension. See the [System plugin](/plugins/system), [Background Tone](/plugins/bg-tone) and [Skills](/concepts/skills) pages.
+The suite and the skills are fetched at their latest version, so these commands also work as the way to bring a machine back to the standard. The Cursor standard on its own (without Background Tone) is `pf sys apply cursor`. Afterwards `pf update` (`pf u`) keeps pf, its plugins, the skills and the suite extensions you have installed current. It updates the registry skills you already have and the copies you made of pf's own skills, but never installs a missing suite extension. See the [System plugin](/plugins/system), [Background Tone](/plugins/bg-tone) and [Skills](/concepts/skills) pages.
 
 ## Shortcuts at a glance
 
@@ -108,11 +108,11 @@ pf docs --dry-run
 
 ```bash
 pf update --check    # is there a newer version?
-pf update            # pf, installed plugins, the ver and pnpm skills and registry skills
+pf update            # pf, installed plugins and installed skills
 pf uninstall         # remove pf from this machine
 ```
 
-`pf update` also refreshes a repo's copies of the `ver` and `pnpm` helpers when you run it inside one. See [Skills](/concepts/skills#stack-skills-ver-pnpm).
+`pf update` also refreshes a repo's copies of the `version` and `pnpm` helpers when you run it inside one. See [Skills](/concepts/skills#skills-that-ship-with-pf).
 
 ## Set up a repo
 

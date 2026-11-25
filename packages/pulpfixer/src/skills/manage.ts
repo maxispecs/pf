@@ -6,11 +6,13 @@ import { err, out } from '@pulpfixer/kit/ui/palette';
 import { reporter } from '@pulpfixer/kit/ui/prompt';
 import { badgeLabel, termLine } from '@pulpfixer/kit/ui/text';
 import { compareVersions } from '@pulpfixer/kit/util';
-import { shortDescription } from './discover.js';
+import { parseSkillFile, shortDescription } from './discover.js';
 import {
   TARGET_IDS,
   inspectPath,
+  installPackaged,
   installRemote,
+  isPackagedSkillPackage,
   installedSkills,
   parseTargets,
   searchRemote,
@@ -21,7 +23,7 @@ import {
   type RemoteSkill,
   type TargetId,
 } from './registry.js';
-import { STACK_SKILLS } from './stack.js';
+import { RETIRED_SKILL_PACKAGES, packagedSkill, packagedSkills, type PackagedSkill } from './packages.js';
 
 const AUTH_HINT = 'Check NPM_TOKEN and the auth line in ~/.npmrc (pf setup fixes the latter)';
 
@@ -40,24 +42,31 @@ export function targetsHelp(): string {
 /** `pf skill available`: what the registry has, and what is installed here. */
 export function listAvailable(home = os.homedir()): number {
   const c = out();
+  const shipped = packagedSkills();
   const found = searchRemote();
   if (!found.skills) {
     process.stderr.write(`${badgeLabel('error', err())} could not search ${REGISTRY_URL}: ${found.error}\n${AUTH_HINT}\n`);
-    return 1;
+    if (!shipped.length) return 1;
   }
-  if (!found.skills.length) {
+  // The registry's ver and pnpm skills were replaced by the ones that ship with pf.
+  const remote = (found.skills ?? []).filter((s) => !packagedSkill(s.name));
+  const rows: RemoteSkill[] = [...shipped.map((s) => ({ name: s.name, package: s.package, version: s.version, description: skillDescription(s) })), ...remote].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
+  if (!rows.length) {
     process.stdout.write(`No @pf-skills packages on ${REGISTRY_URL}.\n`);
     return 0;
   }
   const installed = installedSkills(home);
-  const width = Math.max(0, ...found.skills.map((s) => s.name.length));
-  for (const s of found.skills) {
+  const width = Math.max(0, ...rows.map((s) => s.name.length));
+  for (const s of rows) {
     const mine = installed.filter((i) => i.name === s.name);
+    const bundled = shipped.some((p) => p.name === s.name) ? c.dim('ships with pf  ') : '';
     const state = !mine.length
-      ? c.dim('not installed')
+      ? `${bundled}${c.dim('not installed')}`
       : mine.some((i) => compareVersions(s.version, i.version) > 0)
         ? c.yellow(`update: ${mine.map((i) => `${i.target} v${short(i.version)}`).join(', ')}`)
-        : c.green(`installed: ${mine.map((i) => i.target).join(', ')}`);
+        : `${bundled}${c.green(`installed: ${mine.map((i) => i.target).join(', ')}`)}`;
     process.stdout.write(`  ${c.bold(s.name.padEnd(width))}  v${short(s.version).padEnd(5)}  ${c.dim(shortDescription(s.description, 60))}  ${state}\n`);
   }
   process.stdout.write(`\n${c.dim('install:')} ${termLine('pf skill install <name>', c)}\n`);
@@ -71,6 +80,12 @@ export function installSkills(names: string[], targets: TargetId[], opts: { dryR
   let fails = 0;
   for (const name of names) {
     r.step(name);
+    // A skill that ships with pf (version, pnpm, pf-repo, deploy-setup; `ver` is `version`) is copied from pf, not fetched.
+    const shipped = packagedSkill(name);
+    if (shipped) {
+      fails += placePackaged(shipped, targets, opts);
+      continue;
+    }
     const found = viewRemote(name);
     if (!found.skill) {
       r.fail(found.error!);
@@ -83,7 +98,28 @@ export function installSkills(names: string[], targets: TargetId[], opts: { dryR
   return fails ? 1 : 0;
 }
 
-function place(skill: RemoteSkill, targets: TargetId[], opts: { dryRun?: boolean; force?: boolean; home?: string }): number {
+const skillDescription = (s: PackagedSkill): string => {
+  try {
+    return parseSkillFile(fs.readFileSync(path.join(s.dir, 'SKILL.md'), 'utf8'), s.name).description;
+  } catch {
+    return '';
+  }
+};
+
+function placePackaged(skill: PackagedSkill, targets: TargetId[], opts: { dryRun?: boolean; force?: boolean; home?: string }): number {
+  return place({ name: skill.name, package: skill.package, version: skill.version, description: '' }, targets, opts, (dest) => {
+    try {
+      installPackaged(skill, dest, opts.force);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+}
+
+type Installer = (dest: string) => { ok: true } | { ok: false; error: string };
+
+function place(skill: RemoteSkill, targets: TargetId[], opts: { dryRun?: boolean; force?: boolean; home?: string }, install?: Installer): number {
   const r = reporter(out());
   let fails = 0;
   for (const target of targets) {
@@ -102,7 +138,7 @@ function place(skill: RemoteSkill, targets: TargetId[], opts: { dryRun?: boolean
       r.info(`would install ${label}`);
       continue;
     }
-    const done = installRemote(skill, dest, opts.force);
+    const done = install ? install(dest) : installRemote(skill, dest, opts.force);
     if (done.ok) r.ok(`${target}: installed v${short(skill.version)}${current.version ? ` (was v${short(current.version)})` : ''}`);
     else {
       r.fail(`${target}: ${done.error}`);
@@ -113,28 +149,27 @@ function place(skill: RemoteSkill, targets: TargetId[], opts: { dryRun?: boolean
 }
 
 /**
- * The stack skills (ver, pnpm) in pf's own folder: installed when missing, updated when older. A
- * symlinked checkout or a hand-made folder is left alone. `check` only reports.
+ * The ver and pnpm skills used to be registry installs of `@pf-skills/ver` and `@pf-skills/pnpm` in pf's own
+ * folder. pf now ships both (the `version` and `pnpm` skills), and a copy in `~/.pf/skills` would shadow the
+ * shipped one, so a registry install is removed. A symlink (a skills checkout) or a hand-made folder is never
+ * touched; it is reported. `check` and `dryRun` only report.
  */
-export function refreshStackSkills(opts: { check?: boolean; dryRun?: boolean; home?: string } = {}): number {
-  if (!opts.check) return installSkills([...STACK_SKILLS], ['pf'], { dryRun: opts.dryRun, home: opts.home });
+export function retireStackSkills(opts: { check?: boolean; dryRun?: boolean; home?: string } = {}): number {
   const r = reporter(out());
-  let fails = 0;
-  for (const name of STACK_SKILLS) {
-    const found = viewRemote(name);
-    if (!found.skill) {
-      r.fail(`${name}: ${found.error}`);
-      fails++;
-      continue;
+  for (const name of ['ver', 'pnpm']) {
+    const dir = path.join(targetDir('pf', opts.home), name);
+    const mine = inspectPath(dir);
+    if (mine.kind === 'registry' && RETIRED_SKILL_PACKAGES.includes(mine.package ?? '')) {
+      if (opts.check || opts.dryRun) r.info(`would remove ${dir}: pf ships its own ${name === 'ver' ? 'version' : name} skill now`);
+      else {
+        fs.rmSync(dir, { recursive: true, force: true });
+        r.ok(`removed ${dir}: pf ships its own ${name === 'ver' ? 'version' : name} skill now`);
+      }
+    } else if (mine.kind === 'link' || (mine.kind === 'other' && name === 'pnpm')) {
+      r.info(`${dir} is ${mine.kind === 'link' ? 'a symlink' : 'a folder'} pf no longer uses${name === 'pnpm' ? ', and it wins over the pnpm skill that ships with pf' : ''}: left alone`);
     }
-    const mine = inspectPath(path.join(targetDir('pf', opts.home), name));
-    if (mine.kind === 'missing') r.warn(`${name} v${short(found.skill.version)} is available (not installed in ${targetLabel('pf')})`);
-    else if (mine.kind !== 'registry') r.info(`${name}: ${mine.kind === 'link' ? 'a symlink' : 'not a registry install'} in ${targetLabel('pf')}, left alone`);
-    else if (compareVersions(found.skill.version, mine.version!) > 0) r.warn(`${name} v${short(found.skill.version)} is available (you have v${short(mine.version!)})`);
-    else r.ok(`${name} v${short(mine.version!)} is the latest`);
   }
-  if (fails) r.info(AUTH_HINT);
-  return fails ? 1 : 0;
+  return 0;
 }
 
 /**
@@ -143,22 +178,37 @@ export function refreshStackSkills(opts: { check?: boolean; dryRun?: boolean; ho
  */
 export function updateSkills(
   names: string[],
-  opts: { check?: boolean; dryRun?: boolean; home?: string; skipStack?: boolean } = {},
+  opts: { check?: boolean; dryRun?: boolean; home?: string } = {},
 ): number {
   const c = out();
   const r = reporter(c);
-  // `skipStack`: the stack skills in pf's folder were just handled by refreshStackSkills.
-  const all = installedSkills(opts.home).filter((s) => !(opts.skipStack && s.target === 'pf' && STACK_SKILLS.includes(s.name)));
+  const all = installedSkills(opts.home);
   const chosen = names.length ? all.filter((s) => names.includes(s.name)) : all;
   const unknown = names.filter((n) => !all.some((s) => s.name === n));
   for (const n of unknown) r.warn(`${n} is not installed from the registry (pf skill install ${n})`);
   if (!chosen.length) {
-    if (!names.length && !opts.skipStack) r.info(`no skills installed from the registry (see ${'pf skill available'})`);
+    if (!names.length) r.info(`no skills installed from the registry (see ${'pf skill available'})`);
     return unknown.length ? 1 : 0;
   }
   const latest = new Map<string, RemoteSkill | string>();
   let fails = 0;
   for (const s of chosen) {
+    // A copy of a skill that ships with pf follows the version of the package inside this pf.
+    if (isPackagedSkillPackage(s.package)) {
+      const shipped = packagedSkill(s.name);
+      if (!shipped) {
+        r.info(`${s.name} (${s.target}) is not a skill this pf ships: left alone`);
+        continue;
+      }
+      if (compareVersions(shipped.version, s.version) <= 0) {
+        r.ok(`${s.name} (${s.target}) v${short(s.version)} is the latest`);
+      } else if (opts.check) {
+        r.warn(`${s.name} (${s.target}) v${short(shipped.version)} is available (you have v${short(s.version)})`);
+      } else {
+        fails += placePackaged(shipped, [s.target], { dryRun: opts.dryRun, home: opts.home });
+      }
+      continue;
+    }
     if (!latest.has(s.package)) {
       const found = viewRemote(s.package);
       latest.set(s.package, found.skill ?? found.error!);

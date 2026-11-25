@@ -11,7 +11,7 @@ import { displayVersion } from '@pulpfixer/kit/version';
 import { fetchLatest } from '../update/check.js';
 import { updateSuiteExtensions } from '@pulpfixer/plugin-system';
 import { updatePlugins } from '../plugins/manage.js';
-import { refreshStackSkills, updateSkills } from '../skills/manage.js';
+import { retireStackSkills, updateSkills } from '../skills/manage.js';
 import { TASKS_HELPER_PATHS, findVerCopies, isTasksHelper, resolveTasksHelper } from './repo.js';
 import { cliRevision, findVersionsRoot, resolveVerCli } from './ver.js';
 import type { Command } from '@pulpfixer/kit/types';
@@ -51,9 +51,8 @@ function hasRepoTools(ctx: Context): boolean {
 }
 
 /**
- * Refresh the repo's copies of the stack helpers (the /ver CLI and the /pnpm helper) from the newest
- * ones pf has: the skills in ~/.pf/skills, else the bundled files. Never installs a helper (pf repo
- * does), never touches versions.json or package.json, never commits. `check` only reports.
+ * Refresh the repo's copies of the stack helpers (the version CLI and the pnpm helper) from the ones that ship
+ * with pf (`@pulpfixer/skill-*`). Never installs a helper (pf repo does), never touches versions.json or package.json, never commits. `check` only reports.
  */
 function refreshRepoTools(ctx: Context, dryRun: boolean, check = false): number {
   const r = reporter(out());
@@ -100,16 +99,17 @@ function refreshRepoTools(ctx: Context, dryRun: boolean, check = false): number 
 }
 
 /**
- * Plugins, skills and the suite extensions in Cursor (Background Tone) follow pf: `pf update` updates them too. The stack skills
- * (ver, pnpm) are installed into ~/.pf/skills when missing; the repo refresh then copies from there.
+ * Plugins, skills and the suite extensions in Cursor (Background Tone) follow pf: `pf update` updates them too. The version and
+ * pnpm skills ship with pf (pinned packages), so an old registry install of them in ~/.pf/skills is removed and
+ * copies of them that the user installed elsewhere (`pf skill install`) are refreshed from pf.
  */
 async function refreshAddons(check: boolean, dryRun: boolean): Promise<number> {
   const r = reporter(out());
   r.step('Plugins');
   const plugins = await updatePlugins([], { check, dryRun });
   r.step('Skills');
-  const stack = refreshStackSkills({ check, dryRun });
-  const skills = updateSkills([], { check, dryRun, skipStack: true });
+  const stack = retireStackSkills({ check, dryRun });
+  const skills = updateSkills([], { check, dryRun });
   r.step('Cursor extensions');
   const extensions = await updateSuiteExtensions({ check, dryRun });
   return plugins || stack || skills || extensions;
@@ -117,7 +117,7 @@ async function refreshAddons(check: boolean, dryRun: boolean): Promise<number> {
 
 export const updateCommand: Command = {
   name: 'update',
-  summary: 'Update pf, its plugins, suite extensions, the ver and pnpm skills and this repo\'s copies from cellars',
+  summary: 'Update pf, its plugins, suite extensions, installed skills and this repo\'s copies of the version and pnpm helpers from cellars',
   group: 'Tools',
   usage: 'pf update [--check] [--yes] [--dry-run]',
   async run(ctx, args) {
@@ -167,7 +167,7 @@ export const updateCommand: Command = {
     if (!dryRun) r.ok(`updated to v${displayVersion(found.version)}`);
     const skills = await refreshAddons(false, dryRun);
     if (dryRun) return skills;
-    // The repo refresh must use the new version's bundled fallback files, so hand over to the new binary.
+    // The repo refresh must use the new version's skill packages (the version CLI and pnpm helper), so hand over to the new binary.
     if (hasRepoTools(ctx)) return (await runCmd({ argv: ['pf', 'update', '--repo-only'], cwd: ctx.cwd }, { quiet: true })) || skills;
     return skills;
   },

@@ -35,7 +35,11 @@ test('bundled packages report the versions they ship with', () => {
   assert.match(bundledPackageVersion('@pulpfixer/kit', '@pulpfixer/kit/version'), /^\d+\.\d+/);
   assert.equal(bundledPackageVersion('@pulpfixer/kit', 'node:fs'), '');
   const rows = bundledSection().rows.map((r) => r.name);
-  assert.deepEqual(rows, ['@pulpfixer/kit', '@pulpfixer/plugin-aws', '@pulpfixer/plugin-cri', '@pulpfixer/plugin-yubikey', '@pulpfixer/plugin-system', '@pulpfixer/plugin-db', '@pulpfixer/plugin-io', '@pulpfixer/plugin-csv', '@pulpfixer/plugin-pdf']);
+  assert.deepEqual(rows, ['@pulpfixer/kit', '@pulpfixer/plugin-aws', '@pulpfixer/plugin-cri', '@pulpfixer/plugin-yubikey', '@pulpfixer/plugin-system', '@pulpfixer/plugin-db', '@pulpfixer/plugin-io', '@pulpfixer/plugin-csv', '@pulpfixer/plugin-pdf', '@pulpfixer/skill-version', '@pulpfixer/skill-repo']);
+  const skills = bundledSection().rows.filter((r) => r.name.includes('skill-'));
+  assert.ok(skills.every((r) => /^\d+\.\d+/.test(r.version) && r.state === 'ok'));
+  assert.match(skills.map((r) => r.note).join(' '), /skills: version/);
+  assert.match(skills.map((r) => r.note).join(' '), /deploy-setup, pf-repo, pnpm/);
 });
 
 test('a legacy pf on PATH is flagged and a shadowed one is a warning', () => {
