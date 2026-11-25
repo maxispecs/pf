@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { LOGO_EXTENSIONS, toRelativeLogoPath, validateLogoPath } from './logo.ts';
+import { LOGO_EXTENSIONS, logoPathFromDrop, toRelativeLogoPath, validateLogoPath } from './logo.ts';
 import { primaryFolder } from './settings.ts';
 
 /** Larger images are ignored: they would slow down the webviews for no visual gain. */
@@ -156,6 +156,31 @@ export async function pickLogoPath(): Promise<string | undefined> {
 		return undefined;
 	}
 	return rel;
+}
+
+/**
+ * The logo path for files dropped on the Repo Identity card. `dropped` comes from the page, so it is only a list of
+ * candidates: the file must be an image inside this repo. Returns undefined (after saying why) otherwise.
+ */
+export function droppedLogoPath(dropped: unknown): string | undefined {
+	const folder = primaryFolder();
+	if (folder?.uri.scheme !== 'file') {
+		void vscode.window.showInformationMessage('Background Tone: open a local folder to set a repo logo by dropping an image.');
+		return undefined;
+	}
+	const result = logoPathFromDrop(folder.uri.fsPath, dropped);
+	if (result.ok) {
+		return result.path;
+	}
+	const message =
+		result.reason === 'type'
+			? `Background Tone: the logo must be an image (${LOGO_EXTENSIONS.join(', ')}).`
+			: result.reason === 'outside'
+				? `Background Tone: the logo must be an image file inside this repo (${folder.name}). ` +
+					'Copy it into the repo first so the reference stays valid for everyone who clones it.'
+				: 'Background Tone: drag an image from the Explorer onto the card, holding Shift while you drop it.';
+	void vscode.window.showWarningMessage(message);
+	return undefined;
 }
 
 /** Pretty URL for a webview, with the mtime appended so edits to the file show up. */

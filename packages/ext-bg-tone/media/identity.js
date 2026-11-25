@@ -75,6 +75,7 @@
 			return logoEl;
 		}
 		const logo = h('div', 'logo');
+		logo.title = 'Repo logo. To change it, drag an image from the Explorer here and hold Shift while you drop it.';
 		if (state.logoSrc) {
 			const img = document.createElement('img');
 			img.src = state.logoSrc;
@@ -231,6 +232,69 @@
 	}
 
 	setInterval(updateAgentTime, 30000);
+
+	// Dropping an image on the card makes it the repo logo. The workbench only lets a drag from the Explorer into a
+	// webview while Shift is held. Only the dropped paths go to the extension, which checks them.
+	const DROP_TYPES = ['application/vnd.code.uri-list', 'text/uri-list', 'resourceurls', 'text/plain'];
+	let dropTimer = 0;
+
+	function canDrop(dataTransfer) {
+		const types = Array.from((dataTransfer && dataTransfer.types) || [], t => String(t).toLowerCase());
+		return types.includes('files') || DROP_TYPES.some(t => types.includes(t));
+	}
+
+	function droppedItems(dataTransfer) {
+		const items = [];
+		for (const type of DROP_TYPES) {
+			let text = '';
+			try {
+				text = dataTransfer.getData(type) || '';
+			} catch {
+				text = '';
+			}
+			if (!text) {
+				continue;
+			}
+			if (type === 'resourceurls') {
+				try {
+					const list = JSON.parse(text);
+					if (Array.isArray(list)) {
+						items.push(...list.filter(item => typeof item === 'string'));
+					}
+				} catch {
+					// not a list: ignore it
+				}
+				continue;
+			}
+			items.push(...text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')));
+		}
+		return items.slice(0, 50);
+	}
+
+	/** The drop highlight goes away shortly after the last dragover (dragleave is unreliable across nested elements). */
+	function showDropTarget() {
+		document.body.classList.add('logo-drop');
+		clearTimeout(dropTimer);
+		dropTimer = setTimeout(() => document.body.classList.remove('logo-drop'), 150);
+	}
+
+	window.addEventListener('dragover', event => {
+		if (!canDrop(event.dataTransfer)) {
+			return;
+		}
+		event.preventDefault();
+		event.dataTransfer.dropEffect = 'copy';
+		showDropTarget();
+	});
+	window.addEventListener('drop', event => {
+		if (!canDrop(event.dataTransfer)) {
+			return;
+		}
+		event.preventDefault();
+		clearTimeout(dropTimer);
+		document.body.classList.remove('logo-drop');
+		vscode.postMessage({ type: 'dropLogo', items: droppedItems(event.dataTransfer) });
+	});
 
 	window.addEventListener('message', event => {
 		const message = event.data;

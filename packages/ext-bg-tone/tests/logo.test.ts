@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
 	validateLogoPath,
 	toRelativeLogoPath,
+	logoPathFromDrop,
 	normalizeLogoLocations,
 	normalizeTitlePrefix,
 	buildWindowTitle,
@@ -45,6 +47,30 @@ test('toRelativeLogoPath only returns paths inside the root', () => {
 	assert.equal(toRelativeLogoPath(root, path.join(root, '..', 'other', 'logo.png')), undefined);
 	assert.equal(toRelativeLogoPath(root, path.join(root, 'notes.txt')), undefined);
 	assert.equal(toRelativeLogoPath(root, root), undefined);
+});
+
+test('logoPathFromDrop takes the first image inside the root from URIs or absolute paths', () => {
+	const root = path.join(path.sep, 'work', 'repo');
+	const logo = path.join(root, 'assets', 'logo.png');
+	assert.deepEqual(logoPathFromDrop(root, [pathToFileURL(logo).href]), { ok: true, path: 'assets/logo.png' });
+	assert.deepEqual(logoPathFromDrop(root, [logo]), { ok: true, path: 'assets/logo.png' });
+	assert.deepEqual(
+		logoPathFromDrop(root, ['# comment', 'https://example.com/a.png', pathToFileURL(path.join(root, 'README.md')).href, logo]),
+		{ ok: true, path: 'assets/logo.png' },
+	);
+});
+
+test('logoPathFromDrop says why nothing was usable', () => {
+	const root = path.join(path.sep, 'work', 'repo');
+	assert.deepEqual(logoPathFromDrop(root, [path.join(root, 'notes.txt')]), { ok: false, reason: 'type' });
+	assert.deepEqual(logoPathFromDrop(root, [path.join(root, '..', 'other', 'logo.png')]), { ok: false, reason: 'outside' });
+	assert.deepEqual(
+		logoPathFromDrop(root, [path.join(path.sep, 'tmp', 'a.png'), path.join(root, 'notes.txt')]),
+		{ ok: false, reason: 'type' },
+	);
+	for (const bad of [undefined, 'a.png', [], ['relative/a.png', 'https://example.com/a.png', 42, `${root}/a.png\0`]]) {
+		assert.deepEqual(logoPathFromDrop(root, bad), { ok: false, reason: 'none' }, String(bad));
+	}
 });
 
 test('normalizeLogoLocations', () => {

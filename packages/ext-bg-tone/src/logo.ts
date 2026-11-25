@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** Image types a repo logo may use. SVG renders crisp at any size. */
 export const LOGO_EXTENSIONS: readonly string[] = ['.png', '.svg', '.jpg', '.jpeg', '.webp', '.gif', '.ico'];
@@ -49,6 +50,59 @@ export function toRelativeLogoPath(rootFsPath: string, fileFsPath: string): stri
 	const posix = relative.split(path.sep).join('/');
 	const result = validateLogoPath(posix);
 	return result.ok ? result.path : undefined;
+}
+
+/** A drag carries one file or a few; a longer list from the page is cut. */
+const MAX_DROPPED_ITEMS = 50;
+const MAX_DROPPED_LENGTH = 4096;
+
+export type LogoDropResult =
+	| { ok: true; path: string }
+	| { ok: false; reason: 'none' | 'outside' | 'type' };
+
+/** A dropped `file:` URI or absolute path as a file system path; anything else (other schemes, relative text) is not a file. */
+function droppedFsPath(item: unknown): string | undefined {
+	if (typeof item !== 'string' || item === '' || item.length > MAX_DROPPED_LENGTH || item.includes('\0')) {
+		return undefined;
+	}
+	if (/^file:/i.test(item)) {
+		try {
+			return fileURLToPath(item);
+		} catch {
+			return undefined;
+		}
+	}
+	return path.isAbsolute(item) ? path.normalize(item) : undefined;
+}
+
+/**
+ * The logo path for what was dropped on the Repo Identity card (`file:` URIs or absolute paths, as the page read them
+ * from the drag). The first image inside the root wins. Otherwise the reason: `type` when a dropped file is inside the
+ * repo but not an image, `outside` when the files are elsewhere, `none` when nothing was a file.
+ */
+export function logoPathFromDrop(rootFsPath: string, dropped: unknown): LogoDropResult {
+	if (!Array.isArray(dropped)) {
+		return { ok: false, reason: 'none' };
+	}
+	let reason: 'none' | 'outside' | 'type' = 'none';
+	for (const item of dropped.slice(0, MAX_DROPPED_ITEMS)) {
+		const file = droppedFsPath(item);
+		if (!file) {
+			continue;
+		}
+		const rel = toRelativeLogoPath(rootFsPath, file);
+		if (rel) {
+			return { ok: true, path: rel };
+		}
+		const relative = path.relative(rootFsPath, file);
+		const inside = relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+		if (inside) {
+			reason = 'type';
+		} else if (reason === 'none') {
+			reason = 'outside';
+		}
+	}
+	return { ok: false, reason };
 }
 
 export function normalizeLogoLocations(input: unknown): LogoLocation[] {

@@ -47,6 +47,8 @@ Keys: `enabled`, `color`, `strength` (0 to 0.3), `surfaces`, `baseColors`, `acce
 
 The Repo Identity card appears once the repo has a logo or a tone color, and also in any repo that has a `pulpfixer.json` (what `pf rp` creates), even with no color or logo yet: it then shows the repo name (with a letter in place of the logo) and the action buttons.
 
+To change the logo, drag an image from the Explorer onto the card and hold **Shift** while you drop it (Cursor and VS Code only let a drag into a webview through with Shift). The logo box gets a dashed outline while you drag. The image must be inside the repo (`.png`, `.svg`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.ico`); anything else is refused with a message, and the path is written to `bgTone.logo` in `pulpfixer.json` like the picker does.
+
 A repo that still keeps `bgTone.*` values in `.vscode/settings.json` keeps working: they are read until the first change moves them into `pulpfixer.json`. `bgTone.showLastAgent` (the last Cursor chats on the identity card) is personal, so it stays a normal VS Code user setting.
 
 The colors the extension derives from these values (`workbench.colorCustomizations`, an optional `window.title`) are written to the workspace's `.vscode/settings.json`, as before. They are recomputed from `pulpfixer.json` on every machine, so there is nothing to commit there.

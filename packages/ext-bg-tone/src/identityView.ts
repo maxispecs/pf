@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
-import { LogoService } from './logoService.ts';
+import { LogoService, droppedLogoPath } from './logoService.ts';
 import * as path from 'node:path';
 import { AgentRun, readChatTitles, readRecentAgentRuns } from './agentRuns.ts';
 import type { ActionsService } from './actionsService.ts';
 import { CardActions, CardAgent, CardCache, CardCommit, CardSnapshot, composeSnapshot, escapeAttribute, NO_ACTIONS } from './cardCache.ts';
-import { primaryFolder, readConfig, repoName } from './settings.ts';
+import { primaryFolder, readConfig, repoName, updateBgTone } from './settings.ts';
 import { identityVisible } from './repoConfig.ts';
 import { isPfRepo } from './store.ts';
 import { VERSIONS_FILE, parseStackVersion } from './stackVersion.ts';
@@ -216,7 +216,7 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 				this.stopPolling();
 			}
 		}, null, this.disposables);
-		view.webview.onDidReceiveMessage((m: { type?: string; id?: unknown; target?: unknown; part?: unknown; on?: unknown }) => {
+		view.webview.onDidReceiveMessage((m: { type?: string; id?: unknown; target?: unknown; part?: unknown; on?: unknown; items?: unknown }) => {
 			if (m?.type === 'ready') {
 				this.refresh();
 				void this.actions.refresh();
@@ -238,6 +238,12 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 				void this.versions.commit().then(() => this.refresh());
 			} else if (m?.type === 'editActions') {
 				void vscode.commands.executeCommand('bgTone.openSettings', 'actions');
+			} else if (m?.type === 'dropLogo') {
+				// Only candidate paths come from the page; the logo must be an image file inside this repo.
+				const rel = droppedLogoPath(m.items);
+				if (rel) {
+					void updateBgTone(this.context, 'logo', rel);
+				}
 			}
 		}, null, this.disposables);
 	}

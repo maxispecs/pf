@@ -99,7 +99,9 @@ along with `doc`.
 ## Repo logo
 
 Choose an image that lives inside the repo (the picker refuses files outside it, and `..` or absolute paths in
-`bgTone.logo` are ignored), so the reference stays valid for everyone who clones the repo. The logo shows in:
+`bgTone.logo` are ignored), so the reference stays valid for everyone who clones the repo. You can also drag an
+image from the Explorer onto the Repo Identity card: hold **Shift** while you drop it (the editor only lets a drag
+into a webview through with Shift), and it becomes the logo. The same rule applies: an image inside the repo. The logo shows in:
 
 - the **Repo Identity** card at the top of the Explorer (it also shows, without a logo or color, in a repo that has a `pulpfixer.json`, which `pf rp` creates; the logo is then a letter) (logo, a large repo name, and a list with the
   last 3 Cursor agent chats for this repo: each one's agent tab title and how long ago it was active ("running" while it works). Chats are found in
