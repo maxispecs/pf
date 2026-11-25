@@ -1,6 +1,6 @@
 {
   "name": "pulpfixer",
-  "version": "7.13.0",
+  "version": "7.15.0",
   "description": "pf: unified developer CLI for any repo, any language",
   "license": "MIT",
   "author": "Max Glotov, Sam Pretorius",
@@ -18,6 +18,7 @@
   "dependencies": {
     "@pulpfixer/kit": "workspace:*",
     "@pulpfixer/plugin-aws": "workspace:*",
+    "@pulpfixer/plugin-cri": "workspace:*",
     "@pulpfixer/plugin-csv": "workspace:*",
     "@pulpfixer/plugin-db": "workspace:*",
     "@pulpfixer/plugin-io": "workspace:*",

@@ -35,7 +35,7 @@ test('bundled packages report the versions they ship with', () => {
   assert.match(bundledPackageVersion('@pulpfixer/kit', '@pulpfixer/kit/version'), /^\d+\.\d+/);
   assert.equal(bundledPackageVersion('@pulpfixer/kit', 'node:fs'), '');
   const rows = bundledSection().rows.map((r) => r.name);
-  assert.deepEqual(rows, ['@pulpfixer/kit', '@pulpfixer/plugin-aws', '@pulpfixer/plugin-yubikey', '@pulpfixer/plugin-system', '@pulpfixer/plugin-db', '@pulpfixer/plugin-io', '@pulpfixer/plugin-csv', '@pulpfixer/plugin-pdf']);
+  assert.deepEqual(rows, ['@pulpfixer/kit', '@pulpfixer/plugin-aws', '@pulpfixer/plugin-cri', '@pulpfixer/plugin-yubikey', '@pulpfixer/plugin-system', '@pulpfixer/plugin-db', '@pulpfixer/plugin-io', '@pulpfixer/plugin-csv', '@pulpfixer/plugin-pdf']);
 });
 
 test('a legacy pf on PATH is flagged and a shadowed one is a warning', () => {

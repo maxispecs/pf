@@ -1,0 +1,104 @@
+---
+title: CRI events plugin
+---
+
+# CRI events plugin
+
+The built-in `cri` plugin sends events to the CRI event system: an event is a message dispatched on a bus to a string route. It follows the microservices spec (events, landscape and serialization chapters): **publishers** are configured per route prefix, and a helper, `dispatch(route, payload)`, sends an event through the publisher its route selects.
+
+The transport is Amazon EventBridge, through the same `aws events put-events` code as [`pf events put`](/plugins/aws#sending-events-eventbridge). The aws CLI must be on PATH. The plugin builds on `@pulpfixer/plugin-aws` (`/api`), the one built-in plugin that depends on another; dependencies still point one way (core, then cri, then aws, then kit).
+
+## Setup
+
+```bash
+pf cri identity --domain orders --stack orders-api        # who sends: saved in this repo's pulpfixer.json ("cri" section)
+pf cri publisher add --bus orders --region eu-west-1       # the default publisher
+pf cri publisher add @payments/ --bus payments --profile pay --source orders-api
+pf cri                                                     # list identity and publishers
+```
+
+### Publishers
+
+A publisher is one transport client plus its configuration, kept per machine in `~/.pf/cri/publishers.json` (mode 0600).
+
+| Field | Meaning |
+|-------|---------|
+| `prefix` | the route prefix it handles (`@payments/`, `audit/`). It must end with `/`, so `audit/` matches `audit/log` but not `auditor/log`. No prefix: the **default publisher** |
+| `bus` | the EventBridge event bus, a name or an ARN. Required |
+| `region` | the AWS region (otherwise the aws CLI's default) |
+| `profile` | the AWS profile to use (otherwise the aws CLI's default chain: `AWS_*` variables, the default profile) |
+| `source` | the `Source` of the events. Defaults to the stack name |
+
+A publisher never holds a key. Credentials come from the profile or the environment, as the aws CLI resolves them. Nothing secret is saved.
+
+Selection follows the spec: publishers whose prefix starts the route are candidates and the **longest prefix wins** (`@payments/refunds/` overrides `@payments/`); with no match the default publisher takes the event, `@domain/...` routes included. With no match and no default publisher dispatch fails and says which publisher to add.
+
+```bash
+pf cri publisher add [<prefix>] --bus <name|arn> [--region r] [--profile p] [--source s] [--default] [--dry-run]
+pf cri publisher remove <prefix|default>
+pf cri publisher test <route>        # which publisher would a route use
+```
+
+In a terminal `publisher add` asks for what is missing; without one, give the flags.
+
+### Identity
+
+`domain` and `stack` identify the sender and go into every event's `_meta` (`source_domain`, `source_stack`). They live in the repo, in the `cri` section of `pulpfixer.json`:
+
+```json
+{ "cri": { "domain": "orders", "stack": "orders-api" } }
+```
+
+## Sending from the command line
+
+```bash
+pf cri send users/create --args '{"name": "Alice"}'
+pf cri send @payments/charge --args-file charge.json --correlation-id corr_x9y8z7
+echo '{"id": 1}' | pf cri send audit/log --args-file - --yes
+pf cri send users/create --args '{}' --dry-run     # check and show the event, send nothing
+```
+
+| Flag | Meaning |
+|------|---------|
+| `--args <json>` / `--args-file <path\|->` | the arguments, a JSON object (`-` is standard input). Default `{}`. A top-level `_meta` key is refused |
+| `--correlation-id`, `--causation-id`, `--topic-id`, `--hash` | the matching `_meta` fields. A correlation id is made when none is given |
+| `--json` | print `{ id, eventId, route, publisher, bus }` instead of the event id |
+| `--dry-run` | validate and show the event without sending it |
+| `--yes` | send without asking. Without a terminal it is required (exit 2 otherwise) |
+
+pf shows the publisher, bus and event and asks before it sends, because an event reaches other systems. The event id (EventBridge's) goes to stdout. Exit 2 is a usage error, 1 a failure or a declined send.
+
+## Sending from code: dispatch
+
+```ts
+import { dispatch } from '@pulpfixer/plugin-cri/api';
+
+const ack = await dispatch('@payments/charge', { amount: 10, currency: 'EUR' }, {
+  correlationId: 'corr_x9y8z7',   // optional; also causationId, topicId, hash
+});
+// ack.eventId  EventBridge's id (the acknowledgement)
+// ack.id       the event id in _meta (receivers use it to drop redeliveries)
+// ack.publisher '@payments/' (or 'default'), ack.bus 'payments'
+```
+
+`dispatch` selects the publisher, adds `_meta`, sends, and resolves with the acknowledgement. It rejects with a `CriError` (its `hint` says what to run) for a missing publisher or identity, a bad payload, or an event EventBridge did not accept. `emit` is the same call, for fire-and-forget callers. Options: `identity` and `publishers` (instead of the repo's `pulpfixer.json` and `~/.pf/cri/publishers.json`, for services that carry their own configuration), `cwd`, `dryRun`. `prepareDispatch` and `sendPrepared` are the two halves, to show an event before sending it.
+
+### What goes on the wire
+
+An event maps onto a `PutEvents` entry as the landscape spec says:
+
+| `PutEvents` field | Value |
+|-------------------|-------|
+| `EventBusName` | the publisher's bus |
+| `Source` | the publisher's `source`, else the stack name |
+| `DetailType` | the route, unchanged (a `@domain/` prefix stays) |
+| `Detail` | the payload (flat) plus the reserved `_meta` key |
+| `Time` | the dispatch time |
+
+`_meta` holds `id` (a UUID), `correlation_id`, `causation_id`, `hash` and `topic_id` when given, `source_domain`, `source_stack` and `version` (`1`). An event is at most 256 KB; for more, send a pointer.
+
+## Not covered yet
+
+Scope checks (`stack.scope`), typed dispatchers, a local default publisher, persisting the event record, and transports other than EventBridge. The publisher `type` field exists for them.
+
+There are no agent or MCP tools for events: they write, and their payloads can hold user data.

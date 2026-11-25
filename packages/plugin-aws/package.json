@@ -1,6 +1,6 @@
 {
   "name": "@pulpfixer/plugin-aws",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "description": "pf AWS plugin: exchange bucket (pf s3, pf dl), EventBridge events (pf events)",
   "license": "MIT",
   "type": "module",

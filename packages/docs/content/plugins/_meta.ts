@@ -3,6 +3,7 @@ import type { MetaRecord } from 'nextra'
 const meta: MetaRecord = {
   index: 'Overview',
   aws: 'AWS plugin',
+  cri: 'CRI events plugin',
   system: 'System plugin',
   'bg-tone': 'Background Tone (suite)',
   yubikey: 'YubiKey plugin',

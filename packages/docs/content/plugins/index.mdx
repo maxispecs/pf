@@ -9,6 +9,7 @@ A plugin adds commands (and menu entries) to pf. Some ship inside pf; the rest c
 | Plugin | Package | What it adds |
 |--------|---------|--------------|
 | `aws` (built in) | `@pulpfixer/plugin-aws` | `pf s3`, `pf dl`, `pf aws`, and the agent's `pf_aws_*` tools. See [AWS plugin](/plugins/aws) |
+| `cri` (built in) | `@pulpfixer/plugin-cri` | `pf cri`: publishers per route prefix and `dispatch(route, payload)` to send events to the CRI event system over EventBridge. See [CRI events plugin](/plugins/cri) |
 | `system` (built in) | `@pulpfixer/plugin-system` | `pf sys`: apply standard app configuration (Cursor extensions and settings) from presets published as `@pulpfixer/preset-<name>`. See [System plugin](/plugins/system) and the [Background Tone extension](/plugins/bg-tone) |
 | `yubikey` (built in) | `@pulpfixer/plugin-yubikey` | `pf otp`, `pf yk`. See [YubiKey plugin](/plugins/yubikey) |
 | `db` (built in) | `@pulpfixer/plugin-db` | `pf db`: saved database connections and one set of query helpers. SQLite is built in; the other drivers (`@pulpfixer/db-postgres`, `db-mysql`, `db-dynamodb`) are plugins `pf db` installs when you first need one; query packages (`@pulpfixer/query-<name>`) are clearance-only plugins that hold queries. See [Database plugin](/plugins/db) and [Writing a query package](/plugins/writing-a-query-package) |

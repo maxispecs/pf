@@ -1,6 +1,6 @@
 {
   "stack": {
-    "version": "3.43",
+    "version": "3.44",
     "since": "2026-11-24"
   },
   "featured": [
@@ -26,7 +26,7 @@
       "type": "node"
     },
     "packages/docs": {
-      "version": "2.21",
+      "version": "2.22",
       "since": "2026-11-24",
       "type": "node"
     },
@@ -41,7 +41,12 @@
       "type": "node"
     },
     "packages/plugin-aws": {
-      "version": "6.0",
+      "version": "6.1",
+      "since": "2026-11-24",
+      "type": "node"
+    },
+    "packages/plugin-cri": {
+      "version": "1.0",
       "since": "2026-11-24",
       "type": "node"
     },
@@ -86,7 +91,7 @@
       "type": "node"
     },
     "packages/pulpfixer": {
-      "version": "7.13",
+      "version": "7.15",
       "since": "2026-11-24",
       "type": "node"
     },

@@ -102,6 +102,15 @@ importers:
         specifier: workspace:*
         version: link:../kit
 
+  packages/plugin-cri:
+    dependencies:
+      '@pulpfixer/kit':
+        specifier: workspace:*
+        version: link:../kit
+      '@pulpfixer/plugin-aws':
+        specifier: workspace:*
+        version: link:../plugin-aws
+
   packages/plugin-csv:
     dependencies:
       '@pulpfixer/kit':
@@ -150,6 +159,9 @@ importers:
       '@pulpfixer/plugin-aws':
         specifier: workspace:*
         version: link:../plugin-aws
+      '@pulpfixer/plugin-cri':
+        specifier: workspace:*
+        version: link:../plugin-cri
       '@pulpfixer/plugin-csv':
         specifier: workspace:*
         version: link:../plugin-csv
