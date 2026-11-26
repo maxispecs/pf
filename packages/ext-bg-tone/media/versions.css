@@ -47,24 +47,21 @@ body:has(.versions:not(.versions-card)) {
 .ver-group {
 	display: flex;
 	align-items: center;
-	gap: 6px;
 	margin-top: 6px;
+	min-height: 18px;
 	padding: 0 2px;
+	border-left: 3px solid transparent;
+	border-radius: 3px;
 	font-size: 0.8em;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	color: var(--vscode-descriptionForeground);
 }
-.ver-group::before {
-	content: '';
-	flex: none;
-	width: 8px;
-	height: 8px;
-	border-radius: 2px;
-	background: var(--vscode-descriptionForeground);
-	opacity: 0.5;
+/* A colored category's header is part of its block: the same left edge and background tint as its rows. */
+.ver-group.ver-tinted {
+	border-left-color: var(--ver-cat);
+	background: color-mix(in srgb, var(--ver-cat) 13%, transparent);
 }
-.ver-group.ver-tinted::before { background: var(--ver-cat); opacity: 1; }
 /* Names are left-aligned and, when too long, lose their left part (the folder), not the name itself.
    rtl makes the ellipsis come first; text-align: left keeps a short name at the left edge; the <bdi>
    inside keeps the text reading left to right. */

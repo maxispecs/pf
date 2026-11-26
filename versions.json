@@ -1,6 +1,6 @@
 {
   "stack": {
-    "version": "3.54",
+    "version": "3.58",
     "since": "2026-11-25"
   },
   "featured": [
@@ -49,12 +49,12 @@
       "category": "db"
     },
     "packages/docs": {
-      "version": "2.27",
+      "version": "2.29",
       "since": "2026-11-25",
       "type": "node"
     },
     "packages/ext-bg-tone": {
-      "version": "2.11",
+      "version": "2.12",
       "since": "2026-11-25",
       "type": "node",
       "category": "cursor"
@@ -125,7 +125,7 @@
       "category": "system"
     },
     "packages/pulpfixer": {
-      "version": "7.18",
+      "version": "7.19",
       "since": "2026-11-25",
       "type": "node"
     },

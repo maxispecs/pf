@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { loadRepoConfig } from '@pulpfixer/kit/config';
 import { buildContext } from '@pulpfixer/kit/context';
-import { actionsDocument, listActions, setFeatured } from '../src/commands/actions.js';
+import { actionsDocument, listActions, pfLine, setFeatured } from '../src/commands/actions.js';
 import { json, mkRepo } from './helpers.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -190,4 +190,15 @@ test('the actions document names the pf that printed it, with its build stack', 
   assert.equal(typeof doc.pf.version, 'string');
   assert.ok(doc.pf.stack === null || typeof doc.pf.stack === 'string');
   assert.ok(doc.actions.every((a: { when: unknown }) => Array.isArray(a.when)));
+});
+
+test('pf actions ends the table with the pf version and its build stack', () => {
+  assert.equal(pfLine({ version: '7.17.0', stack: '3.48' }), 'pf 7.17.0, stack 3.48');
+  assert.match(pfLine({ version: '7.17.0', stack: null }), /^pf 7\.17\.0, stack unknown/);
+  const r = pf(repo(), 'actions');
+  assert.equal(r.code, 0);
+  assert.match(r.out.trimEnd().split('\n').at(-1) ?? '', /^pf \S+, stack \S+/);
+  const none = pf(repo(undefined, { dev: 'node app.js' }), 'actions');
+  assert.match(none.out, /No featured actions/);
+  assert.match(none.out.trimEnd().split('\n').at(-1) ?? '', /^pf \S+, stack \S+/);
 });

@@ -79,12 +79,19 @@ const fail = (msg: string) => {
   return 1;
 };
 
+/** The footer of the table: the pf that listed the actions and the stack it was built from. */
+export function pfLine(pf: PfInfo): string {
+  return `pf ${pf.version}, stack ${pf.stack ?? 'unknown (a build with no stamp)'}`;
+}
+
 function printTable(ctx: Context, all: boolean): number {
   const c = out();
-  const actions = actionsDocument(ctx, all).actions;
+  const doc = actionsDocument(ctx, all);
+  const actions = doc.actions;
   if (!ctx.repo) return fail('pf actions needs a repo. Run it inside a project directory.');
   if (!actions.length) {
     w(`No ${all ? '' : 'featured '}actions in ${ctx.repo.name}.${all ? '' : ` ${termLine('pf actions --all', c)} lists every action.`}`);
+    w(c.dim(pfLine(doc.pf)));
     return 0;
   }
   const idW = Math.max(...actions.map((a) => a.id.length));
@@ -93,6 +100,7 @@ function printTable(ctx: Context, all: boolean): number {
   for (const a of actions) {
     w(`  ${a.featured ? '*' : ' '} ${c.bold(a.id.padEnd(idW))}  ${c.dim(a.icon.padEnd(iconW))}  ${a.summary}  ${c.dim(`pf ${a.argv.join(' ')}`)}${a.when.length ? c.dim(`  (when ${a.when.join(' + ')})`) : ''}`);
   }
+  w(c.dim(pfLine(doc.pf)));
   return 0;
 }
 
