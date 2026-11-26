@@ -201,8 +201,39 @@ export function planBump(
 			data.stack = stamp(file.stack, stackTo, today);
 		}
 	}
+	return { ok: true, text: composeVersionsText(data), changes };
+}
+
+/**
+ * The file text as the ver CLI writes it: `featured` and `categories` right after `stack` (each left out when
+ * empty), packages sorted by path, every other key where it was. `over` replaces the featured list or the
+ * categories object for an edit of those; otherwise they are written as `data` has them.
+ */
+export function composeVersionsText(
+	data: Record<string, unknown> & { packages: Record<string, Entry> },
+	over: { featured?: string[]; categories?: Record<string, unknown> } = {},
+): string {
+	const featured = over.featured ?? data.featured;
+	const categories = over.categories ?? data.categories;
+	const isEmpty = (value: unknown): boolean =>
+		value == null || (Array.isArray(value) ? value.length === 0 : typeof value === 'object' && Object.keys(value).length === 0);
 	const packages = Object.fromEntries(Object.entries(data.packages).sort(([a], [b]) => a.localeCompare(b)));
-	return { ok: true, text: `${JSON.stringify({ ...data, packages }, null, 2)}\n`, changes };
+	const out: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(data)) {
+		if (key === 'featured' || key === 'categories') {
+			continue;
+		}
+		out[key] = key === 'packages' ? packages : value;
+		if (key === 'stack') {
+			if (!isEmpty(featured)) {
+				out.featured = featured;
+			}
+			if (!isEmpty(categories)) {
+				out.categories = categories;
+			}
+		}
+	}
+	return `${JSON.stringify(out, null, 2)}\n`;
 }
 
 export type FeaturePlan = { ok: true; text: string; changed: boolean } | { ok: false; reason: string };
@@ -237,18 +268,7 @@ export function planFeature(text: string | null, target: unknown, on: unknown): 
 	} else {
 		return { ok: true, text: text as string, changed: false };
 	}
-	const packages = Object.fromEntries(Object.entries(file.data.packages).sort(([a], [b]) => a.localeCompare(b)));
-	const out: Record<string, unknown> = {};
-	for (const [key, value] of Object.entries(file.data)) {
-		if (key === 'featured') {
-			continue;
-		}
-		out[key] = key === 'packages' ? packages : value;
-		if (key === 'stack' && list.length > 0) {
-			out.featured = list;
-		}
-	}
-	return { ok: true, text: `${JSON.stringify(out, null, 2)}\n`, changed: true };
+	return { ok: true, text: composeVersionsText(file.data, { featured: list }), changed: true };
 }
 
 /**

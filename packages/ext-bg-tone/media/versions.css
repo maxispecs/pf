@@ -126,6 +126,47 @@ body:has(.versions:not(.versions-card)) {
 .ver-commit:disabled { opacity: 0.4; cursor: default; }
 .versions-hint { margin-top: 4px; font-size: 0.9em; color: var(--vscode-descriptionForeground); }
 
+/* The tag opens the category picker: faint on row hover, always shown (in the category color) once set. */
+.ver-tag, .ver-tag-slot { flex: none; width: 18px; height: 18px; }
+.ver-tag {
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--vscode-icon-foreground, var(--vscode-foreground));
+	opacity: 0;
+	cursor: pointer;
+}
+.ver-tag .codicon { font-size: 14px; }
+.ver-row:hover .ver-tag, .ver-tag:focus-visible { opacity: 0.55; }
+.ver-tag-on, .ver-row:hover .ver-tag-on { opacity: 0.9; }
+.ver-tinted .ver-tag-on { color: var(--ver-cat); opacity: 1; }
+.ver-tag:hover:not(:disabled) { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
+.ver-tag:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.ver-tag:disabled { cursor: default; }
+/* The card's title row: the title and the category manager button at its right. */
+.versions-title { display: flex; align-items: center; justify-content: space-between; }
+.ver-manage {
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--vscode-icon-foreground, var(--vscode-foreground));
+	cursor: pointer;
+}
+.ver-manage .codicon { font-size: 14px; }
+.ver-manage:hover:not(:disabled) { background: var(--vscode-toolbar-hoverBackground); }
+.ver-manage:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.ver-manage:disabled { opacity: 0.4; cursor: default; }
+
 /* Featured: the star is always filled; an unfeatured package shows a faint star that fills in on row hover. */
 .ver-star, .ver-star-slot { flex: none; width: 18px; height: 18px; }
 .ver-star {

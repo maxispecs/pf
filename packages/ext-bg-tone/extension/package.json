@@ -186,6 +186,11 @@
         "icon": "$(edit)"
       },
       {
+        "command": "bgTone.manageCategories",
+        "title": "Background Tone: Manage Version Categories...",
+        "icon": "$(tag)"
+      },
+      {
         "command": "bgTone.pickLogo",
         "title": "Background Tone: Choose Repo Logo..."
       },
@@ -213,6 +218,11 @@
           "command": "bgTone.openSettings",
           "when": "view == workbench.explorer.fileView",
           "group": "navigation@1"
+        },
+        {
+          "command": "bgTone.manageCategories",
+          "when": "view == bgTone.versionsScm",
+          "group": "navigation@0"
         }
       ]
     },

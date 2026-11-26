@@ -22,6 +22,7 @@ import { ActionsService } from './actionsService.ts';
 import { diffFeatured } from './actions.ts';
 import { CardCache } from './cardCache.ts';
 import { VersionsService } from './versionsService.ts';
+import { manageCategories } from './categoriesUi.ts';
 
 const NO_COLOR_LABEL = 'No color';
 const CUSTOM_LABEL = 'Custom hex color...';
@@ -120,6 +121,12 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand('bgTone.randomize', () => randomize(context)),
 		vscode.commands.registerCommand('bgTone.clear', () => clear(context)),
 		vscode.commands.registerCommand('bgTone.editActions', () => editActions(actions)),
+		vscode.commands.registerCommand('bgTone.manageCategories', async () => {
+			await manageCategories(versions);
+			card.refresh();
+			scmCard.refresh();
+			versionsView.refresh();
+		}),
 	);
 
 	reapply();

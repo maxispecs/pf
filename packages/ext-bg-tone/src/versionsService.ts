@@ -7,9 +7,12 @@ import type { ActionsService } from './actionsService.ts';
 import { runGit } from './git.ts';
 import { VERSIONS_FILE } from './stackVersion.ts';
 import { primaryFolder } from './store.ts';
+import { planCategorize, planCategoryEdit } from './categories.ts';
+import type { CategoryEdit, CategoryPlan } from './categories.ts';
 import {
 	NO_VERSIONS,
 	PendingCommit,
+	VersionsFile,
 	VersionsState,
 	commitMessage,
 	hookCommands,
@@ -163,6 +166,54 @@ export class VersionsService {
 		const result = this.queue.then(() => this.runFeature(target, on));
 		this.queue = result.then(() => undefined, () => undefined);
 		return result;
+	}
+
+	/** The parsed `versions.json` as it is now (undefined without a valid one): what the category pickers list. */
+	current(): VersionsFile | undefined {
+		return parseVersionsFile(readVersionsText());
+	}
+
+	/** Puts one package in a category, or takes it out (`null`). Same queue and checks as the star; no version changes, so no sync. */
+	setCategory(target: unknown, category: unknown): Promise<boolean> {
+		return this.edit('assign categories', text => planCategorize(text, target, category));
+	}
+
+	/** Adds, recolors, renames, moves or removes a category. Same queue and checks; no version changes, so no sync. */
+	editCategories(edit: CategoryEdit): Promise<boolean> {
+		return this.edit('edit categories', text => planCategoryEdit(text, edit));
+	}
+
+	/** Runs one plan over the file just read, in the queue, in a trusted local workspace. True when the file changed. */
+	private edit(what: string, plan: (text: string | null) => CategoryPlan): Promise<boolean> {
+		const result = this.queue.then(() => this.runEdit(what, plan));
+		this.queue = result.then(() => undefined, () => undefined);
+		return result;
+	}
+
+	private async runEdit(what: string, make: (text: string | null) => CategoryPlan): Promise<boolean> {
+		const folder = localFolder();
+		if (!folder) {
+			return false;
+		}
+		if (!vscode.workspace.isTrusted) {
+			void vscode.window.showWarningMessage(`Background Tone: trust this workspace to ${what}.`);
+			return false;
+		}
+		const plan = make(readVersionsText());
+		if (!plan.ok) {
+			void vscode.window.showErrorMessage(`Background Tone: cannot ${what}: ${plan.reason}.`);
+			return false;
+		}
+		if (!plan.changed) {
+			return false;
+		}
+		try {
+			writeAtomic(path.join(folder.uri.fsPath, VERSIONS_FILE), plan.text);
+		} catch (e) {
+			void vscode.window.showErrorMessage(`Background Tone: could not write ${VERSIONS_FILE}: ${e instanceof Error ? e.message : String(e)}`);
+			return false;
+		}
+		return true;
 	}
 
 	private async runFeature(target: unknown, on: unknown): Promise<boolean> {

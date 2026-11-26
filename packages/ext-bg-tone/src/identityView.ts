@@ -8,6 +8,7 @@ import { primaryFolder, readConfig, repoName, updateBgTone } from './settings.ts
 import { identityVisible } from './repoConfig.ts';
 import { isPfRepo } from './store.ts';
 import { VERSIONS_FILE, parseStackVersion } from './stackVersion.ts';
+import { manageCategories, pickCategory } from './categoriesUi.ts';
 import { NO_VERSIONS, VersionsState } from './versions.ts';
 import { VersionsService, hasVersionsFile } from './versionsService.ts';
 import * as fs from 'node:fs';
@@ -247,6 +248,11 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 			} else if (m?.type === 'feature') {
 				// A package path and a yes or no; both are checked against versions.json.
 				void this.versions.setFeatured(m.target, m.on).then(() => this.refresh());
+			} else if (m?.type === 'categorize') {
+				// Only a package path comes from the page; the picker and the categories are the extension's own.
+				void pickCategory(this.versions, m.target).then(() => this.refresh());
+			} else if (m?.type === 'manageCategories') {
+				void manageCategories(this.versions).then(() => this.refresh());
 			} else if (m?.type === 'commitVersions') {
 				// No payload: the files, the message and the git calls are all the extension's own.
 				void this.versions.commit().then(() => this.refresh());
@@ -521,6 +527,10 @@ export class VersionsViewProvider implements vscode.WebviewViewProvider, vscode.
 				void this.versions.bump(m.target, m.part).then(() => this.refresh());
 			} else if (m?.type === 'feature') {
 				void this.versions.setFeatured(m.target, m.on).then(() => this.refresh());
+			} else if (m?.type === 'categorize') {
+				void pickCategory(this.versions, m.target).then(() => this.refresh());
+			} else if (m?.type === 'manageCategories') {
+				void manageCategories(this.versions).then(() => this.refresh());
 			} else if (m?.type === 'commitVersions') {
 				void this.versions.commit().then(() => this.refresh());
 			}

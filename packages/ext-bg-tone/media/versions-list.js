@@ -43,6 +43,35 @@
 		return button;
 	}
 
+	/** The tag: opens the category picker for a package. Filled and colored when it has a category (the stack has none). */
+	function tag(row, canEdit, post) {
+		const label = row.category ? 'Category of ' + row.label + ': ' + row.category + ' (click to change)' : 'Set a category for ' + row.label;
+		const button = h('button', 'ver-tag' + (row.category ? ' ver-tag-on' : ''));
+		button.type = 'button';
+		button.title = canEdit ? label : label + ' (trust this workspace to edit versions)';
+		button.setAttribute('aria-label', label);
+		button.disabled = !canEdit;
+		button.append(h('span', 'codicon codicon-tag'));
+		// Only the package path leaves the page; the extension opens the picker and checks everything it writes.
+		button.addEventListener('click', () => post({ type: 'categorize', target: row.target }));
+		return button;
+	}
+
+	/** The card's title row: "Versions" and a button for the category manager (the Versions view has it in its toolbar). */
+	function cardTitle(canEdit, post) {
+		const title = h('div', 'versions-title');
+		title.append(h('span', undefined, 'Versions'));
+		const button = h('button', 'ver-manage');
+		button.type = 'button';
+		button.title = canEdit ? 'Manage version categories' : 'Manage version categories (trust this workspace to edit versions)';
+		button.setAttribute('aria-label', 'Manage version categories');
+		button.disabled = !canEdit;
+		button.append(h('span', 'codicon codicon-tag'));
+		button.addEventListener('click', () => post({ type: 'manageCategories' }));
+		title.append(button);
+		return title;
+	}
+
 	/** A category color, only when it is a plain hex color: the one value that ever reaches a style property. */
 	function tintOf(color) {
 		return typeof color === 'string' && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color) ? color : '';
@@ -80,7 +109,7 @@
 		}
 		const section = h('div', 'versions' + (inCard ? ' versions-card' : ''));
 		if (inCard) {
-			section.append(h('div', 'versions-title', 'Versions'));
+			section.append(cardTitle(v.canBump, post));
 		}
 		// Shown at the top while a bump waits for a commit (versions.json differs from HEAD). No payload leaves
 		// the page: the extension works out the files and the message itself and commits without asking.
@@ -121,7 +150,9 @@
 			const control = h('span', 'ver-control');
 			control.append(plus(row, 'major', v.canBump, post), h('span', 'ver-version', row.version), plus(row, 'minor', v.canBump, post));
 			// The stack cannot be featured: an empty slot keeps the rows lined up.
-			el.append(row.target === 'stack' ? h('span', 'ver-star-slot') : star(row, v.canBump, post), name, control);
+			el.append(row.target === 'stack' ? h('span', 'ver-star-slot') : star(row, v.canBump, post), name);
+			// The stack has no category: an empty slot keeps the version columns lined up.
+			el.append(row.target === 'stack' ? h('span', 'ver-tag-slot') : tag(row, v.canBump, post), control);
 			list.append(el);
 		}
 		section.append(list);
