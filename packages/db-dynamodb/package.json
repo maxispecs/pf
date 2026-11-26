@@ -1,6 +1,6 @@
 {
   "name": "@pulpfixer/db-dynamodb",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "pf database driver: Amazon DynamoDB through PartiQL (pf db, query packages)",
   "license": "MIT",
   "type": "module",
