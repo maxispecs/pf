@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 // Revision of this CLI, bumped whenever it changes. `--cli-version` prints it so the /ver skill
 // can tell whether a repo's copy is older than the skill's. Copies without it count as 0.
-const CLI_VERSION = 8;
+const CLI_VERSION = 9;
 const MANIFEST = 'versions.json';
 // Events a repo can hook into through the "hooks" key of versions.json.
 const HOOK_EVENTS = ['postSync', 'preCommit'];
@@ -49,6 +49,15 @@ Commands:
                           Does not change any version.
   unfeature <target> [<target> ...]
                           Remove packages from the featured list.
+  category [<name>] [--color <#hex|none>] [--remove]
+                          With no name, list the categories. With a name, create the category
+                          (or change its color); --remove deletes it and clears it from its
+                          packages. Stored in the "categories" object of versions.json (its order
+                          is the group order). Does not change any version.
+  categorize <category> <target> [<target> ...]
+                          Put packages in a category (create it first with "category").
+  categorize --none <target> [<target> ...]
+                          Take packages out of their category.
   init                    Create versions.json from discovered packages, or add newly
                           discovered packages to an existing one. New versions record
                           today's date as "since".
@@ -62,9 +71,13 @@ VER_STACK, VER_CHANGES (JSON), VER_FILES (newline separated).
 
 Options:
   --json                  (list) machine-readable output
-  --dry-run               (bump, feature, unfeature, init, sync) show changes without writing files
+  --dry-run               (bump, feature, unfeature, category, categorize, init, sync) show changes without writing files
   --no-hooks              (bump, sync, commit button) do not run hooks
   --prune                 (init) drop packages from versions.json that no longer exist
+  --color <#rgb|#rrggbb|none>
+                          (category) the category color, shown in "list" and in editors
+  --remove                (category) delete the category
+  --none                  (categorize) clear the category of the targets
   --root <dir>            repo root (default: nearest dir with versions.json, or cwd for init)
   --cli-version           print this CLI's revision number
   -h, --help              show this help
@@ -92,6 +105,22 @@ function palette(stream) {
 
 const c = palette(process.stdout);
 const cErr = palette(process.stderr);
+// A category color (#rgb or #rrggbb) as a painter: 24-bit color on terminals that say they have it,
+// else the nearest of the 256-color cube; plain text when colors are off.
+function hexRgb(hex) {
+  const h = hex.slice(1);
+  const full = h.length === 3 ? [...h].map((x) => x + x).join('') : h;
+  return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16));
+}
+function hexPaint(hex, stream = process.stdout) {
+  if (!hex || !colorEnabled(stream)) return String;
+  const [r, g, b] = hexRgb(hex);
+  const truecolor = /truecolor|24bit/i.test(process.env.COLORTERM ?? '');
+  const code = truecolor
+    ? `38;2;${r};${g};${b}`
+    : `38;5;${16 + 36 * Math.round(r / 51) + 6 * Math.round(g / 51) + Math.round(b / 51)}`;
+  return (s) => `\x1b[${code}m${s}\x1b[0m`;
+}
 const colorType = (type) => ({ node: c.green, python: c.blue, php: c.red, skill: c.yellow, stack: c.magenta })[type] ?? String;
 const colorTarget = (target) => (target === 'stack' ? c.boldMagenta(target) : c.cyan(target));
 
@@ -652,7 +681,41 @@ function loadManifest(root) {
   }
   loadHooks(data);
   loadFeatured(data);
+  loadCategories(data);
   return data;
+}
+
+const CATEGORY_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+// Validates the optional "categories" key (an ordered object: name -> { color? }) and each package's
+// optional "category" (a string). Returns [{ name, color }] in file order; color is null when unset.
+// A package may name a category that is not defined: collectWarnings reports it, it counts as none.
+function loadCategories(manifest) {
+  const raw = manifest.categories;
+  const list = [];
+  if (raw != null) {
+    if (typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new CliError(`Invalid "categories" in ${MANIFEST}: expected an object of category names`);
+    }
+    for (const [name, value] of Object.entries(raw)) {
+      if (!name.trim() || name !== name.trim() || /[\x00-\x1f]/.test(name)) {
+        throw new CliError(`Invalid category name "${name}" in ${MANIFEST}: no leading or trailing spaces, no control characters`);
+      }
+      if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+        throw new CliError(`Invalid category "${name}" in ${MANIFEST}: expected an object like { "color": "#4aa3ff" }`);
+      }
+      if (value.color != null && (typeof value.color !== 'string' || !CATEGORY_COLOR.test(value.color))) {
+        throw new CliError(`Invalid color "${value.color}" for category "${name}" in ${MANIFEST}: expected #rgb or #rrggbb`);
+      }
+      list.push({ name, color: value.color ?? null });
+    }
+  }
+  for (const [rel, pkg] of Object.entries(manifest.packages ?? {})) {
+    if (pkg.category != null && (typeof pkg.category !== 'string' || !pkg.category.trim())) {
+      throw new CliError(`Invalid category for ${rel} in ${MANIFEST}: expected a category name`);
+    }
+  }
+  return list;
 }
 
 // Validates the optional "featured" key: an ordered array of unique package paths.
@@ -667,14 +730,19 @@ function loadFeatured(manifest) {
   return raw;
 }
 
-// Packages as [rel, pkg, featured]: featured ones first in "featured" order (unknown paths are
-// skipped, collectWarnings reports them), then the rest in the manifest's sorted order.
+// Packages as [rel, pkg, featured, category]: featured ones first in "featured" order (unknown paths
+// are skipped, collectWarnings reports them), whatever their category. The rest follow grouped by
+// category in the "categories" order (sorted inside a group), then the ones with no (or an
+// undefined) category. `category` is the defined category's name or null.
 function orderedPackages(manifest) {
+  const known = new Set(loadCategories(manifest).map((x) => x.name));
+  const categoryOf = (pkg) => (known.has(pkg.category) ? pkg.category : null);
   const featured = loadFeatured(manifest).filter((rel) => manifest.packages[rel]);
-  const first = featured.map((rel) => [rel, manifest.packages[rel], true]);
+  const first = featured.map((rel) => [rel, manifest.packages[rel], true, categoryOf(manifest.packages[rel])]);
   const rest = Object.entries(manifest.packages).filter(([rel]) => !featured.includes(rel))
-    .map(([rel, pkg]) => [rel, pkg, false]);
-  return [...first, ...rest];
+    .map(([rel, pkg]) => [rel, pkg, false, categoryOf(pkg)]);
+  const groups = [...known, null];
+  return [...first, ...groups.flatMap((name) => rest.filter((row) => row[3] === name))];
 }
 
 const STAR = '★';
@@ -708,12 +776,15 @@ function loadHooks(manifest) {
 
 function saveManifest(root, data, dryRun) {
   const packages = Object.fromEntries(Object.entries(data.packages).sort(([a], [b]) => a.localeCompare(b)));
-  // "featured" is written right after "stack" and omitted when empty.
+  // "featured" and "categories" are written right after "stack" and omitted when empty.
   const out = {};
   for (const [key, value] of Object.entries(data)) {
-    if (key === 'featured') continue;
+    if (key === 'featured' || key === 'categories') continue;
     out[key] = key === 'packages' ? packages : value;
-    if (key === 'stack' && data.featured?.length) out.featured = data.featured;
+    if (key === 'stack') {
+      if (data.featured?.length) out.featured = data.featured;
+      if (data.categories && Object.keys(data.categories).length) out.categories = data.categories;
+    }
   }
   const text = `${JSON.stringify(out, null, 2)}\n`;
   if (!dryRun) writeAtomic(path.join(root, MANIFEST), text);
@@ -791,7 +862,11 @@ function collectWarnings(root, manifest, discovered) {
   for (const rel of loadFeatured(manifest)) {
     if (!manifest.packages[rel]) warnings.push(`featured ${rel} is not in ${MANIFEST} packages. Run "unfeature ${rel}" to remove it.`);
   }
+  const knownCategories = new Set(loadCategories(manifest).map((x) => x.name));
   for (const [rel, pkg] of Object.entries(manifest.packages)) {
+    if (pkg.category != null && !knownCategories.has(pkg.category)) {
+      warnings.push(`${rel} is in category "${pkg.category}", which is not in ${MANIFEST} categories. Run "category ${pkg.category}" to create it or "categorize --none ${rel}" to clear it.`);
+    }
     if (!isDir(path.join(root, rel))) {
       warnings.push(`${rel} is in ${MANIFEST} but not on disk. Run "init --prune" to remove it.`);
       continue;
@@ -819,11 +894,14 @@ function cmdList(root, flags) {
   const prefix = bumpCommandPrefix(root);
   const cmd = (target, part) => `${prefix} ${target} ${part}`;
   const warnings = collectWarnings(root, manifest, discovered);
-  const packages = orderedPackages(manifest).map(([rel, pkg, featured]) => ({
+  const categories = loadCategories(manifest);
+  const colorOf = (name) => categories.find((x) => x.name === name)?.color ?? null;
+  const packages = orderedPackages(manifest).map(([rel, pkg, featured, category]) => ({
     path: rel,
     name: readNative(root, rel, pkg.type).name,
     type: pkg.type,
     featured,
+    category,
     version: pkg.version,
     since: pkg.since ?? null,
     commands: { minor: cmd(rel, 'minor'), major: cmd(rel, 'major') },
@@ -840,6 +918,7 @@ function cmdList(root, flags) {
         since: manifest.stack.since ?? null,
         commands: { minor: cmd('stack', 'minor'), major: cmd('stack', 'major') },
       },
+      categories,
       packages,
       warnings,
     };
@@ -856,16 +935,21 @@ function cmdList(root, flags) {
     const lead = targetLead(featured, anyFeatured);
     return { text: lead + target, shown: (featured ? `${c.yellow(STAR)} ` : lead) + paint(target) };
   };
+  // With categories, rows follow the grouped order, the target takes its category's color and a
+  // CATEGORY column (last, so it never skews the others) names it.
+  const anyCategories = categories.length > 0;
+  const withCategory = (row, p) => (anyCategories ? [...row, cell(p?.category ?? '-', p?.category ? hexPaint(colorOf(p.category)) : c.dim)] : row);
   const rows = [
-    header(['TARGET', 'TYPE', 'VERSION', 'SINCE', 'NAME']),
-    [
+    header(anyCategories ? ['TARGET', 'TYPE', 'VERSION', 'SINCE', 'NAME', 'CATEGORY'] : ['TARGET', 'TYPE', 'VERSION', 'SINCE', 'NAME']),
+    withCategory([
       targetCell('stack', false, c.boldMagenta), cell('stack', c.magenta), cell(manifest.stack.version, c.boldMagenta),
       sinceCell(manifest.stack.since), cell(stackName(root), c.dim),
-    ],
-    ...packages.map((p) => [
-      targetCell(p.path, p.featured, c.cyan), cell(p.type, colorType(p.type)), cell(p.version, c.bold),
+    ], null),
+    ...packages.map((p) => withCategory([
+      targetCell(p.path, p.featured, p.category && colorOf(p.category) ? hexPaint(colorOf(p.category)) : c.cyan),
+      cell(p.type, colorType(p.type)), cell(p.version, c.bold),
       sinceCell(p.since), cell(p.name ?? '-', c.dim),
-    ]),
+    ], p)),
   ];
   console.log(table(rows));
   console.log(`\n${c.bold('Bump commands')} ${c.dim('(package bumps raise the stack minor once per command):')}`);
@@ -997,6 +1081,96 @@ function cmdFeature(root, positional, flags, on) {
     rows.push([cell(rel, c.cyan), cell(outcome, changed ? c.green : c.dim)]);
   }
   manifest.featured = featured;
+  saveManifest(root, manifest, flags.dryRun);
+  console.log(flags.dryRun ? c.yellow('Dry run, no files written:') : c.green(`Updated ${MANIFEST}:`));
+  console.log(table(rows, '  '));
+}
+
+// Lists the categories, or creates / recolors / removes one. Only the "categories" key (and the
+// "category" of packages in a removed category) changes: no version, since, stack bump, sync or hook.
+function cmdCategory(root, positional, flags) {
+  const manifest = loadManifest(root);
+  const existing = loadCategories(manifest);
+  if (!positional.length) {
+    if (flags.remove || flags.color != null) throw new CliError('Usage: category <name> [--color <#hex|none>] [--remove]');
+    if (!existing.length) {
+      console.log(c.dim('No categories. Create one with: category <name> --color <#hex>'));
+      return;
+    }
+    const counts = (name) => Object.values(manifest.packages).filter((p) => p.category === name).length;
+    const rows = [
+      header(['CATEGORY', 'COLOR', 'PACKAGES']),
+      ...existing.map((x) => [
+        cell(x.name, hexPaint(x.color)), cell(x.color ?? '-', x.color ? hexPaint(x.color) : c.dim), cell(counts(x.name), c.dim),
+      ]),
+    ];
+    console.log(table(rows));
+    return;
+  }
+  if (positional.length > 1) throw new CliError('Usage: category <name> [--color <#hex|none>] [--remove]');
+  const name = positional[0];
+  if (!name.trim() || name !== name.trim() || /[\x00-\x1f]/.test(name)) {
+    throw new CliError(`Invalid category name "${name}": no leading or trailing spaces, no control characters`);
+  }
+  const categories = { ...(manifest.categories ?? {}) };
+  let outcome;
+  if (flags.remove) {
+    if (flags.color != null) throw new CliError('--remove cannot be combined with --color');
+    if (!categories[name]) throw new CliError(`Unknown category "${name}". Run "category" to list them.`);
+    delete categories[name];
+    let cleared = 0;
+    for (const pkg of Object.values(manifest.packages)) {
+      if (pkg.category === name) {
+        delete pkg.category;
+        cleared++;
+      }
+    }
+    outcome = `removed (${cleared} package${cleared === 1 ? '' : 's'} left without a category)`;
+  } else {
+    let color;
+    if (flags.color != null) {
+      if (flags.color === 'none') color = null;
+      else if (CATEGORY_COLOR.test(flags.color)) color = flags.color.toLowerCase();
+      else throw new CliError(`Invalid color "${flags.color}": expected #rgb, #rrggbb or none`);
+    }
+    const before = categories[name];
+    const next = { ...(before ?? {}) };
+    if (color === null) delete next.color;
+    else if (color !== undefined) next.color = color;
+    categories[name] = next;
+    outcome = !before ? 'created' : color !== undefined && color !== (before.color ?? null) ? 'updated' : 'unchanged';
+  }
+  manifest.categories = categories;
+  saveManifest(root, manifest, flags.dryRun);
+  console.log(flags.dryRun ? c.yellow('Dry run, no files written:') : c.green(`Updated ${MANIFEST}:`));
+  console.log(table([[cell(name, hexPaint(categories[name]?.color)), cell(outcome, c.green)]], '  '));
+}
+
+// Puts packages in a category, or (--none) takes them out of theirs. Only each package's "category"
+// key changes, like "feature" changes only "featured".
+function cmdCategorize(root, positional, flags) {
+  const none = flags.none;
+  const usage = 'Usage: categorize <category> <target> [<target> ...]  |  categorize --none <target> [<target> ...]';
+  const [category, ...targets] = none ? [null, ...positional] : positional;
+  if (!targets.length || (!none && !category)) throw new CliError(usage);
+  const manifest = loadManifest(root);
+  const known = loadCategories(manifest).map((x) => x.name);
+  if (!none && !known.includes(category)) {
+    throw new CliError(`Unknown category "${category}"${known.length ? ` (have: ${known.join(', ')})` : ''}. Create it first: category ${category} --color <#hex>`);
+  }
+  const rows = [];
+  for (const target of targets) {
+    const rel = resolveTarget(root, manifest, target);
+    if (!rel) throw new CliError('The stack has no category: only packages do.');
+    const pkg = manifest.packages[rel];
+    const changed = none ? pkg.category != null : pkg.category !== category;
+    if (changed) {
+      if (none) delete pkg.category;
+      else pkg.category = category;
+    }
+    const outcome = none ? (changed ? 'no category' : 'had no category') : (changed ? `-> ${category}` : `already in ${category}`);
+    rows.push([cell(rel, c.cyan), cell(outcome, changed ? c.green : c.dim)]);
+  }
   saveManifest(root, manifest, flags.dryRun);
   console.log(flags.dryRun ? c.yellow('Dry run, no files written:') : c.green(`Updated ${MANIFEST}:`));
   console.log(table(rows, '  '));
@@ -1201,8 +1375,8 @@ function buildInteractiveView(root, flags, status, columns, hover, stackMinorDon
   const anyFeatured = ordered.some(([, , featured]) => featured);
   const rows = [
     { target: 'stack', type: 'stack', version: manifest.stack.version, since: manifest.stack.since ?? '-', name: stackName(root) },
-    ...ordered.map(([rel, pkg, featured]) => ({
-      target: rel, featured, type: pkg.type, version: pkg.version, since: pkg.since ?? '-',
+    ...ordered.map(([rel, pkg, featured, category]) => ({
+      target: rel, featured, category, type: pkg.type, version: pkg.version, since: pkg.since ?? '-',
       name: readNative(root, rel, pkg.type).name ?? '-',
     })),
   ];
@@ -1235,13 +1409,29 @@ function buildInteractiveView(root, flags, status, columns, hover, stackMinorDon
     c.bold(`${' '.repeat(4)}${pad('VERSION', wVersion)}${' '.repeat(4)}`),
     c.bold(pad('SINCE', wSince)), c.bold('NAME'),
   ].join('  '));
+  // With categories, a header line starts each group: the featured block, each category, then the rest.
+  // A package's target takes its category's color. The header lines shift the rows below them, and
+  // the button hit-boxes use the row's real line index, so they stay right.
+  const categories = loadCategories(manifest);
+  const colorOf = (name) => categories.find((x) => x.name === name)?.color ?? null;
+  let group;
   for (const r of rows) {
+    if (categories.length && r.target !== 'stack') {
+      const key = r.featured ? '\0featured' : r.category ?? '\0other';
+      if (key !== group) {
+        group = key;
+        const paint = hexPaint(r.featured ? null : colorOf(r.category));
+        const label = r.featured ? `${STAR} featured` : r.category ?? 'other';
+        lines.push(r.featured || !r.category ? c.dim(`-- ${label}`) : paint(c.bold(`-- ${label}`)));
+      }
+    }
     const screenRow = lines.length + 1;
     const typePaint = colorType(r.type);
     const name = wName >= 4 && r.name.length > wName ? `${r.name.slice(0, wName - 1)}…` : r.name;
+    const targetPaint = r.target === 'stack' ? c.boldMagenta : r.category && colorOf(r.category) ? hexPaint(colorOf(r.category)) : c.cyan;
     lines.push([
       (r.featured ? `${c.yellow(STAR)} ` : r.lead)
-        + (r.target === 'stack' ? c.boldMagenta : c.cyan)(pad(r.target, wTarget - r.lead.length)),
+        + targetPaint(pad(r.target, wTarget - r.lead.length)),
       typePaint(pad(r.type, wType)),
       `${plus(r, 'major', c.yellow)} ${c.bold(center(r.version, wVersion))} ${plus(r, 'minor', c.green)}`,
       c.dim(pad(r.since, wSince)),
@@ -1471,7 +1661,10 @@ function cmdSync(root, flags) {
 // ---------- main
 
 function parseArgs(argv) {
-  const flags = { json: false, dryRun: false, prune: false, noHooks: false, help: false, cliVersion: false, root: null };
+  const flags = {
+    json: false, dryRun: false, prune: false, noHooks: false, help: false, cliVersion: false, root: null,
+    color: null, remove: false, none: false,
+  };
   const positional = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -1479,6 +1672,12 @@ function parseArgs(argv) {
     else if (a === '--dry-run') flags.dryRun = true;
     else if (a === '--prune') flags.prune = true;
     else if (a === '--no-hooks') flags.noHooks = true;
+    else if (a === '--remove') flags.remove = true;
+    else if (a === '--none') flags.none = true;
+    else if (a === '--color') {
+      flags.color = argv[++i];
+      if (!flags.color) throw new CliError('--color needs a value: #rgb, #rrggbb or none');
+    } else if (a.startsWith('--color=')) flags.color = a.slice('--color='.length);
     else if (a === '--cli-version') flags.cliVersion = true;
     else if (a === '-h' || a === '--help') flags.help = true;
     else if (a === '--root') {
@@ -1516,6 +1715,8 @@ function main() {
   else if (command === 'list') cmdList(root, flags);
   else if (command === 'bump') cmdBump(root, rest, flags);
   else if (command === 'feature' || command === 'unfeature') cmdFeature(root, rest, flags, command === 'feature');
+  else if (command === 'category') cmdCategory(root, rest, flags);
+  else if (command === 'categorize') cmdCategorize(root, rest, flags);
   else if (command === 'sync') cmdSync(root, flags);
   else throw new CliError(`Unknown command "${command}"\n\n${HELP}`);
 }

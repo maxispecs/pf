@@ -163,3 +163,31 @@ test('the pulpfixer checkout gets a cycle action (pf c), featured only where the
   assert.equal(featured.cycle?.featured, true);
   assert.equal(listActions(buildContext(repo())).some((a) => a.id === 'cycle'), false);
 });
+
+test('when: defaults for the git and cycle actions, a custom command and the actions section override them', () => {
+  const files = {
+    '.git/HEAD': '',
+    'pf': '',
+    'scripts/release.mjs': '',
+    'package.json': json({ name: 'pulpfixer-monorepo', scripts: { dev: 'node app.js' } }),
+    'packages/pulpfixer/package.json': json({ name: 'pulpfixer' }),
+  };
+  const byId = (config?: unknown) =>
+    Object.fromEntries(listActions(buildContext(mkRepo({ ...files, ...(config ? { 'pulpfixer.json': json(config) } : {}) }))).map((a) => [a.id, a]));
+  assert.deepEqual(byId().cycle?.when, ['pfBehind']);
+  assert.deepEqual(byId().dev?.when, []);
+  assert.deepEqual(byId({ actions: { cycle: { when: [] } } }).cycle?.when, []);
+  assert.deepEqual(byId({ actions: { dev: { when: 'changes' } } }).dev?.when, ['changes']);
+  const custom = byId({ commands: { seed: { run: 'x', when: ['unpushed'] }, plain: 'y' }, actions: { plain: { when: ['changes', 'pfBehind'] } } });
+  assert.deepEqual(custom.seed?.when, ['unpushed']);
+  assert.deepEqual(custom.plain?.when, ['changes', 'pfBehind']);
+});
+
+test('the actions document names the pf that printed it, with its build stack', () => {
+  const ctx = buildContext(repo());
+  assert.deepEqual(actionsDocument(ctx, true, { version: '7.17.0', stack: '3.48' }).pf, { version: '7.17.0', stack: '3.48' });
+  const doc = JSON.parse(pf(repo(), 'actions', '--json').out);
+  assert.equal(typeof doc.pf.version, 'string');
+  assert.ok(doc.pf.stack === null || typeof doc.pf.stack === 'string');
+  assert.ok(doc.actions.every((a: { when: unknown }) => Array.isArray(a.when)));
+});

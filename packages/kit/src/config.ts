@@ -15,12 +15,31 @@ export interface CustomCommand {
   icon?: string;
   /** Show the command as a button on the Repo Identity card. Custom commands are not featured unless they say so. */
   featured?: boolean;
+  /** Conditions that must all hold for the button to show (see `ACTION_CONDITIONS`); `[]` means always. */
+  when?: string[];
 }
 
 /** Per-action overrides in the `actions` section of `pulpfixer.json`, keyed by action id (`install`, `deploy:staging`, a custom command's name). */
 export interface ActionOverride {
   featured?: boolean;
   icon?: string;
+  when?: string[];
+}
+
+/**
+ * When an editor shows an action's button. All listed conditions must hold:
+ * `changes` (uncommitted files), `unpushed` (local commits no remote has), `pfBehind` (the global pf was
+ * built from an older stack version than the repo's versions.json).
+ */
+export const ACTION_CONDITIONS = ['changes', 'unpushed', 'pfBehind'] as const;
+export type ActionCondition = (typeof ACTION_CONDITIONS)[number];
+
+/** A `when` value (a condition name or a list of them) reduced to the known names; undefined when it is neither. */
+export function parseWhen(v: unknown): string[] | undefined {
+  const list = typeof v === 'string' ? [v] : Array.isArray(v) ? v : undefined;
+  if (!list) return undefined;
+  const known = new Set<string>(ACTION_CONDITIONS);
+  return [...new Set(list.filter((x): x is string => typeof x === 'string' && known.has(x.trim())).map((x) => x.trim()))];
 }
 
 /** A codicon name: lowercase letters, digits and dashes (`rocket`, `cloud-upload`). */
@@ -161,9 +180,11 @@ export function parseActionOverrides(v: unknown): Record<string, ActionOverride>
   const out: Record<string, ActionOverride> = {};
   for (const [id, o] of Object.entries(v)) {
     if (id === '__proto__' || !isObj(o)) continue;
+    const when = parseWhen(o.when);
     const entry: ActionOverride = {
       ...(typeof o.featured === 'boolean' ? { featured: o.featured } : {}),
       ...(typeof o.icon === 'string' && ICON_NAME.test(o.icon) ? { icon: o.icon } : {}),
+      ...(when ? { when } : {}),
     };
     if (Object.keys(entry).length) out[id] = entry;
   }
@@ -179,6 +200,7 @@ export function loadRepoConfig(root: string): RepoConfig {
         commands[name] = { run: v };
       } else if (v && typeof v === 'object' && typeof (v as { run?: unknown }).run === 'string') {
         const o = v as CustomCommand;
+        const when = parseWhen(o.when);
         commands[name] = {
           run: o.run,
           ...(typeof o.description === 'string' ? { description: o.description } : {}),
@@ -187,6 +209,7 @@ export function loadRepoConfig(root: string): RepoConfig {
           ...(o.message === true ? { message: true } : {}),
           ...(typeof o.icon === 'string' && ICON_NAME.test(o.icon) ? { icon: o.icon } : {}),
           ...(typeof o.featured === 'boolean' ? { featured: o.featured } : {}),
+          ...(when ? { when } : {}),
         };
       }
     }

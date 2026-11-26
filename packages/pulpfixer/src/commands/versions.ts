@@ -5,7 +5,7 @@ import { PACKAGE_NAME, pfHome } from '@pulpfixer/kit/constants';
 import { out, type Palette } from '@pulpfixer/kit/ui/palette';
 import { badgeLabel, termLine } from '@pulpfixer/kit/ui/text';
 import { compareVersions, readJson, takeFlag } from '@pulpfixer/kit/util';
-import { packageRoot, version } from '@pulpfixer/kit/version';
+import { buildStack, packageRoot, version } from '@pulpfixer/kit/version';
 import type { Command } from '@pulpfixer/kit/types';
 import { systemVersions, type SystemVersions } from '@pulpfixer/plugin-system';
 import { pfOnPath } from '../install/env.js';
@@ -55,13 +55,18 @@ export function bundledPackageVersion(pkg: string, specifier: string): string {
   return '';
 }
 
-export function pfSection(): VersionSection {
+export function pfSection(stack: string | null = buildStack()): VersionSection {
   return {
     id: 'pf',
     title: 'pf',
     hint: 'this installation',
     empty: '',
-    rows: [row(PACKAGE_NAME, version(), packageRoot()), row('node', process.versions.node, process.execPath)],
+    rows: [
+      row(PACKAGE_NAME, version(), packageRoot()),
+      // The stack version this build came from (an editor compares it with a repo's versions.json).
+      ...(stack ? [row('stack', stack, 'the pulpfixer stack this pf was built from')] : []),
+      row('node', process.versions.node, process.execPath),
+    ],
   };
 }
 

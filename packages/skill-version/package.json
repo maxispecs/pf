@@ -1,6 +1,6 @@
 {
   "name": "@pulpfixer/skill-version",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "pf skill: the version skill (major.minor versioning for any repo, with the zero-dependency versions CLI), bundled with pf",
   "license": "MIT",
   "type": "module",

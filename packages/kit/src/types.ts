@@ -30,5 +30,7 @@ export interface Entry {
   icon?: string;
   /** Shown as a button in editors by default (before the repo's `actions` overrides). */
   featured?: boolean;
+  /** Conditions that must all hold for the button to show (see `ACTION_CONDITIONS` in config.ts); missing or empty: always. */
+  when?: string[];
   run: () => Promise<number>;
 }

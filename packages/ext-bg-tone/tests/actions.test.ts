@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { commandLine, diffFeatured, isMissingInterpreter, mergePath, parseAction, parseActions, quoteArg, statusNotice } from '../src/actions.ts';
+import { compareStack, conditionHolds, evaluateWhen, parsePfInfo, type ActionFacts, commandLine, diffFeatured, isMissingInterpreter, mergePath, parseAction, parseActions, quoteArg, statusNotice } from '../src/actions.ts';
 
 const doc = (actions: unknown[], over: Record<string, unknown> = {}) =>
 	JSON.stringify({ schema: 1, repo: 'arbiter', actions, ...over });
@@ -73,7 +73,7 @@ test('commandLine puts pf first and quotes the path to it', () => {
 });
 
 test('diffFeatured lists what the picker turned on and off', () => {
-	const mk = (id: string, featured: boolean) => ({ id, label: id, icon: 'terminal', featured, argv: [id] });
+	const mk = (id: string, featured: boolean) => ({ id, label: id, icon: 'terminal', featured, when: [], argv: [id] });
 	const all = [mk('dev', true), mk('doc', true), mk('build', false), mk('test', false)];
 	assert.deepEqual(diffFeatured(all, ['dev', 'build']), { feature: ['build'], unfeature: ['doc'] });
 	assert.deepEqual(diffFeatured(all, ['dev', 'doc']), { feature: [], unfeature: [] });
@@ -100,4 +100,61 @@ test('isMissingInterpreter spots a pf whose node is not on PATH', () => {
 	assert.equal(isMissingInterpreter(127, '/bin/sh: pf: command not found'), true);
 	assert.equal(isMissingInterpreter(1, 'env: node: No such file or directory'), false);
 	assert.equal(isMissingInterpreter(127, ''), false);
+});
+
+test('parseAction reads when and drops anything that is not text', () => {
+	assert.deepEqual(parseAction({ id: 'a', argv: ['a'], when: ['unpushed', 'changes'] })?.when, ['unpushed', 'changes']);
+	assert.deepEqual(parseAction({ id: 'a', argv: ['a'], when: ['x', 3, '', 'a\nb'] })?.when, ['x']);
+	assert.deepEqual(parseAction({ id: 'a', argv: ['a'], when: 'changes' })?.when, []);
+	assert.deepEqual(parseAction({ id: 'a', argv: ['a'] })?.when, []);
+});
+
+test('parseActions reads the pf block, and null for an older pf', () => {
+	const r = parseActions(doc([dev], { pf: { version: '7.17.0', stack: '3.48' } }));
+	assert.ok(r.ok);
+	assert.deepEqual(r.pf, { version: '7.17.0', stack: '3.48' });
+	const unstamped = parseActions(doc([dev], { pf: { version: '7.16.0', stack: null } }));
+	assert.ok(unstamped.ok);
+	assert.deepEqual(unstamped.pf, { version: '7.16.0', stack: null });
+	const old = parseActions(doc([dev]));
+	assert.ok(old.ok);
+	assert.equal(old.pf, null);
+	assert.deepEqual(parsePfInfo({ version: 'x', stack: 'nope' }), { version: 'x', stack: null });
+});
+
+test('compareStack compares numerically and refuses non-versions', () => {
+	assert.ok(compareStack('3.9', '3.10')! < 0);
+	assert.ok(compareStack('3.47', '3.46')! > 0);
+	assert.equal(compareStack('3.47', '3.47.0'), 0);
+	assert.ok(compareStack('2.99', '3.0')! < 0);
+	assert.equal(compareStack('', '3.0'), undefined);
+	assert.equal(compareStack('v3', '3.0'), undefined);
+});
+
+const facts = (over: Partial<ActionFacts> = {}): ActionFacts => ({ changes: 0, unpushed: 0, repoStack: '3.47', pfStack: '3.47', ...over });
+
+test('changes and unpushed show only while there is something, and never hide on an unknown count', () => {
+	assert.equal(conditionHolds('changes', facts({ changes: 0 })), false);
+	assert.equal(conditionHolds('changes', facts({ changes: 2 })), true);
+	assert.equal(conditionHolds('changes', facts({ changes: null })), true);
+	assert.equal(conditionHolds('unpushed', facts({ unpushed: 0 })), false);
+	assert.equal(conditionHolds('unpushed', facts({ unpushed: 1 })), true);
+	assert.equal(conditionHolds('unpushed', facts({ unpushed: null })), true);
+});
+
+test('pfBehind: the pf stack is below the repo stack, a pf with no stamp is behind, unknowns never hide', () => {
+	assert.equal(conditionHolds('pfBehind', facts({ pfStack: '3.46' })), true);
+	assert.equal(conditionHolds('pfBehind', facts({ pfStack: '3.47' })), false);
+	assert.equal(conditionHolds('pfBehind', facts({ pfStack: '3.48' })), false);
+	assert.equal(conditionHolds('pfBehind', facts({ pfStack: '3.9', repoStack: '3.10' })), true);
+	assert.equal(conditionHolds('pfBehind', facts({ pfStack: null })), true);
+	assert.equal(conditionHolds('pfBehind', facts({ pfStack: undefined })), true);
+	assert.equal(conditionHolds('pfBehind', facts({ pfStack: '3.1', repoStack: '' })), true);
+});
+
+test('evaluateWhen needs every condition; none or an unknown one counts as holding', () => {
+	assert.equal(evaluateWhen([], facts()), true);
+	assert.equal(evaluateWhen(['whatever'], facts()), true);
+	assert.equal(evaluateWhen(['changes', 'unpushed'], facts({ changes: 1, unpushed: 0 })), false);
+	assert.equal(evaluateWhen(['changes', 'unpushed'], facts({ changes: 1, unpushed: 3 })), true);
 });

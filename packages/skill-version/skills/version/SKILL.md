@@ -204,7 +204,9 @@ Suggestion: add a "Versioning" rule to AGENTS.md so agents bump the minor versio
 | Bump the stack only | `node scripts/version.mjs bump stack <major\|minor>` |
 | Feature packages (list them first, after the stack) | `node scripts/version.mjs feature <path-or-name> [<path-or-name> ...]` |
 | Remove packages from the featured list | `node scripts/version.mjs unfeature <path-or-name> [...]` |
-| Preview any bump, feature or unfeature | add `--dry-run` |
+| List, create, recolor or remove categories | `node scripts/version.mjs category [<name>] [--color <#hex\|none>] [--remove]` |
+| Put packages in a category (or take them out) | `node scripts/version.mjs categorize <category> <path-or-name> [...]` / `categorize --none <path-or-name> [...]` |
+| Preview any bump, feature, unfeature, category or categorize | add `--dry-run` |
 | Pick up new packages | `node scripts/version.mjs init` (add `--prune` to drop deleted ones) |
 | Fix native manifests that drifted | `node scripts/version.mjs sync` |
 
@@ -221,6 +223,10 @@ Never edit versions in `package.json` or `pyproject.toml` by hand. Edit `version
 ### Featured packages
 
 In a repo with many packages the list gets long. `feature` puts the packages that matter on top: they are listed right after the stack row, in the order they were featured, marked with `★`, in the table, the bump commands and the interactive list. Everything else follows alphabetically. The order is stored in the top-level `featured` array of `versions.json`. Featuring changes no version: no `since`, no stack minor, no sync. Only feature packages when the user asks (or after setup, as a suggestion when there are more than about 8 packages); never choose them for the user. To reorder, `unfeature` then `feature` again. `list --json` has `featured: true|false` on each package. Needs CLI revision 8 or newer.
+
+### Categories
+
+A repo with many packages can group them. A **category** is a name with an optional color; a package belongs to at most one. `list` adds a CATEGORY column and lists the packages grouped (after the featured ones), the interactive list shows a header per group, and the Background Tone Versions pane tints each group with its color. Categories live in the top-level `categories` object of `versions.json` (its order is the group order; each value is `{ "color": "#4aa3ff" }`, `#rgb` or `#rrggbb`, color optional) and a package's `"category": "<name>"` entry. Create one with `category <name> --color <#hex>`, assign packages with `categorize <name> <target> ...`. Categories change no version: no `since`, stack minor, sync or hook. Only create categories or assign packages when the user asks (or as a suggestion after setup when there are more than about 8 packages); never choose them for the user. `list --json` has `category` on each package and a top-level `categories` array (`name`, `color`). Needs CLI revision 9 or newer.
 
 ## Hooks (repo-specific sync and pre-commit)
 

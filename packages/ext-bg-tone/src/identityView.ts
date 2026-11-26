@@ -13,6 +13,8 @@ import { VersionsService, hasVersionsFile } from './versionsService.ts';
 import * as fs from 'node:fs';
 import { runGit } from './git.ts';
 import { countChangedFiles } from './gitChanges.ts';
+import { parseAheadCount } from './gitAhead.ts';
+import { ActionFacts, evaluateWhen } from './actions.ts';
 import { LOG_ARGS_FORMAT, parseHashSet, parseRecentCommits } from './gitLog.ts';
 
 /** How often the card re-reads the agent transcripts (cheap: one directory scan, two small reads). */
@@ -85,6 +87,18 @@ async function uncommittedFiles(): Promise<number | null> {
 	}
 	const result = await runGit(folder.uri.fsPath, ['status', '--porcelain=v1', '-z', '--untracked-files=all'], 5000);
 	return result.ok ? countChangedFiles(result.stdout) : null;
+}
+
+/** Local commits no remote has (the upstream's `..HEAD`, else those no remote branch has); null when git cannot say. */
+async function unpushedCommits(): Promise<number | null> {
+	const folder = primaryFolder();
+	if (folder?.uri.scheme !== 'file') {
+		return null;
+	}
+	const cwd = folder.uri.fsPath;
+	const upstream = await runGit(cwd, ['rev-list', '@{upstream}..HEAD'], 5000);
+	const local = upstream.ok ? upstream : await runGit(cwd, ['rev-list', 'HEAD', '--not', '--remotes'], 5000);
+	return local.ok ? parseAheadCount(local.stdout) : null;
 }
 
 /** The last 3 commits of the primary folder (`git log`); empty without a local git repo, git, or any commit. */
@@ -272,16 +286,18 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		view.title = repoName();
 		view.description = undefined;
 		const config = readConfig();
-		const [runs, commits, changes, versions] = await Promise.all([
+		const [runs, commits, changes, versions, unpushed] = await Promise.all([
 			this.list === 'chats' && config.showLastAgent ? this.recentAgents() : Promise.resolve(undefined),
 			this.list === 'commits' && config.showLastCommits ? recentCommits() : Promise.resolve(undefined),
 			uncommittedFiles(),
 			this.showsVersions() ? this.versions.state() : Promise.resolve(undefined),
+			// Only a featured button with a `when` of `unpushed` needs it: skip the two git calls otherwise.
+			this.needs('unpushed') ? unpushedCommits() : Promise.resolve(null),
 		]);
 		if (generation !== this.generation || this.view !== view) {
 			return; // a newer refresh superseded this one, or the view went away
 		}
-		const snapshot = this.snapshot(runs?.map(({ title, status, updatedAt }) => ({ title, status, updatedAt })), commits, changes, versions);
+		const snapshot = this.snapshot(runs?.map(({ title, status, updatedAt }) => ({ title, status, updatedAt })), commits, changes, versions, { changes: changes ?? null, unpushed });
 		if (this.logos.loaded && this.actions.status.type !== 'loading') {
 			this.cache.set(snapshot);
 		}
@@ -289,7 +305,13 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 	}
 
 	/** The card from what is known now, with the cached values for the parts that have not loaded yet. */
-	private snapshot(agents: CardAgent[] | undefined, commits?: CardCommit[], changes?: number | null, versions?: VersionsState): CardSnapshot {
+	private snapshot(
+		agents: CardAgent[] | undefined,
+		commits?: CardCommit[],
+		changes?: number | null,
+		versions?: VersionsState,
+		counts?: { changes: number | null; unpushed: number | null },
+	): CardSnapshot {
 		const config = readConfig();
 		const logo = this.logos.logo;
 		return composeSnapshot(
@@ -303,7 +325,7 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 				agents: this.list === 'chats' && !config.showLastAgent ? [] : agents,
 				commits: this.list === 'commits' && !config.showLastCommits ? [] : commits,
 				versions,
-				actions: !config.showActions ? NO_ACTIONS : this.actions.status.type === 'loading' ? undefined : this.actionsState(),
+				actions: !config.showActions ? NO_ACTIONS : this.actions.status.type === 'loading' || !counts ? undefined : this.actionsState(counts),
 			},
 			this.cache.snapshot,
 		);
@@ -321,8 +343,23 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 		return this.list === 'commits' && readConfig().versions === 'card';
 	}
 
+	/** True when a featured button has `condition` in its `when` (so its fact is worth gathering). */
+	private needs(condition: string): boolean {
+		return this.actions.featured.some(a => a.when.includes(condition));
+	}
+
+	/** What a button's `when` is checked against. A count that was not gathered is unknown (never hides a button). */
+	private facts(counts: { changes: number | null; unpushed: number | null }): ActionFacts {
+		return {
+			changes: counts.changes,
+			unpushed: counts.unpushed,
+			repoStack: stackVersion(),
+			pfStack: this.actions.pfStack,
+		};
+	}
+
 	/** What the card draws for the actions row: the featured buttons, whether to offer editing, and a hint when pf is the problem. */
-	private actionsState(): CardActions {
+	private actionsState(counts: { changes: number | null; unpushed: number | null }): CardActions {
 		const status = this.actions.status;
 		const hint =
 			status.type === 'no-pf'
@@ -333,7 +370,9 @@ export class IdentityCardProvider implements vscode.WebviewViewProvider, vscode.
 						? `Repo actions failed: ${status.reason}`.slice(0, 140)
 						: '';
 		return {
-			buttons: this.actions.featured.map(({ id, label, icon }) => ({ id, label, icon })),
+			buttons: this.actions.featured
+				.filter(a => evaluateWhen(a.when, this.facts(counts)))
+				.map(({ id, label, icon }) => ({ id, label, icon })),
 			canEdit: status.type === 'ready' && this.actions.actions.length > 0,
 			hint,
 		};
@@ -413,13 +452,15 @@ ${scripts.map(file => `<script nonce="${n}" src="${media(file)}"></script>`).joi
 </html>`;
 }
 
-/** Redraw triggers for the versions: `versions.json` itself and the git log of HEAD (a commit resets "stack bumped"). */
+/** Redraw triggers for the versions and the buttons: `versions.json`, the git log of HEAD (a commit resets "stack bumped") and remote refs. */
 function watchVersions(onChange: () => void): vscode.Disposable {
 	const folder = primaryFolder();
 	if (!folder) {
 		return { dispose: () => undefined };
 	}
-	const watchers = [VERSIONS_FILE, '.git/logs/HEAD'].map(pattern => {
+	// Also what the action buttons depend on: a push moves a remote ref. Not `.git/index`: our own `git status`
+	// refreshes it, which would redraw the card in a loop (edits are covered by the save and file events).
+	const watchers = [VERSIONS_FILE, '.git/logs/HEAD', '.git/refs/remotes/**'].map(pattern => {
 		const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
 		watcher.onDidChange(onChange);
 		watcher.onDidCreate(onChange);

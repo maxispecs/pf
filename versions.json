@@ -1,6 +1,6 @@
 {
   "stack": {
-    "version": "3.47",
+    "version": "3.49",
     "since": "2026-11-25"
   },
   "featured": [
@@ -26,17 +26,17 @@
       "type": "node"
     },
     "packages/docs": {
-      "version": "2.24",
+      "version": "2.25",
       "since": "2026-11-25",
       "type": "node"
     },
     "packages/ext-bg-tone": {
-      "version": "2.8",
+      "version": "2.9",
       "since": "2026-11-25",
       "type": "node"
     },
     "packages/kit": {
-      "version": "6.15",
+      "version": "6.16",
       "since": "2026-11-25",
       "type": "node"
     },
@@ -91,7 +91,7 @@
       "type": "node"
     },
     "packages/pulpfixer": {
-      "version": "7.16",
+      "version": "7.17",
       "since": "2026-11-25",
       "type": "node"
     },
@@ -101,7 +101,7 @@
       "type": "node"
     },
     "packages/skill-version": {
-      "version": "1.0",
+      "version": "1.1",
       "since": "2026-11-25",
       "type": "node"
     },

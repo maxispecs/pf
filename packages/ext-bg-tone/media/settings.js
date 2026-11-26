@@ -285,6 +285,11 @@
 	const ICON_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 	let actionsKey = null;
 
+	const WHEN_TEXT = { changes: 'there are uncommitted files', unpushed: 'there are unpushed commits', pfBehind: 'the installed pf is older than this repo' };
+	function whenText(condition) {
+		return WHEN_TEXT[condition] || condition;
+	}
+
 	function renderActions() {
 		const a = state.actions || { status: 'loading', notice: '', items: [] };
 		const key = JSON.stringify(a);
@@ -309,7 +314,8 @@
 			box.checked = item.featured;
 			return h('label', { class: 'check action-row' }, box,
 				h('span', { class: 'codicon codicon-' + (ICON_NAME.test(item.icon) ? item.icon : 'terminal'), 'aria-hidden': 'true' }),
-				h('span', { class: 'text' }, item.label, h('span', { class: 'muted small' }, h('code', { text: item.command }), '  ' + item.id)));
+				h('span', { class: 'text' }, item.label, h('span', { class: 'muted small' }, h('code', { text: item.command }), '  ' + item.id),
+					item.when && item.when.length ? h('span', { class: 'muted small', text: 'Shown only when ' + item.when.map(whenText).join(' and ') }) : null));
 		});
 		if (!rows.length) {
 			rows.push(h('p', {

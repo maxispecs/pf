@@ -179,6 +179,81 @@ test('featured packages are listed right after the stack, in featured order, and
 	assert.deepEqual(parseVersionsFile('{"stack":{"version":"1.0"},"featured":[1]}')?.featured, []);
 });
 
+test('categories group the rows in file order, with the featured block still first', () => {
+	const text = JSON.stringify({
+		stack: { version: '1.0' },
+		featured: ['packages/web'],
+		categories: { core: { color: '#4AA3FF' }, plain: {}, bad: { color: 'red' }, ' pad': { color: '#fff' }, empty: null },
+		packages: {
+			'packages/aws': { version: '2.0', type: 'node', category: 'plain' },
+			'packages/db': { version: '1.0', type: 'node' },
+			'packages/gone': { version: '1.0', type: 'node', category: 'nowhere' },
+			'packages/kit': { version: '1.4', type: 'node', category: 'core' },
+			'packages/web': { version: '1.0', type: 'node', category: 'core' },
+			'packages/zed': { version: '1.0', type: 'node', category: 'core' },
+		},
+	});
+	const file = parseVersionsFile(text)!;
+	// A bad color keeps the category without one, a non-object value too; a padded name is dropped.
+	assert.deepEqual(file.categories, [{ name: 'core', color: '#4aa3ff' }, { name: 'plain' }, { name: 'bad' }, { name: 'empty' }]);
+	const state = versionsState(file, { stackDone: false, canBump: true });
+	assert.deepEqual(state.rows.map(r => [r.label, r.featured, r.category, r.color]), [
+		['stack', false, undefined, undefined],
+		['web', true, 'core', '#4aa3ff'], // featured block first, keeps its category color
+		['kit', false, 'core', '#4aa3ff'],
+		['zed', false, 'core', '#4aa3ff'],
+		['aws', false, 'plain', undefined],
+		['db', false, undefined, undefined], // no category
+		['gone', false, undefined, undefined], // a category that is not defined counts as none
+	]);
+	assert.deepEqual(state.categories, file.categories);
+	// Without categories the order is the old one.
+	assert.deepEqual(versionsState(parseVersionsFile(FILE), { stackDone: false, canBump: true }).categories, []);
+	// A malformed categories value means none.
+	assert.deepEqual(parseVersionsFile('{"stack":{"version":"1.0"},"categories":["a"]}')?.categories, []);
+});
+
+test('bumping or featuring keeps categories and each package category', () => {
+	const doc = {
+		stack: { version: '1.0' },
+		categories: { core: { color: '#4aa3ff' } },
+		hooks: { postSync: 'echo hi' },
+		packages: { 'packages/a': { version: '1.0', type: 'node', category: 'core' }, 'packages/b': { version: '1.0', type: 'node' } },
+	};
+	const text = JSON.stringify(doc);
+	const bump = planBump(text, 'packages/a', 'minor', { stackDone: true, today: TODAY });
+	const bumped = bump.ok ? JSON.parse(bump.text) : {};
+	assert.deepEqual(bumped.categories, doc.categories);
+	assert.equal(bumped.packages['packages/a'].category, 'core');
+	assert.equal(bumped.packages['packages/a'].version, '1.1');
+	const feature = planFeature(text, 'packages/b', true);
+	const featured = feature.ok ? JSON.parse(feature.text) : {};
+	assert.deepEqual(featured.categories, doc.categories);
+	assert.equal(featured.packages['packages/a'].category, 'core');
+	assert.deepEqual(Object.keys(featured), ['stack', 'featured', 'categories', 'hooks', 'packages']);
+});
+
+test('parseVersionsState accepts only hex colors for categories and rows', () => {
+	const text = JSON.stringify({
+		stack: { version: '1.0' },
+		categories: { core: { color: '#4aa3ff' } },
+		packages: { 'packages/a': { version: '1.0', type: 'node', category: 'core' } },
+	});
+	const state = versionsState(parseVersionsFile(text), { stackDone: false, canBump: true });
+	assert.deepEqual(parseVersionsState(JSON.parse(JSON.stringify(state))), state);
+	const evil = JSON.parse(JSON.stringify(state));
+	evil.rows[1].color = 'red; background: url(x)';
+	evil.categories[0].color = 'url(x)';
+	const parsed = parseVersionsState(evil);
+	assert.equal(parsed.rows[1].category, 'core');
+	assert.equal('color' in parsed.rows[1], false);
+	assert.deepEqual(parsed.categories, [{ name: 'core' }]);
+	// A state saved before categories existed has none.
+	const old = JSON.parse(JSON.stringify(state));
+	delete old.categories;
+	assert.deepEqual(parseVersionsState(old).categories, []);
+});
+
 test('parseVersionsState keeps only well-formed rows', () => {
 	const state = versionsState(parseVersionsFile(FILE), { stackDone: true, canBump: true, hint: 'h' });
 	assert.deepEqual(parseVersionsState(JSON.parse(JSON.stringify(state))), state);

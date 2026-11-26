@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { RepoAction, commandLine, isMissingInterpreter, mergePath, parseActions } from './actions.ts';
+import { PfInfo, RepoAction, commandLine, isMissingInterpreter, mergePath, parseActions } from './actions.ts';
 import { primaryFolder } from './store.ts';
 
 /** Files whose change can add or remove an action (what pf's detection reads, plus its own config). */
@@ -109,6 +109,8 @@ function loginShellPath(): Promise<string> {
  */
 export class ActionsService implements vscode.Disposable {
 	private all: RepoAction[] = [];
+	/** The pf that printed the list (null: none, or an older pf that prints no `pf` block). */
+	private pfInfo: PfInfo | null = null;
 	private state: ActionsStatus = { type: 'loading' };
 	private generation = 0;
 	private timer: ReturnType<typeof setTimeout> | undefined;
@@ -140,7 +142,14 @@ export class ActionsService implements vscode.Disposable {
 		if (typeof vscode.window.onDidStartTerminalShellExecution === 'function') {
 			this.disposables.push(
 				vscode.window.onDidStartTerminalShellExecution(e => this.busy.add(e.terminal)),
-				vscode.window.onDidEndTerminalShellExecution(e => this.busy.delete(e.terminal)),
+				vscode.window.onDidEndTerminalShellExecution(e => {
+					this.busy.delete(e.terminal);
+					// A finished action can change what the buttons depend on (a push, a commit, `pf u` after the dev
+					// cycle: the pf's stack), so re-read the pf and redraw instead of waiting for the next poll.
+					if (e.terminal.name.startsWith('pf: ')) {
+						this.refreshSoon();
+					}
+				}),
 			);
 		}
 		this.rewatch();
@@ -178,10 +187,19 @@ export class ActionsService implements vscode.Disposable {
 		}
 		this.all = next.actions;
 		this.state = next.status;
+		this.pfInfo = next.pf ?? null;
 		this.emitter.fire();
 	}
 
-	private async load(): Promise<{ status: ActionsStatus; actions: RepoAction[] }> {
+	/**
+	 * The stack version the pf was built from: a version, null when pf has no stamp (older than the stamp),
+	 * undefined when no pf answered (conditions on it then never hide a button).
+	 */
+	get pfStack(): string | null | undefined {
+		return this.state.type === 'ready' ? this.pfInfo?.stack ?? null : undefined;
+	}
+
+	private async load(): Promise<{ status: ActionsStatus; actions: RepoAction[]; pf?: PfInfo | null }> {
 		const folder = primaryFolder();
 		if (!folder || folder.uri.scheme !== 'file') {
 			return { status: { type: 'unavailable', reason: 'local folders only' }, actions: [] };
@@ -195,7 +213,7 @@ export class ActionsService implements vscode.Disposable {
 			const { stdout } = await this.runPf(args, cwd);
 			const parsed = parseActions(stdout);
 			return parsed.ok
-				? { status: { type: 'ready' }, actions: parsed.actions }
+				? { status: { type: 'ready' }, actions: parsed.actions, pf: parsed.pf }
 				: { status: { type: 'error', reason: parsed.reason }, actions: [] };
 		} catch (e) {
 			const err = e as NodeJS.ErrnoException & { stderr?: string };

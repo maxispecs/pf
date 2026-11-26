@@ -12,12 +12,36 @@ To see what is installed on this machine instead (pf, plugins, skills, extension
 pf ver                         # list versions, with ready-to-run bump commands
 pf ver bump packages/pulpfixer minor
 pf ver bump packages/kit packages/pulpfixer minor   # several targets, the stack minor rises once
+pf ver feature packages/kit    # list a package first (after the stack), in bold in the editor
+pf ver category core --color '#4aa3ff'   # create a category (the color is optional)
+pf ver categorize core kit aws           # put packages in it
 pf ver init                    # create versions.json, or add newly found packages
 pf ver sync                    # rewrite manifests from versions.json
 pf ver --dry-run               # preview
 ```
 
 The state lives in `versions.json` at the repo root. Never edit versions in manifests by hand: `pf ver bump` updates `versions.json` and each manifest together.
+
+## Categories
+
+A repo with many packages can group them. A **category** is a name with an optional color (`#rgb` or `#rrggbb`); a package is in at most one. They are stored in `versions.json`: a top-level `categories` object (its order is the group order) and a `category` on each package.
+
+```json
+{
+  "categories": { "core": { "color": "#4aa3ff" }, "plugins": { "color": "#b180d7" } },
+  "packages": { "packages/kit": { "version": "1.4", "type": "node", "category": "core" } }
+}
+```
+
+| Command | Effect |
+|---------|--------|
+| `pf ver category` | List the categories with their color and package count |
+| `pf ver category <name> [--color <#hex\|none>]` | Create a category, or change its color |
+| `pf ver category <name> --remove` | Delete it (its packages are left without a category) |
+| `pf ver categorize <category> <package>...` | Put packages in a category |
+| `pf ver categorize --none <package>...` | Take packages out of their category |
+
+Categories change no version. `pf ver` lists the stack, then the featured packages (whatever their category), then one group per category in the `categories` order, then the packages with none. The list gets a CATEGORY column and a package's name takes its category color; the interactive list has a header per group, and the [Background Tone](/plugins/bg-tone#versions) Versions view tints each group with its color. `list --json` has `category` on each package and a `categories` array. Needs CLI revision 9 or newer.
 
 ## Rules of thumb
 

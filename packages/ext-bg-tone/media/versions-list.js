@@ -43,6 +43,23 @@
 		return button;
 	}
 
+	/** A category color, only when it is a plain hex color: the one value that ever reaches a style property. */
+	function tintOf(color) {
+		return typeof color === 'string' && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color) ? color : '';
+	}
+
+	/** The line that starts a group of rows: a dot in the category color and its name. */
+	function groupHeader(text, color) {
+		const el = h('div', 'ver-group', text);
+		el.setAttribute('role', 'presentation');
+		const tint = tintOf(color);
+		if (tint) {
+			el.classList.add('ver-tinted');
+			el.style.setProperty('--ver-cat', tint);
+		}
+		return el;
+	}
+
 	let key = '';
 	let element = null;
 
@@ -51,7 +68,7 @@
 	 * state is unchanged, so the periodic refresh does not rebuild buttons under the pointer.
 	 */
 	function render(versions, post, inCard) {
-		const v = versions && Array.isArray(versions.rows) ? versions : { rows: [], pending: null, canBump: false, stackDone: false, hint: '' };
+		const v = versions && Array.isArray(versions.rows) ? versions : { rows: [], pending: null, canBump: false, stackDone: false, hint: '', categories: [] };
 		const next = JSON.stringify([v, !!inCard]);
 		if (next === key) {
 			return element;
@@ -79,13 +96,28 @@
 		}
 		const list = h('div', 'versions-list');
 		list.setAttribute('role', 'list');
+		// With categories, a header starts each group of rows: the featured block (whatever the category), each
+		// category, then the packages with none. Rows come in that order already (see versionsState).
+		const grouped = Array.isArray(v.categories) && v.categories.length > 0;
+		let group;
 		for (const row of v.rows) {
-			const el = h('div', 'ver-row' + (row.target === 'stack' ? ' ver-stack' : '') + (row.featured ? ' ver-featured' : ''));
+			if (grouped && row.target !== 'stack') {
+				const key = row.featured ? '\0featured' : row.category || '\0other';
+				if (key !== group) {
+					group = key;
+					list.append(groupHeader(row.featured ? 'Featured' : row.category || 'Other', row.featured ? undefined : row.color));
+				}
+			}
+			const tint = tintOf(row.color);
+			const el = h('div', 'ver-row' + (row.target === 'stack' ? ' ver-stack' : '') + (row.featured ? ' ver-featured' : '') + (tint ? ' ver-tinted' : ''));
 			el.setAttribute('role', 'listitem');
+			if (tint) {
+				el.style.setProperty('--ver-cat', tint);
+			}
 			// Left-aligned and cut from the left (see .ver-name): the end of a path is the name that matters.
 			const name = h('span', 'ver-name');
 			name.append(h('bdi', undefined, row.label));
-			name.title = row.target + (row.featured ? ' (featured)' : '') + (row.since ? ' (since ' + row.since + ')' : '');
+			name.title = row.target + (row.featured ? ' (featured)' : '') + (row.category ? ' (' + row.category + ')' : '') + (row.since ? ' (since ' + row.since + ')' : '');
 			const control = h('span', 'ver-control');
 			control.append(plus(row, 'major', v.canBump, post), h('span', 'ver-version', row.version), plus(row, 'minor', v.canBump, post));
 			// The stack cannot be featured: an empty slot keeps the rows lined up.

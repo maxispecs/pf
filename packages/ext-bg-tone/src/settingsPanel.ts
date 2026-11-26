@@ -177,11 +177,12 @@ export class SettingsPanel implements vscode.Disposable {
 			actions: {
 				status: this.actions.status.type,
 				notice: statusNotice(this.actions.status),
-				items: this.actions.actions.map(({ id, label, icon, featured, argv }) => ({
+				items: this.actions.actions.map(({ id, label, icon, featured, when, argv }) => ({
 					id,
 					label,
 					icon,
 					featured,
+					when,
 					command: `pf ${argv.join(' ')}`,
 				})),
 			},

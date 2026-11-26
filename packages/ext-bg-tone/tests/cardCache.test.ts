@@ -18,6 +18,7 @@ const cached: CardSnapshot = {
 		canBump: true,
 		stackDone: false,
 		hint: '',
+		categories: [],
 	},
 };
 

@@ -4,6 +4,7 @@ import type { Command } from '@pulpfixer/kit/types';
 import { err, out } from '@pulpfixer/kit/ui/palette';
 import { badgeLabel, termLine } from '@pulpfixer/kit/ui/text';
 import { takeFlag, takeOption } from '@pulpfixer/kit/util';
+import { buildStack, version } from '@pulpfixer/kit/version';
 import { defaultMeta } from '../actionmeta.js';
 import { entriesFor } from '../menu.js';
 
@@ -18,8 +19,17 @@ export interface ActionInfo {
   /** Codicon name. */
   icon: string;
   featured: boolean;
+  /** Conditions that must all hold for an editor to show its button (`changes`, `unpushed`, `pfBehind`); empty: always. */
+  when: string[];
   /** The pf arguments that run it (`pf deploy staging`). */
   argv: string[];
+}
+
+/** The pf that printed the document: an editor compares `stack` with the repo's `versions.json` (the `pfBehind` condition). */
+export interface PfInfo {
+  version: string;
+  /** The stack version this pf was built from; null for a build with no stamp. */
+  stack: string | null;
 }
 
 /** Bump when a field of `ActionInfo` changes meaning; the JSON carries it so a client can refuse a newer shape. */
@@ -45,6 +55,8 @@ export function listActions(ctx: Context): ActionInfo[] {
       group: e.group,
       icon: over?.icon ?? e.icon ?? d.icon,
       featured: over?.featured ?? e.featured ?? d.featured,
+      // `e.when` already holds a custom command's own `when`, else the default.
+      when: over?.when ?? e.when ?? d.when ?? [],
       argv: e.argv,
     });
   }
@@ -52,9 +64,13 @@ export function listActions(ctx: Context): ActionInfo[] {
 }
 
 /** The JSON document `pf actions --json` prints. */
-export function actionsDocument(ctx: Context, all: boolean): { schema: number; repo: string | null; actions: ActionInfo[] } {
+export function actionsDocument(
+  ctx: Context,
+  all: boolean,
+  pf: PfInfo = { version: version(), stack: buildStack() },
+): { schema: number; repo: string | null; pf: PfInfo; actions: ActionInfo[] } {
   const actions = listActions(ctx);
-  return { schema: ACTIONS_SCHEMA, repo: ctx.repo?.name ?? null, actions: all ? actions : actions.filter((a) => a.featured) };
+  return { schema: ACTIONS_SCHEMA, repo: ctx.repo?.name ?? null, pf, actions: all ? actions : actions.filter((a) => a.featured) };
 }
 
 const w = (s: string) => process.stdout.write(s + '\n');
@@ -75,7 +91,7 @@ function printTable(ctx: Context, all: boolean): number {
   const iconW = Math.max(...actions.map((a) => a.icon.length));
   w(`${c.bold(ctx.repo.name)}  ${c.dim(all ? 'every action; * = featured (a button)' : 'featured actions (a button each)')}`);
   for (const a of actions) {
-    w(`  ${a.featured ? '*' : ' '} ${c.bold(a.id.padEnd(idW))}  ${c.dim(a.icon.padEnd(iconW))}  ${a.summary}  ${c.dim(`pf ${a.argv.join(' ')}`)}`);
+    w(`  ${a.featured ? '*' : ' '} ${c.bold(a.id.padEnd(idW))}  ${c.dim(a.icon.padEnd(iconW))}  ${a.summary}  ${c.dim(`pf ${a.argv.join(' ')}`)}${a.when.length ? c.dim(`  (when ${a.when.join(' + ')})`) : ''}`);
   }
   return 0;
 }

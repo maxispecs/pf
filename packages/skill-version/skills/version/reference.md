@@ -18,6 +18,7 @@
 - Keys under `packages` are repo-relative POSIX paths. The CLI sorts them on write.
 - `type` is `node` (synced to `package.json`), `python` (synced to `pyproject.toml`, falling back to `setup.py`), `php` (synced to `composer.json`) or `skill` (synced to the `SKILL.md` frontmatter).
 - `featured` (optional, top level) is an ordered array of package paths, for example `"featured": ["apps/web", "packages/ui"]`. Those packages are listed first, right after the stack row, in that order; the rest follow alphabetically. It must be an array of non-empty strings with no duplicates, or the CLI refuses to run. A path that is not in `packages` is not an error: `list` warns about it and ignores it for ordering, and `unfeature <path>` or `init --prune` removes it. The CLI writes `featured` right after `stack` and drops the key when it is empty. Use `feature` / `unfeature` to edit it (see below).
+- `categories` (optional, top level) is an ordered object of category names, each `{ "color"?: "#rgb" | "#rrggbb" }`, for example `"categories": { "core": { "color": "#4aa3ff" }, "data": {} }`. Names have no leading or trailing spaces and no control characters; a malformed object or color makes the CLI refuse to run. A package's optional `"category"` is one of those names; a name that is not defined is a warning in `list` and counts as no category. The CLI writes `categories` right after `featured` (or `stack`) and drops the key when it is empty. Use `category` / `categorize` to edit it (see below).
 - Unknown top-level keys, and unknown keys on an entry, are preserved. On bump, `version` and `since` are written first, then `type`, then any extra keys.
 
 ## Bump semantics
@@ -48,6 +49,20 @@ Write order: `versions.json` is written first, then native manifests. If a nativ
 Targets resolve like `bump` targets (path, package name, or unique directory name). `stack` is rejected. Only the `featured` key of `versions.json` is written: no version, `since`, stack bump, native manifest or hook is touched, and the commit button does not pick it up. `--dry-run` shows the result without writing. Bumping, `sync` and `init` keep `featured` as it is; `init --prune` also drops pruned paths from it.
 
 Ordering is the same everywhere: `list`, the bump commands block, `list --json` (the `packages` array, each with `featured`) and the interactive list. The stack is always first. Once any package is featured, the TARGET column gets a 2 character lead on every row: `★ ` for featured packages and blanks for the others, so names stay aligned. Bump commands and JSON paths stay plain.
+
+## Categories (`category`, `categorize`)
+
+| Command | Effect |
+|---------|--------|
+| `category` | Lists the categories with their color and package count. |
+| `category <name> [--color <#hex\|none>]` | Creates the category (appended, so it lists last), or changes its color; `--color none` clears it. |
+| `category <name> --remove` | Deletes the category and clears `category` on its packages. |
+| `categorize <category> <target> [<target> ...]` | Sets `category` on each package. The category must exist. |
+| `categorize --none <target> [<target> ...]` | Removes `category` from each package. |
+
+Targets resolve like `bump` targets; `stack` is rejected. Only `categories` and the packages' `category` key are written: no version, `since`, stack bump, native manifest or hook, and the commit button does not pick it up (`init`, `sync` and bumps keep them). To reorder categories, edit the order of the keys in `versions.json`. `--dry-run` shows the result without writing.
+
+Order in `list`, the bump commands block, `list --json` (`packages` array, each with `category`; top-level `categories` is `[{ name, color }]` in order) and the interactive list: the stack, then the featured packages (whatever their category, in featured order), then one group per category in the `categories` order (alphabetical inside), then the packages with no category. `list` shows a CATEGORY column (last) only when categories exist and paints a package's target in its category's color (24-bit color when `COLORTERM` says so, else the 256-color cube; `NO_COLOR` turns it off). The interactive list draws a `-- <category>` header before each group.
 
 ## Discovery (`init`, and drift warnings in `list`)
 

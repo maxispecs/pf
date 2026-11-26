@@ -41,6 +41,32 @@ export function version(): string {
   }
 }
 
+/** Where the build writes the stack version it was built from (next to the compiled code, so it ships). */
+export const BUILD_INFO_FILE = path.join('dist', 'build-info.json');
+
+/** The stack version out of a build-info text; null when it is missing, not JSON or not a plain version. */
+export function parseBuildStack(text: string | null): string | null {
+  if (text === null) return null;
+  try {
+    const stack = (JSON.parse(text) as { stack?: unknown } | null)?.stack;
+    return typeof stack === 'string' && /^\d+(\.\d+){0,2}$/.test(stack.trim()) ? stack.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The stack (whole repo) version this pf was built from, so a repo's stack can be compared with the
+ * installed pf. Null for a pf with no build stamp (run from source, or built before the stamp existed).
+ */
+export function buildStack(root: string = packageRoot()): string | null {
+  try {
+    return parseBuildStack(fs.readFileSync(path.join(root, BUILD_INFO_FILE), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
 /** 2.1.0 -> "2.1" (versions are major.minor; a patch is shown only when it is set). */
 export function displayVersion(v: string = version()): string {
   return v.endsWith('.0') ? v.slice(0, -2) : v;

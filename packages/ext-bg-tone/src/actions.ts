@@ -16,13 +16,84 @@ export interface RepoAction {
 	/** Codicon name. */
 	icon: string;
 	featured: boolean;
+	/** Conditions that must all hold for the button to show (`changes`, `unpushed`, `pfBehind`); empty: always. */
+	when: string[];
 	/** The pf arguments that run it. */
 	argv: string[];
 }
 
+/** The pf that printed the list: its version and the stack version it was built from (null: no stamp, an older pf). */
+export interface PfInfo {
+	version: string;
+	stack: string | null;
+}
+
 export type ParsedActions =
-	| { ok: true; repo: string | null; actions: RepoAction[] }
+	| { ok: true; repo: string | null; pf: PfInfo | null; actions: RepoAction[] }
 	| { ok: false; reason: string };
+
+/** What a `when` condition is checked against. `null` / `undefined` means "could not be read". */
+export interface ActionFacts {
+	/** Files with uncommitted changes. */
+	changes: number | null;
+	/** Local commits no remote has. */
+	unpushed: number | null;
+	/** The repo's stack version (`versions.json`); empty when it has none. */
+	repoStack: string;
+	/** The pf's build stack: a version, null for a pf without a stamp, undefined when no pf answered. */
+	pfStack: string | null | undefined;
+}
+
+/** `major.minor[.patch]` as numbers, or undefined when it is not one. */
+function stackParts(v: string): number[] | undefined {
+	return /^\d+(\.\d+){0,2}$/.test(v) ? v.split('.').map(Number) : undefined;
+}
+
+/** Negative, zero or positive like a sort comparator; undefined when either side is not a version. */
+export function compareStack(a: string, b: string): number | undefined {
+	const x = stackParts(a);
+	const y = stackParts(b);
+	if (!x || !y) {
+		return undefined;
+	}
+	for (let i = 0; i < 3; i++) {
+		const d = (x[i] ?? 0) - (y[i] ?? 0);
+		if (d !== 0) {
+			return d;
+		}
+	}
+	return 0;
+}
+
+/**
+ * Whether one condition holds. A fact that could not be read, or a condition this version does not know,
+ * counts as holding: a button is never hidden on a guess. A pf with no stack stamp is older than the stamp, so it is behind.
+ */
+export function conditionHolds(condition: string, facts: ActionFacts): boolean {
+	switch (condition) {
+		case 'changes':
+			return facts.changes === null || facts.changes > 0;
+		case 'unpushed':
+			return facts.unpushed === null || facts.unpushed > 0;
+		case 'pfBehind': {
+			if (facts.pfStack === undefined || facts.repoStack === '') {
+				return true; // no pf answered, or the repo has no stack version: nothing to compare
+			}
+			if (facts.pfStack === null) {
+				return true; // a pf with no stamp predates it, so it is behind
+			}
+			const c = compareStack(facts.pfStack, facts.repoStack);
+			return c === undefined || c < 0;
+		}
+		default:
+			return true;
+	}
+}
+
+/** True when every condition holds (no conditions: always). */
+export function evaluateWhen(when: readonly string[], facts: ActionFacts): boolean {
+	return when.every(c => conditionHolds(c, facts));
+}
 
 const ICON_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 // eslint-disable-next-line no-control-regex
@@ -60,6 +131,7 @@ export function parseAction(raw: unknown): RepoAction | undefined {
 		label: cleanText(raw.label) ?? id,
 		icon,
 		featured: raw.featured === true,
+		when: Array.isArray(raw.when) ? raw.when.map(cleanText).filter((c): c is string => c !== undefined) : [],
 		argv: args as string[],
 	};
 }
@@ -92,7 +164,17 @@ export function parseActions(stdout: string): ParsedActions {
 			actions.push(action);
 		}
 	}
-	return { ok: true, repo: typeof doc.repo === 'string' ? doc.repo : null, actions };
+	return { ok: true, repo: typeof doc.repo === 'string' ? doc.repo : null, pf: parsePfInfo(doc.pf), actions };
+}
+
+/** The `pf` block of the document; null when an older pf did not print one. A missing stack stays null (no stamp). */
+export function parsePfInfo(raw: unknown): PfInfo | null {
+	if (!isObject(raw)) {
+		return null;
+	}
+	const version = cleanText(raw.version) ?? '';
+	const stack = typeof raw.stack === 'string' && stackParts(raw.stack.trim()) ? raw.stack.trim() : null;
+	return { version, stack };
 }
 
 /** Quotes one argument for the shell a terminal opens (`win32`: PowerShell and cmd both honor double quotes). */

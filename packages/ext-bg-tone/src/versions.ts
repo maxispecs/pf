@@ -34,6 +34,36 @@ export interface VersionsFile {
 	packages: Record<string, Entry>;
 	/** The `featured` array (the ver CLI's `feature`): package paths to list first, in order. Unknown paths are skipped. */
 	featured: string[];
+	/** The `categories` object (the ver CLI's `category`) in file order. A malformed one (or a bad color) is dropped, not an error. */
+	categories: VersionCategory[];
+}
+
+/** A category of `versions.json`: a name and an optional `#rgb` / `#rrggbb` color. */
+export interface VersionCategory {
+	name: string;
+	color?: string;
+}
+
+const CATEGORY_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+/** The color if it is a plain hex color (what the page may paint with), else undefined. */
+export function categoryColor(value: unknown): string | undefined {
+	return typeof value === 'string' && CATEGORY_COLOR.test(value) ? value.toLowerCase() : undefined;
+}
+
+function parseCategories(raw: unknown): VersionCategory[] {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+		return [];
+	}
+	const out: VersionCategory[] = [];
+	for (const [name, value] of Object.entries(raw)) {
+		if (!name.trim() || name !== name.trim()) {
+			continue;
+		}
+		const color = value && typeof value === 'object' && !Array.isArray(value) ? categoryColor((value as { color?: unknown }).color) : undefined;
+		out.push(color ? { name, color } : { name });
+	}
+	return out;
 }
 
 const has = (object: object, key: string): boolean => Object.prototype.hasOwnProperty.call(object, key);
@@ -76,7 +106,13 @@ export function parseVersionsFile(text: string | null): VersionsFile | undefined
 		Array.isArray(rawFeatured) && rawFeatured.every(x => typeof x === 'string')
 			? rawFeatured.filter((x, i) => rawFeatured.indexOf(x) === i && has(rawPackages, x))
 			: [];
-	return { data: data as VersionsFile['data'], stack: data.stack, packages: data.packages as Record<string, Entry>, featured };
+	return {
+		data: data as VersionsFile['data'],
+		stack: data.stack,
+		packages: data.packages as Record<string, Entry>,
+		featured,
+		categories: parseCategories(data.categories),
+	};
 }
 
 /** `major.minor` after a bump: major gives `X+1.0`, minor gives `X.Y+1`. */
@@ -331,6 +367,10 @@ export interface VersionRow {
 	since: string;
 	/** A featured package (listed first, name in bold). */
 	featured: boolean;
+	/** The package's category (one of `VersionsState.categories`), left out for none. */
+	category?: string;
+	/** That category's color, `#rrggbb` / `#rgb`, left out when it has none. */
+	color?: string;
 	tips: { major: string; minor: string };
 }
 
@@ -348,9 +388,14 @@ export interface VersionsState {
 	canBump: boolean;
 	stackDone: boolean;
 	hint: string;
+	/**
+	 * The defined categories in file order. When there are any, the page puts a header before each group of
+	 * rows: the featured block (whatever the category), each category, then the packages with none.
+	 */
+	categories: VersionCategory[];
 }
 
-export const NO_VERSIONS: VersionsState = { rows: [], pending: null, canBump: false, stackDone: false, hint: '' };
+export const NO_VERSIONS: VersionsState = { rows: [], pending: null, canBump: false, stackDone: false, hint: '', categories: [] };
 
 /**
  * Short names for package paths: the folder a package is stored in (`packages/`, `apps/`, ...) is redundant, so
@@ -392,21 +437,32 @@ export function versionsState(
 	if (!file) {
 		return NO_VERSIONS;
 	}
-	const row = (target: string, label: string, entry: Entry, featured = false): VersionRow => ({
-		target,
-		label,
-		version: entry.version,
-		since: typeof entry.since === 'string' ? entry.since : '',
-		featured,
-		tips: {
-			major: previewBump(file, target, 'major', options.stackDone),
-			minor: previewBump(file, target, 'minor', options.stackDone),
-		},
-	});
-	// Featured packages first, in the order they were featured (as the CLI lists them); the rest alphabetically.
-	const rest = Object.keys(file.packages)
+	// A package's category counts only when `categories` defines it (the CLI warns about the others).
+	const categoryOf = (entry: Entry): VersionCategory | undefined =>
+		typeof entry.category === 'string' ? file.categories.find(c => c.name === entry.category) : undefined;
+	const row = (target: string, label: string, entry: Entry, featured = false): VersionRow => {
+		const category = target === STACK_TARGET ? undefined : categoryOf(entry);
+		return {
+			target,
+			label,
+			version: entry.version,
+			since: typeof entry.since === 'string' ? entry.since : '',
+			featured,
+			...(category ? { category: category.name } : {}),
+			...(category?.color ? { color: category.color } : {}),
+			tips: {
+				major: previewBump(file, target, 'major', options.stackDone),
+				minor: previewBump(file, target, 'minor', options.stackDone),
+			},
+		};
+	};
+	// Featured packages first, in the order they were featured (as the CLI lists them), whatever their category.
+	// The rest follow grouped by category in the `categories` order, alphabetically inside a group, then the
+	// ones with no category.
+	const unfeatured = Object.keys(file.packages)
 		.filter(p => !file.featured.includes(p))
 		.sort((a, b) => a.localeCompare(b));
+	const rest = [...file.categories.map(c => c.name), undefined].flatMap(name => unfeatured.filter(p => categoryOf(file.packages[p])?.name === name));
 	const labels = shortLabels([...file.featured, ...rest]);
 	return {
 		rows: [
@@ -418,6 +474,7 @@ export function versionsState(
 		canBump: options.canBump,
 		stackDone: options.stackDone,
 		hint: options.hint ?? '',
+		categories: file.categories,
 	};
 }
 
@@ -436,7 +493,26 @@ export function parseVersionsState(raw: unknown): VersionsState {
 				!!r && typeof r.target === 'string' && typeof r.label === 'string' && typeof r.version === 'string' && typeof r.since === 'string' &&
 				!!r.tips && typeof r.tips.major === 'string' && typeof r.tips.minor === 'string',
 		)
-		.map(r => ({ ...r, featured: r.featured === true }));
+		.map(r => {
+			// A category name is text and a color only ever a plain hex color: the page paints with it.
+			const { category, color, ...base } = r;
+			const hex = categoryColor(color);
+			return {
+				...base,
+				featured: r.featured === true,
+				...(typeof category === 'string' && category.trim() ? { category } : {}),
+				...(typeof category === 'string' && category.trim() && hex ? { color: hex } : {}),
+			};
+		});
+	const categories = Array.isArray(s.categories)
+		? s.categories.flatMap((c): VersionCategory[] => {
+				if (!c || typeof c !== 'object' || typeof c.name !== 'string' || !c.name.trim()) {
+					return [];
+				}
+				const hex = categoryColor(c.color);
+				return [hex ? { name: c.name, color: hex } : { name: c.name }];
+			})
+		: [];
 	const pending = s.pending && typeof s.pending === 'object' && typeof s.pending.message === 'string' ? { message: s.pending.message } : null;
-	return { rows, pending, canBump: s.canBump === true, stackDone: s.stackDone === true, hint: typeof s.hint === 'string' ? s.hint : '' };
+	return { rows, pending, canBump: s.canBump === true, stackDone: s.stackDone === true, hint: typeof s.hint === 'string' ? s.hint : '', categories };
 }

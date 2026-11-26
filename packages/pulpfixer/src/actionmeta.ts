@@ -6,6 +6,11 @@
 export interface ActionMeta {
   icon: string;
   featured: boolean;
+  /**
+   * When the button shows (all must hold; see `ACTION_CONDITIONS` in kit): `changes`, `unpushed`,
+   * `pfBehind`. Missing means always. A repo overrides it with `when` in `pulpfixer.json`.
+   */
+  when?: string[];
 }
 
 const DEFAULTS: Record<string, ActionMeta> = {
@@ -20,10 +25,10 @@ const DEFAULTS: Record<string, ActionMeta> = {
   'deploy:production': { icon: 'cloud', featured: true },
   'publish:staging': { icon: 'cloud-upload', featured: true },
   tools: { icon: 'tools', featured: false },
-  'git:push': { icon: 'repo-push', featured: true },
-  'repo:commit': { icon: 'git-commit', featured: false },
+  'git:push': { icon: 'repo-push', featured: true, when: ['unpushed'] },
+  'repo:commit': { icon: 'git-commit', featured: false, when: ['changes'] },
   // The pulpfixer checkout's dev cycle (`pf c`); that repo features it in its own pulpfixer.json.
-  cycle: { icon: 'sync', featured: false },
+  cycle: { icon: 'sync', featured: false, when: ['pfBehind'] },
 };
 
 /** Fallback for an id with no entry: `install:<target>` shares the install look, anything else is a plain command. */

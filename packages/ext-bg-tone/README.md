@@ -40,7 +40,7 @@ customization keys are left alone.
   have uncommitted changes (`git status`, untracked files included), hidden at zero or outside a git repo. The number is a link: it asks for a commit message, then
   stages everything (`git add -A`) and commits (hooks run; nothing is pushed). Only in a trusted workspace.
 - **Versions**: in a repo with a `versions.json`, Source Control lists the stack and every package with its version and
-  two `[+]` buttons, like `pf v` (featured packages, the `featured` array the CLI's `feature` writes, come first with bold names; the star at the left of a package row features or unfeatures it by editing the `featured` array) (the one before the version bumps major, the one after it minor; hover shows the
+  two `[+]` buttons, like `pf v` (featured packages, the `featured` array the CLI's `feature` writes, come first with bold names; the star at the left of a package row features or unfeatures it by editing the `featured` array; when `versions.json` has `categories` (the CLI's `category` / `categorize`), the rest are grouped by category under a small header each, in the order of the `categories` object, and a category's `color` tints its rows; the view only displays categories) (the one before the version bumps major, the one after it minor; hover shows the
   result). A package bump also raises the stack minor, but only once until the next commit (the stack counts as
   already bumped when its version differs from `HEAD:versions.json`, so a bump made in a terminal counts too; a click
   on the stack itself always bumps it). A click edits `versions.json` (same format as the `ver` CLI) and runs
@@ -88,6 +88,12 @@ icons, live in the repo's `pulpfixer.json` (not in the `bgTone` section; pf owns
   "actions": { "doc": { "featured": false }, "build": { "featured": true, "icon": "package" } }
 }
 ```
+
+A button can depend on the repo's state: each action has a `when` from `pf actions --json` (`changes`: uncommitted
+files, `unpushed`: commits no remote has, `pfBehind`: the installed pf was built from an older stack than the repo's
+`versions.json`). By default push shows only with unpushed commits, commit (`pf g`) only with uncommitted files and
+`cycle` only while pf is behind. Override it with `"when"` in `pulpfixer.json` (`[]` = always). When git or pf cannot
+answer, the button stays visible.
 
 The pencil at the end of the row opens the **Actions** tab of Repo Settings: every action pf offers in the repo (what
 its menu runs), each with a checkbox; ticked ones become buttons (it runs `pf actions feature` / `unfeature`). The

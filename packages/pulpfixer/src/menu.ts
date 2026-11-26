@@ -133,9 +133,10 @@ export function entriesFor(ctx: Context): Entry[] {
   const entries: Entry[] = [];
   const fromRepo: Entry[] = [];
   /** Action metadata for an entry adapted from the repo: its id, the pf args that run it and the default icon / featured flag. */
-  const action = (id: string, argv: string[], own: { icon?: string; featured?: boolean } = {}) => {
+  const action = (id: string, argv: string[], own: { icon?: string; featured?: boolean; when?: string[] } = {}) => {
     const d = defaultMeta(id);
-    return { id, argv, icon: own.icon ?? d.icon, featured: own.featured ?? d.featured };
+    const when = own.when ?? d.when;
+    return { id, argv, icon: own.icon ?? d.icon, featured: own.featured ?? d.featured, ...(when ? { when } : {}) };
   };
   const tool = (cmd: { name: string; summary: string; run: (c: Context, a: string[]) => Promise<number> }, group: string, detail?: string): Entry => ({
     name: cmd.name,
@@ -283,7 +284,7 @@ export function entriesFor(ctx: Context): Entry[] {
         name,
         summary: cfg.description ?? cfg.run,
         group: cfg.group ?? 'Tools',
-        ...action(name, [name], { icon: cfg.icon, featured: cfg.featured }),
+        ...action(name, [name], { icon: cfg.icon, featured: cfg.featured, when: cfg.when }),
         ...(cfg.description ? { detail: cfg.run } : {}),
         run: () => runCustom(ctx, name, []),
       });
